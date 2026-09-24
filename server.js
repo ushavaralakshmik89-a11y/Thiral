@@ -391,7 +391,7 @@ api.post('/attempts', requireAuth, async (req,res)=>{
        FROM unnest($3::bigint[]) AS x
        ON CONFLICT (user_id, question_id, mode)
        DO NOTHING`,
-      [req.user.id, clean, mode]
+      [req.user.id, mode, clean]
     );
 
     res.json({id:ins.rows[0].id});
