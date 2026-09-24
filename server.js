@@ -240,21 +240,17 @@ api.post('/auth/logout', async (req, res) => {
 api.get('/questions', requireAuth, async (req, res) => {
   try {
     const exam = String(req.query.exam || '').trim();
-
-    // Accept both database subject codes and the display labels
-    // used by older frontend controllers.
     const rawSubject = String(req.query.subject || '').trim();
     const subjectAliases = {
-      'பொது அறிவு': 'gs',
-      'General Knowledge': 'gs',
-      'general knowledge': 'gs',
-      'Aptitude': 'apt',
-      'aptitude': 'apt',
-      'தமிழ்': 'tamil',
-      'Tamil': 'tamil'
+      'பொது அறிவு':'gs',
+      'General Knowledge':'gs',
+      'general knowledge':'gs',
+      'Aptitude':'apt',
+      'aptitude':'apt',
+      'தமிழ்':'tamil',
+      'Tamil':'tamil'
     };
     const subject = subjectAliases[rawSubject] || rawSubject;
-
     const language = String(req.query.language || 'ta').trim();
     const subtopic = String(req.query.subtopic || '').trim();
     const limit = Math.min(Math.max(parseInt(req.query.limit || '20',10) || 20,1),200);
@@ -273,7 +269,7 @@ api.get('/questions', requireAuth, async (req, res) => {
     const q = await pool.query(
       `SELECT id,exam,subject,subtopic,language,question,options,explanation
        FROM questions WHERE ${where.join(' AND ')}
-       ORDER BY random() LIMIT $${n} OFFSET $${n+1}`, dataParams
+       ORDER BY id LIMIT $${n} OFFSET $${n+1}`, dataParams
     );
 
     const nextOffset = offset + q.rows.length;
@@ -285,13 +281,24 @@ api.get('/questions', requireAuth, async (req, res) => {
 });
 
 /* ===== FAST PRACTICE API =====
-   Existing /questions API is intentionally left unchanged.
-   Practice gets only the requested number of fresh questions.
+   Practice questions are fetched directly from PostgreSQL.
+   Only the requested number is returned to the browser.
+   Existing question-bank rows are never deleted or modified.
 */
 api.get('/practice/questions', requireAuth, async (req, res) => {
   try {
     const exam = String(req.query.exam || '').trim();
-    const subject = String(req.query.subject || '').trim();
+    const rawSubject = String(req.query.subject || '').trim();
+    const subjectAliases = {
+      'பொது அறிவு':'gs',
+      'General Knowledge':'gs',
+      'general knowledge':'gs',
+      'Aptitude':'apt',
+      'aptitude':'apt',
+      'தமிழ்':'tamil',
+      'Tamil':'tamil'
+    };
+    const subject = subjectAliases[rawSubject] || rawSubject;
     const language = String(req.query.language || 'ta').trim();
     const subtopic = String(req.query.subtopic || '').trim();
 
