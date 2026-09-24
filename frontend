@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="ta">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>திறல் | TNPSC Preparation</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,"Noto Sans Tamil",sans-serif;background:#f5f7fb;color:#172033}
+header{background:#182848;color:white;padding:18px 22px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.brand{font-size:25px;font-weight:800}.muted{opacity:.8;font-size:13px}
+main{max-width:1050px;margin:28px auto;padding:0 16px}.card{background:white;border:1px solid #e3e8f0;border-radius:16px;padding:22px;margin-bottom:18px;box-shadow:0 4px 18px #00000008}
+h1,h2,h3{margin-top:0}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+input,select,button{font:inherit;border-radius:10px;padding:11px 13px;border:1px solid #ccd4df}
+input,select{width:100%;background:white}button{cursor:pointer;background:#182848;color:white;border:none;font-weight:700}
+button.secondary{background:#eef2f7;color:#172033;border:1px solid #d7dee8}button.danger{background:#a52828}
+.row{display:flex;gap:10px;flex-wrap:wrap}.row>*{flex:1;min-width:150px}
+.hidden{display:none!important}.msg{margin-top:10px;padding:10px;border-radius:9px;background:#f0f4f9}.error{background:#fff0f0;color:#9b1c1c}.ok{background:#edf9f0;color:#176b2b}
+.subject{padding:16px;border:2px solid #e0e6ef;border-radius:14px;background:white;color:#172033}.subject.active{border-color:#182848;background:#f1f5ff}
+.q{font-size:19px;font-weight:700;line-height:1.55}.option{display:block;width:100%;text-align:left;margin:9px 0;background:#f7f9fc;color:#172033;border:1px solid #dce3ec}.option.selected{border-color:#182848;background:#e8eefb}.option.correct{border-color:#238443;background:#eaf7ee}.option.wrong{border-color:#b42318;background:#fff0ee}
+.topbar{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}.pill{padding:6px 10px;border-radius:999px;background:#eef2f7;font-size:13px}
+table{width:100%;border-collapse:collapse}th,td{padding:9px;border-bottom:1px solid #e6eaf0;text-align:left;font-size:14px}
+</style>
+</head>
+<body>
+<header>
+  <div><div class="brand">திறல்</div><div class="muted">TNPSC Preparation</div></div>
+  <div class="row" style="flex:0"><button class="secondary" id="langBtn">English</button><button id="logoutBtn" class="hidden">Logout</button></div>
+</header>
+
+<main>
+<section id="home" class="card">
+  <h1>TNPSC Group 4</h1>
+  <p>பயிற்சி கேள்விகளை நேரடியாக backend-ல் இருந்து பெறும் எளிய frontend.</p>
+  <div class="row">
+    <button onclick="show('login')">Login</button>
+    <button class="secondary" onclick="show('register')">New Registration</button>
+  </div>
+  <div id="homeMsg" class="msg">Login செய்த பிறகு Practice பயன்படுத்தலாம்.</div>
+</section>
+
+<section id="login" class="card hidden">
+  <h2>Login</h2>
+  <div class="grid">
+    <label>Email / ID<input id="email" autocomplete="username"></label>
+    <label>Password<input id="password" type="password" autocomplete="current-password"></label>
+  </div>
+  <div class="row" style="margin-top:14px"><button onclick="login()">Login</button><button class="secondary" onclick="show('home')">Back</button></div>
+  <div id="loginMsg" class="msg"></div>
+</section>
+
+<section id="register" class="card hidden">
+  <h2>New Registration</h2>
+  <div class="grid">
+    <label>Name<input id="rname"></label><label>Email<input id="remail"></label>
+    <label>Phone<input id="rphone"></label><label>Date of Birth<input id="rdob" type="date"></label>
+    <label>Gender<select id="rgender"><option value="">Select</option><option>ஆண்</option><option>பெண்</option><option>மூன்றாம் பாலினம்</option></select></label>
+    <label>Password<input id="rpass" type="password"></label>
+  </div>
+  <div class="row" style="margin-top:14px"><button onclick="registerUser()">Register</button><button class="secondary" onclick="show('home')">Back</button></div>
+  <div id="registerMsg" class="msg"></div>
+</section>
+
+<section id="dashboard" class="hidden">
+  <div class="card topbar"><div><h2 style="margin-bottom:4px">Welcome, <span id="userName"></span></h2><span class="pill" id="rolePill"></span></div><div class="row" style="flex:0"><button onclick="show('practiceSetup')">Practice</button><button class="secondary" onclick="loadResults()">Results</button><button id="adminBtn" class="secondary hidden" onclick="loadAdmin()">Admin</button></div></div>
+  <div id="dashMsg" class="card">ஒரு பகுதியைத் தேர்வு செய்யவும்.</div>
+</section>
+
+<section id="practiceSetup" class="card hidden">
+  <div class="topbar"><h2>Practice</h2><button class="secondary" onclick="show('dashboard')">Back</button></div>
+  <div class="grid">
+    <div><h3>Subject</h3><div class="grid" id="subjects"></div></div>
+    <div><h3>Subtopic</h3><select id="subtopic"></select><p class="muted" id="subHelp"></p></div>
+  </div>
+  <div class="row" style="margin-top:18px">
+    <button onclick="startPractice(10)">10 Questions</button>
+    <button onclick="startPractice(20)">20 Questions</button>
+    <button onclick="startPractice(50)">50 Questions</button>
+    <button class="secondary" onclick="startPractice(9999)">Question Bank</button>
+  </div>
+  <div id="setupMsg" class="msg"></div>
+</section>
+
+<section id="practice" class="card hidden">
+  <div class="topbar"><div><span class="pill" id="progress"></span><span class="pill" id="practiceTopic"></span></div><button class="secondary" onclick="show('dashboard')">Exit</button></div>
+  <div id="questionBox" style="margin-top:20px"></div>
+  <div id="answerMsg" class="msg hidden"></div>
+  <div class="row" style="margin-top:16px"><button id="nextBtn" onclick="nextQuestion()" class="hidden">Next</button></div>
+</section>
+
+<section id="results" class="card hidden">
+  <div class="topbar"><h2>Results</h2><button class="secondary" onclick="show('dashboard')">Back</button></div>
+  <div id="resultsBox"></div>
+</section>
+
+<section id="admin" class="card hidden">
+  <div class="topbar"><h2>Admin</h2><button class="secondary" onclick="show('dashboard')">Back</button></div>
+  <div class="grid" id="adminStats"></div>
+  <h3 style="margin-top:24px">Students</h3><div style="overflow:auto"><table><thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Gender</th><th>Created</th></tr></thead><tbody id="students"></tbody></table></div>
+  <div id="adminMsg" class="msg"></div>
+</section>
+</main>
+
+<script>
+const API='/api';
+const DATA={
+ tamil:{title:'📚 தமிழ்',topics:{
+  'எழுத்து & இலக்கணம்':['எழுத்து வகைகள்','சொல் வகைகள்','வேற்றுமை','வினைச்சொல்','புணர்ச்சி'],
+  'சொல் & பொருள்':['ஒருபொருட்பன்மொழி','எதிர்ச்சொல்','இணைச்சொல்','மரபுத்தொடர்','கலைச்சொல்'],
+  'இலக்கியம்':['சங்க இலக்கியம்','பதினெண்கீழ்க்கணக்கு','காப்பியங்கள்','பக்தி இலக்கியம்','நவீன இலக்கியம்'],
+  'திருக்குறள்':['அறத்துப்பால்','பொருட்பால்','இன்பத்துப்பால்','குறள் பொருள்','குறள் சார்ந்த கருத்துகள்']}},
+ gs:{title:'📗 பொது அறிவு',topics:{
+  'இந்திய வரலாறு':['பண்டைய இந்தியா','இடைக்கால இந்தியா','நவீன இந்தியா','சுதந்திரப் போராட்டம்'],
+  'தமிழ்நாடு வரலாறு':['சங்க காலம்','சோழர்','பாண்டியர்','பல்லவர்','நாயக்கர்'],
+  'இந்திய அரசியல்':['அரசியலமைப்பு','அடிப்படை உரிமைகள்','பாராளுமன்றம்','மாநில அரசு','உள்ளாட்சி'],
+  'புவியியல்':['இந்தியா','தமிழ்நாடு','ஆறுகள்','மலைகள்','வளங்கள்'],
+  'அறிவியல்':['இயற்பியல்','வேதியியல்','உயிரியல்','சுற்றுச்சூழல்'],
+  'பொருளாதாரம்':['அடிப்படை பொருளாதாரம்','இந்திய பொருளாதாரம்','தமிழ்நாடு பொருளாதாரம்']}},
+ apt:{title:'📐 திறனறிவு / Aptitude',topics:{
+  'அடிப்படை கணிதம்':['எண்கள்','பின்னங்கள்','சதவீதம்','விகிதம்','சராசரி'],
+  'அளவியல்':['பரப்பளவு','சுற்றளவு','கனஅளவு','அலகுகள்'],
+  'வணிகக் கணிதம்':['இலாபம் மற்றும் நட்டம்','வட்டி','காலம் மற்றும் வேலை','வேகம் மற்றும் தூரம்'],
+  'தர்க்கத் திறன்':['எண் தொடர்','எழுத்துத் தொடர்','ஒப்புமை','வகைப்படுத்தல்','குறியீடு']}}
+};
+const EN={
+ 'எழுத்து வகைகள்':'Letter Types','சொல் வகைகள்':'Word Types','வேற்றுமை':'Cases','வினைச்சொல்':'Verb','புணர்ச்சி':'Word Combination',
+ 'பண்டைய இந்தியா':'Ancient India','இடைக்கால இந்தியா':'Medieval India','நவீன இந்தியா':'Modern India','சுதந்திரப் போராட்டம்':'Indian Freedom Movement',
+ 'சங்க காலம்':'Sangam Age','சோழர்':'Cholas','பாண்டியர்':'Pandyas','பல்லவர்':'Pallavas','நாயக்கர்':'Nayaks',
+ 'அரசியலமைப்பு':'Constitution','அடிப்படை உரிமைகள்':'Fundamental Rights','பாராளுமன்றம்':'Parliament','மாநில அரசு':'State Government','உள்ளாட்சி':'Local Government',
+ 'இந்தியா':'India','தமிழ்நாடு':'Tamil Nadu','ஆறுகள்':'Rivers','மலைகள்':'Mountains','வளங்கள்':'Resources',
+ 'இயற்பியல்':'Physics','வேதியியல்':'Chemistry','உயிரியல்':'Biology','சுற்றுச்சூழல்':'Environment',
+ 'அடிப்படை பொருளாதாரம்':'Basic Economics','இந்திய பொருளாதாரம்':'Indian Economy','தமிழ்நாடு பொருளாதாரம்':'Tamil Nadu Economy',
+ 'எண்கள்':'Numbers','பின்னங்கள்':'Fractions','சதவீதம்':'Percentage','விகிதம்':'Ratio','சராசரி':'Average',
+ 'பரப்பளவு':'Area','சுற்றளவு':'Perimeter','கனஅளவு':'Volume','அலகுகள்':'Units','இலாபம் மற்றும் நட்டம்':'Profit and Loss','வட்டி':'Interest','காலம் மற்றும் வேலை':'Time and Work','வேகம் மற்றும் தூரம்':'Speed and Distance','எண் தொடர்':'Number Series','எழுத்துத் தொடர்':'Letter Series','ஒப்புமை':'Analogy','வகைப்படுத்தல்':'Classification','குறியீடு':'Coding'
+};
+let lang='ta', subject='tamil', subtopic='', questions=[], index=0, attemptId=null, answers={};
+
+function $(id){return document.getElementById(id)}
+function show(id){document.querySelectorAll('main>section').forEach(x=>x.classList.add('hidden'));$(id).classList.remove('hidden')}
+function msg(id,text,err=false){$(id).textContent=text;$(id).className='msg '+(err?'error':'ok')}
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+async function api(path,opt={}){const r=await fetch(API+path,{credentials:'include',headers:{'Content-Type':'application/json',...(opt.headers||{})},...opt});let d={};try{d=await r.json()}catch{}if(!r.ok)throw Error(d.error||('HTTP '+r.status));return d}
+
+function initSubjects(){
+ $('subjects').innerHTML='';
+ [['tamil','📚 தமிழ்'],['gs','📗 பொது அறிவு'],['apt','📐 திறனறிவு / Aptitude']].forEach(([k,t])=>{
+  const b=document.createElement('button');b.className='subject'+(subject===k?' active':'');b.textContent=t;
+  b.onclick=()=>{subject=k;initSubjects();fillSubtopics()};$('subjects').appendChild(b)
+ });fillSubtopics()
+}
+function fillSubtopics(){
+ const sel=$('subtopic');sel.innerHTML='';
+ Object.entries(DATA[subject].topics).forEach(([topic,subs])=>{
+  const g=document.createElement('optgroup');g.label=lang==='en'&&subject!=='tamil'?(topic):topic;
+  subs.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=lang==='en'&&subject!=='tamil'?(EN[s]||s):s;g.appendChild(o)});sel.appendChild(g)
+ });
+ subtopic=sel.value||'';sel.onchange=()=>subtopic=sel.value;
+}
+function dbSubject(){return subject==='gs'?'பொது அறிவு':subject==='apt'?'apt':'tamil'}
+function dbSub(){return subtopic}
+function dbLang(){return subject==='tamil'?'ta':lang}
+async function login(){
+ try{const d=await api('/auth/login',{method:'POST',body:JSON.stringify({email:$('email').value.trim(),password:$('password').value})});sessionUser=d.user;enter();msg('loginMsg','Login successful');}
+ catch(e){msg('loginMsg',e.message,true)}
+}
+async function registerUser(){
+ try{const d=await api('/auth/register',{method:'POST',body:JSON.stringify({name:$('rname').value.trim(),email:$('remail').value.trim(),phone:$('rphone').value.trim(),dob:$('rdob').value,gender:$('rgender').value,password:$('rpass').value})});sessionUser=d.user;enter()}
+ catch(e){msg('registerMsg',e.message,true)}
+}
+let sessionUser=null;
+function enter(){ $('userName').textContent=sessionUser.name||sessionUser.email;$('rolePill').textContent=sessionUser.role||'STUDENT';$('logoutBtn').classList.remove('hidden');$('adminBtn').classList.toggle('hidden',sessionUser.role!=='ADMIN');show('dashboard');initSubjects()}
+async function boot(){try{const d=await api('/auth/me');if(d.user){sessionUser=d.user;enter()}else show('home')}catch{show('home')}}
+async function logout(){try{await api('/auth/logout',{method:'POST'})}catch{}sessionUser=null;$('logoutBtn').classList.add('hidden');show('home')}
+$('logoutBtn').onclick=logout;
+
+async function startPractice(count){
+ msg('setupMsg','Loading questions...');
+ try{
+  const l=dbLang(),s=dbSubject(),st=dbSub();
+  let rows=[],offset=0,limit=200,total=0;
+  const wanted=count===9999?5000:count;
+  while(rows.length<wanted){
+   const u=`/questions?exam=group4&subject=${encodeURIComponent(s)}&language=${encodeURIComponent(l)}&subtopic=${encodeURIComponent(st)}&limit=${limit}&offset=${offset}`;
+   const d=await api(u);const batch=d.questions||[];total=d.pagination?.total||batch.length;
+   rows.push(...batch);if(!d.pagination?.hasMore||!batch.length)break;offset=d.pagination.nextOffset;
+  }
+  rows=rows.slice(0,wanted);
+  if(!rows.length)throw Error(`இந்த Subtopic-க்கு கேள்விகள் இல்லை. subject=${s}, language=${l}, subtopic=${st}`);
+  const a=await api('/attempts',{method:'POST',body:JSON.stringify({exam:'group4',subject:s,mode:'practice',language:l,questionIds:rows.map(q=>q.id)})});
+  attemptId=a.id;questions=rows;index=0;answers={};$('practiceTopic').textContent=st;show('practice');renderQuestion()
+ }catch(e){msg('setupMsg',e.message,true)}
+}
+function optionsOf(q){try{return Array.isArray(q.options)?q.options:JSON.parse(q.options||'[]')}catch{return[]}}
+function renderQuestion(){
+ const q=questions[index], opts=optionsOf(q);$('progress').textContent=`${index+1} / ${questions.length}`;
+ $('questionBox').innerHTML=`<div class="q">${esc(q.question)}</div>`+opts.map((o,i)=>`<button class="option" onclick="answer(${i})">${String.fromCharCode(65+i)}. ${esc(o)}</button>`).join('');
+ $('answerMsg').classList.add('hidden');$('nextBtn').classList.add('hidden')
+}
+async function answer(i){
+ const q=questions[index];if(answers[q.id]!=null)return;
+ try{const d=await api(`/attempts/${attemptId}/check-answer`,{method:'POST',body:JSON.stringify({questionId:q.id,answer:i})});answers[q.id]=i;
+  const opts=document.querySelectorAll('.option');opts.forEach((b,n)=>{if(n===d.correct_option)b.classList.add('correct');if(n===i&&!d.correct)b.classList.add('wrong')});
+  $('answerMsg').className='msg '+(d.correct?'ok':'error');$('answerMsg').innerHTML=(d.correct?'Correct':'Wrong')+(d.explanation?`<br>${esc(d.explanation)}`:'');
+  $('nextBtn').textContent=index<questions.length-1?'Next':'Finish';$('nextBtn').classList.remove('hidden')
+ }catch(e){$('answerMsg').className='msg error';$('answerMsg').textContent=e.message;$('answerMsg').classList.remove('hidden')}
+}
+async function nextQuestion(){if(index<questions.length-1){index++;renderQuestion()}else{try{const d=await api(`/attempts/${attemptId}/submit`,{method:'POST',body:JSON.stringify({answers})});$('dashMsg').innerHTML=`Score: <b>${d.score}%</b> &nbsp; Correct: ${d.correct} / ${d.total}`;show('dashboard')}catch(e){$('answerMsg').textContent=e.message}}}
+async function loadResults(){show('results');$('resultsBox').textContent='Loading...';try{const d=await api('/results');$('resultsBox').innerHTML=(d.results||[]).map(r=>`<div class="card"><b>${esc(r.subject)}</b> · ${esc(r.mode)} · ${esc(r.language)}<br>Score: ${r.score}% · ${r.correct_count}/${r.total_count}<br><span class="muted">${esc(r.started_at||'')}</span></div>`).join('')||'No results yet.'}catch(e){$('resultsBox').textContent=e.message}}
+async function loadAdmin(){show('admin');try{const [a,b]=await Promise.all([api('/admin/summary'),api('/admin/students')]);const s=a.students||{};$('adminStats').innerHTML=[['Students',s.total],['Today',s.today],['This month',s.month],['Male',s.male],['Female',s.female]].map(x=>`<div class="card"><div class="muted">${x[0]}</div><h2>${x[1]??0}</h2></div>`).join('');$('students').innerHTML=(b.students||[]).map(x=>`<tr><td>${esc(x.student_id)}</td><td>${esc(x.name)}</td><td>${esc(x.email)}</td><td>${esc(x.gender)}</td><td>${esc(x.created_at)}</td></tr>`).join('')}catch(e){msg('adminMsg',e.message,true)}}
+$('langBtn').onclick=()=>{lang=lang==='ta'?'en':'ta';$('langBtn').textContent=lang==='ta'?'English':'தமிழ்';fillSubtopics()}
+initSubjects();boot();
+</script>
+</body>
+</html>
