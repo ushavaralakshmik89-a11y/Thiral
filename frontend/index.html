@@ -3684,7 +3684,7 @@ const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;'
 const qtext=q=>String(q?.question??q?.q??'');
 const opts=q=>Array.isArray(q?.options)?q.options:(Array.isArray(q?.o)?q.o:[]);
 const exam=()=>String(typeof selectedExam!=='undefined'&&selectedExam?selectedExam:'group4');
-const subject=()=>{const s=String(typeof currentSubject!=='undefined'&&currentSubject?currentSubject:'gs'); return s==='gs'?'பொது அறிவு':s==='apt'?'apt':'tamil';};
+const subject=()=>{const s=String(typeof currentSubject!=='undefined'&&currentSubject?currentSubject:'gs'); return ['gs','apt','tamil'].includes(s)?s:'gs';};
 const lang=()=>typeof contentLanguage!=='undefined'&&contentLanguage==='en'?'en':'ta';
 
 async function api(path,init={}){
@@ -3821,59 +3821,45 @@ function savePracticeHistory(keys,bankSize){
 async function startPractice(n){
   stop();
   const requested=Number(n||10);
-  if(![10,20,50,9999].includes(requested)){
-    if($('feedback'))$('feedback').textContent='Practice எண்ணிக்கை 10, 20, 50 அல்லது “முழுவதும்” மட்டும்.';
+  if(![10,20,50,100,200,9999].includes(requested)){
+    if($('feedback'))$('feedback').innerHTML='<b>Practice எண்ணிக்கை 10, 20, 50, 100, 200 அல்லது Question Bank ஆக இருக்க வேண்டும்.</b>';
+    return;
+  }
+  const examCode=String(typeof selectedExam!=='undefined'&&selectedExam?selectedExam:'group4');
+  const subjectCode=String(typeof currentSubject!=='undefined'&&currentSubject?currentSubject:'gs');
+  const languageCode=(subjectCode==='tamil')?'ta':((typeof contentLanguage!=='undefined'&&contentLanguage==='en')?'en':'ta');
+  const subtopicCode=String(typeof currentSub!=='undefined'&&currentSub?currentSub:'').trim();
+  if(examCode!=='group4' || !['tamil','gs','apt'].includes(subjectCode)){
+    if($('feedback'))$('feedback').innerHTML='<b>Group 4 பாடத்தைத் தேர்வு செய்யவும்.</b>';
+    return;
+  }
+  if(!subtopicCode){
+    if($('feedback'))$('feedback').innerHTML='<b>முதலில் Subtopic தேர்வு செய்யவும்.</b>';
     return;
   }
   T.q=[];T.answers={};T.checks={};T.i=0;T.attempt=null;T.submitted=false;T.busy=false;
-  if($('feedback'))$('feedback').innerHTML='<b>தேர்ந்தெடுத்த Subtopic-ன் முழு Question Bank சரிபார்க்கப்படுகிறது...</b>';
+  if($('feedback'))$('feedback').innerHTML='<b>கேள்விகள் ஏற்றப்படுகின்றன...</b>';
   try{
-    const bank=await loadPracticeQuestions(requested);
-    if(!bank.length)throw new Error('இந்த Subtopic-ல் கேள்விகள் இல்லை.');
-
-    const used=new Set(getPracticeHistory());
-    let fresh=bank.filter(q=>!used.has(String(q.id)));
-    fresh.sort(()=>Math.random()-0.5);
-
-    let selected;
-    if(requested===9999){
-      /* “முழுவதும்”: இந்த Subtopic-ல் இதுவரை பயன்படுத்தாத அனைத்து கேள்விகளும்.
-         முழு cycle முடிந்தால் புதிய shuffled cycle தொடங்கும். */
-      if(!fresh.length){
-        fresh=bank.slice().sort(()=>Math.random()-0.5);
-        localStorage.removeItem(practiceHistoryKey());
-        used.clear();
-      }
-      selected=fresh.slice();
-    }else{
-      const target=requested;
-      if(fresh.length<target){
-        /* பழைய கேள்விகளை மீண்டும் எடுப்பது, முழு bank cycle முடிந்த பிறகே. */
-        const freshKeys=new Set(fresh.map(q=>String(q.id)));
-        const recycle=bank.filter(q=>!freshKeys.has(String(q.id))).sort(()=>Math.random()-0.5);
-        selected=[...fresh,...recycle].slice(0,target);
-      }else{
-        selected=fresh.slice(0,target);
-      }
-    }
-
-    if(selected.length<requested && requested!==9999)
-      throw new Error('தேவையான கேள்விகள் கிடைக்கவில்லை. கிடைத்தது: '+selected.length);
-
-    T.q=selected;
-    const historyKeys=[...used,...selected.map(q=>String(q.id))];
-    savePracticeHistory(historyKeys,bank.length);
-
-    const a=await api('/attempts',{
-      method:'POST',
-      body:JSON.stringify({
-        exam:String(selectedExam||'group4'),subject:subject(),mode:'practice',language:(contentLanguage==='en'?'en':'ta'),
-        questionIds:T.q.map(q=>Number(q.id))
-      })
-    });
+    /* Only the requested number is returned. The full question bank never reaches the browser. */
+    const requestLimit=requested===9999?200:requested;
+    const url='/practice/questions?exam='+encodeURIComponent(examCode)+
+      '&subject='+encodeURIComponent(subjectCode)+
+      '&language='+encodeURIComponent(languageCode)+
+      '&subtopic='+encodeURIComponent(subtopicCode)+
+      '&limit='+encodeURIComponent(requestLimit);
+    const d=await api(url);
+    if(!Array.isArray(d.questions)||!d.questions.length)throw new Error('இந்த Subtopic-ல் கேள்விகள் இல்லை.');
+    if(requested!==9999 && d.questions.length<requested)throw new Error('தேவையான '+requested+' கேள்விகளில் '+d.questions.length+' மட்டுமே கிடைத்துள்ளன.');
+    T.q=d.questions.slice(0,requestLimit);
+    const a=await api('/attempts',{method:'POST',body:JSON.stringify({
+      exam:examCode,subject:subjectCode,mode:'practice',language:languageCode,
+      questionIds:T.q.map(q=>Number(q.id))
+    })});
+    if(!a||!a.id)throw new Error('Practice attempt உருவாக்கப்படவில்லை.');
     T.attempt=a.id;
     if($('practiceReview')){$('practiceReview').innerHTML='';$('practiceReview').classList.add('hidden','screen-review');$('practiceReview').style.display='none';}
     if($('resultText'))$('resultText').innerHTML='';
+    if($('stopInfinitePractice'))$('stopInfinitePractice').classList.toggle('hidden',requested!==9999);
     if(typeof show==='function')show('practice');
     render();
   }catch(e){
@@ -4132,8 +4118,9 @@ window.__THIRAL_GROUP4_FINAL_LANGUAGE_FIXED__='TA-GK + EN-GK + TA-APT + EN-APT';
 (function(){
 'use strict';
 window.__THIRAL_GROUP4_FINAL_WEBSITE__={
+  version:'PRACTICE-DB-v3',
   exam:'group4',
-  dbSubjects:{tamil:'tamil',gs:'பொது அறிவு',apt:'apt'},
+  dbSubjects:{tamil:'tamil',gs:'gs',apt:'apt'},
   languages:{tamil:['ta'],gs:['ta','en'],apt:['ta','en']},
   checked:'syntax-only'
 };
