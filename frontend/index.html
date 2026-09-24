@@ -3641,8 +3641,7 @@ async function start(n){
  P.questions=[];P.answers={};P.checks={};P.index=0;P.attemptId=null;P.submitted=false;P.count=count;P.busy=false;
  if($('feedback'))$('feedback').innerHTML='<b>கேள்விகள் ஏற்றப்படுகின்றன...</b>';
  try{
-  const subtopic=(typeof currentSub!=='undefined'&&currentSub)?String(currentSub).trim():'';
-  const d=await api()('/questions?exam='+encodeURIComponent(exam)+'&subject='+encodeURIComponent(subject)+'&language='+encodeURIComponent(language)+'&subtopic='+encodeURIComponent(subtopic)+'&limit='+count+'&offset=0');
+  const d=await api()('/questions?exam='+encodeURIComponent(exam)+'&subject='+encodeURIComponent(subject)+'&language='+encodeURIComponent(language)+'&limit='+count);
   if(!Array.isArray(d.questions)||!d.questions.length)throw new Error('இந்த தேர்வு / பாடத்திற்கு backend-ல் கேள்விகள் இல்லை.');
   if(d.questions.length<count)throw new Error('தேவையான '+count+' கேள்விகளில் '+d.questions.length+' மட்டுமே கிடைத்துள்ளன.');
   P.questions=d.questions.slice(0,count);
@@ -3685,7 +3684,7 @@ const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;'
 const qtext=q=>String(q?.question??q?.q??'');
 const opts=q=>Array.isArray(q?.options)?q.options:(Array.isArray(q?.o)?q.o:[]);
 const exam=()=>String(typeof selectedExam!=='undefined'&&selectedExam?selectedExam:'group4');
-const subject=()=>{const s=String(typeof currentSubject!=='undefined'&&currentSubject?currentSubject:'gs').trim(); return ['tamil','gs','apt'].includes(s)?s:'tamil';};
+const subject=()=>{const s=String(typeof currentSubject!=='undefined'&&currentSubject?currentSubject:'gs'); return s==='gs'?'பொது அறிவு':s==='apt'?'apt':'tamil';};
 const lang=()=>typeof contentLanguage!=='undefined'&&contentLanguage==='en'?'en':'ta';
 
 async function api(path,init={}){
