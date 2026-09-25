@@ -107,6 +107,15 @@ const GROUP4_SUBTOPIC_ALIASES = {
   'குறியீடு':'Coding','Coding':'குறியீடு'
 };
 function canonicalSubject(raw){ return SUBJECT_ALIASES[String(raw||'').trim()] || String(raw||'').trim(); }
+function subjectCandidates(raw){
+  const s=String(raw||'').trim();
+  if(!s) return [];
+  const canonical=canonicalSubject(s);
+  const aliases=Object.entries(SUBJECT_ALIASES)
+    .filter(([label,key]) => key===canonical)
+    .map(([label])=>label);
+  return [...new Set([canonical,s,...aliases].filter(Boolean))];
+}
 function subtopicCandidates(raw){
   const s=String(raw||'').trim();
   if(!s) return [];
@@ -291,6 +300,7 @@ api.get('/questions', requireAuth, async (req, res) => {
     const exam = String(req.query.exam || '').trim();
     const rawSubject = String(req.query.subject || '').trim();
     const subject = canonicalSubject(rawSubject);
+    const subjectCandidatesList = subjectCandidates(rawSubject);
     const language = String(req.query.language || 'ta').trim();
     const subtopic = String(req.query.subtopic || '').trim();
     const historyMode = String(req.query.historyMode || '').trim();
@@ -298,8 +308,8 @@ api.get('/questions', requireAuth, async (req, res) => {
     const offset = Math.max(parseInt(req.query.offset || '0',10) || 0,0);
     if (!exam || !subject || !['ta','en'].includes(language)) return sendError(res,400,'Invalid question request.');
 
-    const where = ['exam=$1','subject=$2','language=$3','is_active=true'];
-    const params = [exam, subject, language];
+    const where = ['exam=$1','subject = ANY($2::text[])','language=$3','is_active=true'];
+    const params = [exam, subjectCandidatesList, language];
     let n = 4;
     const subCandidates = subtopicCandidates(subtopic);
     if (subCandidates.length === 1) {
@@ -347,7 +357,9 @@ api.get('/questions', requireAuth, async (req, res) => {
 api.get('/practice/questions', requireAuth, async (req, res) => {
   try {
     const exam = String(req.query.exam || '').trim();
-    const subject = canonicalSubject(String(req.query.subject || '').trim());
+    const rawSubject = String(req.query.subject || '').trim();
+    const subject = canonicalSubject(rawSubject);
+    const subjectCandidatesList = subjectCandidates(rawSubject);
     const language = String(req.query.language || 'ta').trim();
     const subtopic = String(req.query.subtopic || '').trim();
     const limit = Math.min(
@@ -359,12 +371,12 @@ api.get('/practice/questions', requireAuth, async (req, res) => {
       return sendError(res, 400, 'Invalid question request.');
     }
 
-    const params = [req.user.id, exam, subject, language];
+    const params = [req.user.id, exam, subjectCandidatesList, language];
     let n = 5;
 
     let where = `
       q.exam = $2
-      AND q.subject = $3
+      AND q.subject = ANY($3::text[])
       AND q.language = $4
       AND q.is_active = true
     `;
@@ -593,6 +605,19 @@ api.get('/admin/students', requireAdmin, async (req,res)=>{
     const q=await pool.query(`SELECT student_id,name,email,phone,gender,dob,created_at,last_login_at FROM users WHERE role='STUDENT' AND is_active=true ORDER BY created_at DESC LIMIT 5000`);
     res.json({students:q.rows});
   }catch(e){console.error(e);sendError(res,500,'Admin students error.');}
+});
+
+api.get('/group4/question-status', requireAuth, async (req,res)=>{
+  try{
+    const rows=await pool.query(`
+      SELECT subject,language,count(*)::int AS total,
+             count(*) FILTER (WHERE is_active=true)::int AS active
+      FROM questions
+      WHERE exam='group4'
+      GROUP BY subject,language
+      ORDER BY subject,language`);
+    res.json({exam:'group4',rows:rows.rows});
+  }catch(e){ console.error(e); sendError(res,500,'Question status service error.'); }
 });
 
 app.use('/api', api);
