@@ -36,6 +36,7 @@ app.use((req, res, next) => {
 });
 
 const PORT = process.env.PORT || 10000;
+const THIRAL_SECURITY_VERSION = 'V157';
 const isProd = process.env.NODE_ENV === 'production';
 
 if (!process.env.DATABASE_URL) {
@@ -704,9 +705,81 @@ api.get('/admin/summary', requireAdmin, async (req,res)=>{
 
 api.get('/admin/students', requireAdmin, async (req,res)=>{
   try{
-    const q=await pool.query(`SELECT student_id,name,email,phone,gender,dob,created_at,last_login_at FROM users WHERE role='STUDENT' AND is_active=true ORDER BY created_at DESC LIMIT 5000`);
+    const q=await pool.query(`SELECT student_id,name,email,phone,gender,dob,created_at,last_login_at,is_active FROM users WHERE role='STUDENT' ORDER BY is_active DESC, created_at DESC LIMIT 5000`);
     res.json({students:q.rows});
   }catch(e){console.error(e);sendError(res,500,'Admin students error.');}
+});
+
+api.patch('/admin/students/:studentId/status', requireAdmin, async (req,res)=>{
+  const client = await pool.connect();
+  try{
+    const studentId = String(req.params.studentId || '').trim();
+    const requestedActive = req.body?.is_active;
+
+    if(!studentId || typeof requestedActive !== 'boolean'){
+      return sendError(res,400,'Student ID and is_active are required.');
+    }
+
+    await client.query('BEGIN');
+
+    const q = await client.query(
+      `SELECT id,student_id,role,is_active FROM users WHERE student_id=$1 LIMIT 1 FOR UPDATE`,
+      [studentId]
+    );
+
+    if(!q.rowCount){
+      await client.query('ROLLBACK');
+      return sendError(res,404,'Student not found.');
+    }
+
+    const target = q.rows[0];
+
+    if(target.role !== 'STUDENT'){
+      await client.query('ROLLBACK');
+      return sendError(res,400,'Only STUDENT accounts can be changed here.');
+    }
+
+    if(target.id === req.user.id){
+      await client.query('ROLLBACK');
+      return sendError(res,400,'The logged-in Admin account cannot be changed here.');
+    }
+
+    await client.query(
+      `UPDATE users SET is_active=$1 WHERE id=$2`,
+      [requestedActive, target.id]
+    );
+
+    /* Deactivation immediately invalidates every active session for that student.
+       Results, attempts, questions and other historical data are intentionally kept. */
+    if(!requestedActive){
+      await client.query(`DELETE FROM sessions WHERE user_id=$1`, [target.id]);
+      await client.query(
+        `INSERT INTO activity_events(user_id,event_type,metadata)
+         VALUES($1,'ACCOUNT_DEACTIVATED',$2)`,
+        [req.user.id, JSON.stringify({target_student_id:target.student_id})]
+      );
+    }else{
+      await client.query(
+        `INSERT INTO activity_events(user_id,event_type,metadata)
+         VALUES($1,'ACCOUNT_REACTIVATED',$2)`,
+        [req.user.id, JSON.stringify({target_student_id:target.student_id})]
+      );
+    }
+
+    await client.query('COMMIT');
+
+    res.json({
+      ok:true,
+      student_id:target.student_id,
+      is_active:requestedActive
+    });
+  }catch(e){
+    try{ await client.query('ROLLBACK'); }catch(_){}
+    console.error('Student status change error:',e);
+    sendError(res,500,'Student status change service error.');
+  }finally{
+    client.release();
+  }
 });
 
 api.get('/group4/question-status', requireAuth, async (req,res)=>{
