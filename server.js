@@ -155,7 +155,7 @@ async function getUserFromSession(req) {
 async function requireAuth(req, res, next) {
   try {
     const user = await getUserFromSession(req);
-    if (!user) return sendError(res, 401, 'Login required.');
+    if (!user) return sendError(res, 401, 'ACCESS DENIED: Login required.');
     req.user = user;
     next();
   } catch (e) {
@@ -166,7 +166,7 @@ async function requireAuth(req, res, next) {
 
 async function requireAdmin(req, res, next) {
   await requireAuth(req, res, () => {
-    if (req.user.role !== 'ADMIN') return sendError(res, 403, 'Admin authorization required.');
+    if (req.user.role !== 'ADMIN') return sendError(res, 403, 'ACCESS DENIED: Admin authorization required.');
     next();
   });
 }
@@ -618,6 +618,21 @@ api.get('/group4/question-status', requireAuth, async (req,res)=>{
       ORDER BY subject,language`);
     res.json({exam:'group4',rows:rows.rows});
   }catch(e){ console.error(e); sendError(res,500,'Question status service error.'); }
+});
+
+/* Security invariant: every /api/admin/* request must have a valid ADMIN session.
+   Keep this server-side; hiding the Admin screen in HTML is not a security boundary. */
+app.use('/api/admin', async (req, res, next) => {
+  try {
+    const user = await getUserFromSession(req);
+    if (!user) return sendError(res, 401, 'ACCESS DENIED: Login required.');
+    if (user.role !== 'ADMIN') return sendError(res, 403, 'ACCESS DENIED: Admin authorization required.');
+    req.user = user;
+    next();
+  } catch (e) {
+    console.error('Admin authorization error:', e);
+    return sendError(res, 500, 'Authentication service error.');
+  }
 });
 
 app.use('/api', api);
