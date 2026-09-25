@@ -4540,4 +4540,33 @@ window.logout=async function(){try{g4StopTimer();if(G4.mockTimer)clearInterval(G
 })();
 </script>
 
+<script id="thiral-dob-auto-format">
+(function(){
+  'use strict';
+  window.formatDOB = function(input){
+    if(!input) return;
+    var digits = String(input.value || '').replace(/\D/g,'').slice(0,8);
+    var value = '';
+    if(digits.length <= 2){
+      value = digits;
+    }else if(digits.length <= 4){
+      value = digits.slice(0,2) + '/' + digits.slice(2);
+    }else{
+      value = digits.slice(0,2) + '/' + digits.slice(2,4) + '/' + digits.slice(4,8);
+    }
+    input.value = value;
+  };
+
+  document.addEventListener('DOMContentLoaded', function(){
+    var input = document.getElementById('rdob');
+    if(!input) return;
+    input.setAttribute('inputmode','numeric');
+    input.setAttribute('autocomplete','bday');
+    input.addEventListener('input', function(){ window.formatDOB(input); });
+    input.addEventListener('paste', function(){
+      setTimeout(function(){ window.formatDOB(input); }, 0);
+    });
+  });
+})();
+</script>
 </body></html>
