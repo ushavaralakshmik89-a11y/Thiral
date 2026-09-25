@@ -4431,4 +4431,29 @@ window.startPractice=async function(n){
   window.__THIRAL_GROUP4_ONLY_FINAL__=true;
 })();
 </script>
+
+<script id="thiral-v158-fast-client">
+/* THIRAL V158 client performance layer.
+   Only de-duplicates identical in-flight question GETs in this browser tab.
+   It never caches student/admin/private data and never changes question content. */
+(function(){
+  'use strict';
+  var base=window.thiralV138Api;
+  if(typeof base!=='function' || window.__THIRAL_V158_FAST_CLIENT__) return;
+  var pending=new Map();
+  window.thiralV138Api=function(path,opt){
+    opt=opt||{};
+    var method=String(opt.method||'GET').toUpperCase();
+    var key=method+' '+String(path||'');
+    var isQuestionGet=method==='GET' && /^\/questions\?/.test(String(path||'')) && !/[?&]historyMode=bank(?:&|$)/.test(String(path||''));
+    if(!isQuestionGet) return base(path,opt);
+    if(pending.has(key)) return pending.get(key);
+    var p=Promise.resolve(base(path,opt));
+    pending.set(key,p);
+    p.finally(function(){ if(pending.get(key)===p) pending.delete(key); }).catch(function(){});
+    return p;
+  };
+  window.__THIRAL_V158_FAST_CLIENT__=true;
+})();
+</script>
 </body></html>
