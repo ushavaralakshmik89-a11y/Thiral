@@ -4515,4 +4515,29 @@ window.logout=async function(){try{g4StopTimer();if(G4.mockTimer)clearInterval(G
   };
 })();
 </script>
+
+<script id="thiral-hide-question-bank-ui-v2">
+(function(){
+  'use strict';
+  function hideQuestionBankButtons(root){
+    var scope=root||document;
+    scope.querySelectorAll('button,a,[role="button"]').forEach(function(el){
+      var t=(el.textContent||'').replace(/\s+/g,' ').trim();
+      if(/Question\s*Bank/i.test(t) || /முழுவதும்/.test(t) || /தொடர்ச்சி/.test(t)){
+        el.style.setProperty('display','none','important');
+        el.setAttribute('aria-hidden','true');
+      }
+    });
+  }
+  hideQuestionBankButtons(document);
+  new MutationObserver(function(mutations){
+    mutations.forEach(function(m){
+      m.addedNodes.forEach(function(n){
+        if(n.nodeType===1) hideQuestionBankButtons(n);
+      });
+    });
+  }).observe(document.documentElement,{childList:true,subtree:true});
+})();
+</script>
+
 </body></html>
