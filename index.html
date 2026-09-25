@@ -4336,44 +4336,19 @@ async function qbLoadAll(){
   return unique;
 }
 function qbAddLogoutButton(){
-  let b=document.getElementById('qbLogoutReview');
-  if(!b){
-    b=document.createElement('button');
-    b.id='qbLogoutReview';
-    b.type='button';
-    b.className='secondary';
+  const b=qb$('questionBankExitReviewStatic');
+  if(b){
+    b.classList.remove('hidden');
+    b.style.setProperty('display','block','important');
+    b.style.setProperty('visibility','visible','important');
+    b.style.setProperty('opacity','1','important');
+    b.style.setProperty('width','100%','important');
+    b.style.setProperty('position','sticky','important');
+    b.style.setProperty('top','8px','important');
+    b.style.setProperty('z-index','9999','important');
+    b.disabled=false;
     b.textContent='🚪 வெளியேறு & Review';
-    b.title='இந்த Question Bank session-ஐ முடித்து பயன்படுத்திய கேள்விகளுக்கான Review பார்க்க';
-    b.style.margin='10px 0 14px';
-    b.style.display='block';
-    b.style.width='100%';
-    b.style.position='sticky';
-    b.style.top='8px';
-    b.style.zIndex='20';
-    b.style.fontWeight='800';
-    b.style.boxShadow='0 3px 10px rgba(0,0,0,.12)';
-    const progress=qb$('progress');
-    const practice=qb$('practice');
-    if(progress && progress.parentElement) progress.parentElement.insertAdjacentElement('afterend',b);
-    else if(practice) practice.insertBefore(b,practice.firstChild);
-    else if(qb$('feedback')?.parentElement) qb$('feedback').parentElement.appendChild(b);
-    b.onclick=async()=>{
-      if(QB.busy||QB.submitted)return;
-      b.disabled=true;
-      b.textContent='⏳ Review தயாராகிறது...';
-      try{
-        await qbSubmit(false);
-      }catch(e){
-        b.disabled=false;
-        b.textContent='🚪 வெளியேறு & Review';
-      }
-    };
   }
-  const oldStop=qb$('stopInfinitePractice');
-  if(oldStop) oldStop.classList.add('hidden');
-  b.classList.remove('hidden');
-  b.disabled=false;
-  b.textContent='🚪 வெளியேறு & Review';
 }
 function qbHideLogoutButton(){
   const b=qb$('qbLogoutReview');if(b)b.classList.add('hidden');
@@ -4471,11 +4446,6 @@ async function qbSubmit(autoFinish){
       qb$('practiceReview').style.display='block';
     }
     qbHideLogoutButton();
-    var exitBtn=document.getElementById('questionBankExitReviewStatic');
-    if(exitBtn){
-      exitBtn.style.display='none';
-      exitBtn.classList.add('hidden');
-    }
     return d;
   }catch(e){
     QB.submitted=false;
@@ -4541,20 +4511,8 @@ window.startPractice=async function(n){
     if(typeof show==='function')show('practice');
     if(qb$('practiceReview')){qb$('practiceReview').innerHTML='';qb$('practiceReview').classList.add('hidden','screen-review');qb$('practiceReview').style.display='none';}
     qbRender();
-    var exitBtn=document.getElementById('questionBankExitReviewStatic');
-    if(exitBtn){
-      exitBtn.style.display='block';
-      exitBtn.classList.remove('hidden');
-      exitBtn.disabled=false;
-      exitBtn.textContent='🚪 வெளியேறு & Review';
-    }
   }catch(e){
     QB.active=false;qbHideLogoutButton();
-    var exitBtn=document.getElementById('questionBankExitReviewStatic');
-    if(exitBtn){
-      exitBtn.style.display='none';
-      exitBtn.classList.add('hidden');
-    }
     if(qb$('feedback'))qb$('feedback').innerHTML='<b>Question Bank தொடங்க முடியவில்லை.</b><br>'+qbEsc(e.message);
   }
 };
@@ -4607,136 +4565,25 @@ window.__THIRAL_QUESTION_BANK_REVIEW_V1__=true;
 })();
 </script>
 
-<script id="thiral-qb-exit-final-bridge">
+<script id="thiral-qb-final-safety">
 (function(){
-  function btn(){ return document.getElementById('questionBankExitReviewStatic'); }
-  function isQB(){
+  function sync(){
+    var b=document.getElementById('questionBankExitReviewStatic');
+    var p=document.getElementById('practice');
+    if(!b || !p) return;
     var title=document.getElementById('subTitle');
     var t=title ? String(title.textContent||'') : '';
-    if(/Question Bank|தொடர்ச்சி/i.test(t)) return true;
-    var p=document.getElementById('practice');
-    if(p && !p.classList.contains('hidden')){
-      var level=document.getElementById('progress');
-      var s=level ? String(level.textContent||'') : '';
-      if(/\/\s*\d+/.test(s) && window.__THIRAL_QUESTION_BANK_REVIEW_V1__) return true;
-    }
-    return false;
-  }
-  function sync(){
-    var b=btn();
-    if(!b) return;
-    if(isQB()){
+    var qb=/Question Bank|தொடர்ச்சி/i.test(t);
+    if(qb && !p.classList.contains('hidden') && getComputedStyle(p).display!=='none'){
       b.classList.remove('hidden');
       b.style.setProperty('display','block','important');
       b.style.setProperty('visibility','visible','important');
       b.style.setProperty('opacity','1','important');
-      if(!b.disabled) b.textContent='🚪 வெளியேறு & Review';
-    }else{
-      b.style.setProperty('display','none','important');
     }
   }
-  window.__THIRAL_QB_EXIT_REVIEW__=async function(){
-    var b=btn();
-    if(b){b.disabled=true;b.textContent='⏳ Review தயாராகிறது...';}
-    try{
-      if(typeof window.__THIRAL_QB_SUBMIT==='function'){
-        await window.__THIRAL_QB_SUBMIT(false);
-      }else if(typeof window.stopInfinitePractice==='function'){
-        window.stopInfinitePractice();
-      }else{
-        throw new Error('Question Bank Review செயல்பாடு ஏற்றப்படவில்லை.');
-      }
-    }catch(e){
-      if(b){b.disabled=false;b.textContent='🚪 வெளியேறு & Review';}
-      var f=document.getElementById('feedback');
-      if(f)f.innerHTML='<b>Review திறக்க முடியவில்லை.</b><br>'+String(e&&e.message||e);
-    }
-  };
   document.addEventListener('DOMContentLoaded',function(){
     sync();
-    setInterval(sync,200);
-  });
-})();
-</script>
-
-
-<script id="thiral-qb-exit-v4">
-(function(){
-  function practice(){ return document.getElementById('practice'); }
-  function btn(){ return document.getElementById('questionBankExitReviewStatic'); }
-  function isPracticeVisible(){
-    var p=practice();
-    return !!(p && getComputedStyle(p).display!=='none' && !p.classList.contains('hidden'));
-  }
-  function isQuestionBank(){
-    var sub=document.getElementById('subTitle');
-    var title=sub ? String(sub.textContent||'') : '';
-    if(/Question Bank|தொடர்ச்சி/i.test(title)) return true;
-
-    var prog=document.getElementById('progress');
-    var s=prog ? String(prog.textContent||'') : '';
-    var m=s.match(/(\d+)\s*\/\s*(\d+)/);
-    if(m && Number(m[2]) >= 100) return true;
-
-    var stop=document.getElementById('stopInfinitePractice');
-    if(stop && !stop.classList.contains('hidden')) return true;
-    return false;
-  }
-
-  function ensureButton(){
-    var p=practice();
-    if(!p) return null;
-    var b=btn();
-    if(!b){
-      b=document.createElement('button');
-      b.id='questionBankExitReviewStatic';
-      b.type='button';
-      b.className='secondary';
-      b.textContent='🚪 வெளியேறு & Review';
-      b.onclick=function(){
-        if(typeof window.__THIRAL_QB_EXIT_REVIEW__==='function'){
-          window.__THIRAL_QB_EXIT_REVIEW__();
-        }else if(typeof window.stopInfinitePractice==='function'){
-          window.stopInfinitePractice();
-        }else{
-          alert('Review செயல்பாடு தற்போது கிடைக்கவில்லை.');
-        }
-      };
-      var bar=p.querySelector('.bar');
-      if(bar) p.insertBefore(b,bar);
-      else p.insertBefore(b,p.firstChild);
-    }
-    return b;
-  }
-
-  function sync(){
-    var p=practice();
-    if(!p) return;
-    var b=ensureButton();
-    if(!b) return;
-
-    if(isPracticeVisible() && isQuestionBank()){
-      b.classList.remove('hidden');
-      b.style.setProperty('display','block','important');
-      b.style.setProperty('visibility','visible','important');
-      b.style.setProperty('opacity','1','important');
-      b.style.setProperty('width','100%','important');
-      b.style.setProperty('position','sticky','important');
-      b.style.setProperty('top','8px','important');
-      b.style.setProperty('z-index','99999','important');
-      b.textContent='🚪 வெளியேறு & Review';
-      b.disabled=false;
-    }else{
-      b.style.setProperty('display','none','important');
-    }
-  }
-
-  document.addEventListener('DOMContentLoaded',function(){
-    sync();
-    setInterval(sync,150);
-    try{
-      new MutationObserver(sync).observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['class','style']});
-    }catch(e){}
+    setInterval(sync,500);
   });
 })();
 </script>
