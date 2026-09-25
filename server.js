@@ -43,13 +43,42 @@ if (!process.env.DATABASE_URL) {
   console.error('DATABASE_URL is missing. Set it in Render Environment Variables.');
 }
 
+const PG_POOL_MAX = Math.max(5, Math.min(Number(process.env.PG_POOL_MAX || 20), 50));
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : undefined,
-  max: 5,
+  max: PG_POOL_MAX,
+  min: 2,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 10000
+  connectionTimeoutMillis: 10000,
+  keepAlive: true
 });
+
+/* Keep individual slow SQL calls from occupying a pooled connection forever. */
+pool.on('connect', client => {
+  client.query(`SET statement_timeout = '10000ms'; SET idle_in_transaction_session_timeout = '15000ms'`).catch(()=>{});
+});
+pool.on('error', err => console.error('PostgreSQL pool error:', err));
+
+/* Small per-process cache for identical public question-list queries.
+   User-specific Question Bank/history requests deliberately bypass this cache. */
+const QUESTION_CACHE_TTL_MS = 15000;
+const QUESTION_CACHE_MAX = 500;
+const questionCache = new Map();
+function getQuestionCache(key){
+  const hit = questionCache.get(key);
+  if(!hit) return null;
+  if(hit.expiresAt <= Date.now()){ questionCache.delete(key); return null; }
+  return hit.value;
+}
+function setQuestionCache(key,value){
+  if(questionCache.size >= QUESTION_CACHE_MAX){
+    const firstKey = questionCache.keys().next().value;
+    if(firstKey) questionCache.delete(firstKey);
+  }
+  questionCache.set(key,{value,expiresAt:Date.now()+QUESTION_CACHE_TTL_MS});
+}
+function clearQuestionCache(){ questionCache.clear(); }
 
 app.use(helmet({
   contentSecurityPolicy: false,
@@ -59,8 +88,27 @@ app.use(compression());
 app.use(express.json({ limit: '2mb' }));
 app.use(cookieParser());
 
+/* Cheap HTTP-level protections that also reduce repeat work at the server. */
+app.disable('x-powered-by');
+app.use((req,res,next)=>{
+  if(req.method==='GET' && req.path.startsWith('/api/questions')){
+    res.setHeader('Cache-Control','private, max-age=10, stale-while-revalidate=20');
+  }
+  next();
+});
+
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false });
-const apiLimiter = rateLimit({ windowMs: 60 * 1000, max: 180, standardHeaders: true, legacyHeaders: false });
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: req => {
+    const sid = req.cookies?.thiral_session;
+    if (sid) return 'session:' + crypto.createHash('sha256').update(sid).digest('hex');
+    return 'ip:' + req.ip;
+  }
+});
 
 function sendError(res, status, error) {
   return res.status(status).json({ error });
@@ -117,6 +165,10 @@ function subjectCandidates(raw){
     .map(([label])=>label);
   return [...new Set([canonical,s,...aliases].filter(Boolean))];
 }
+function requireGroup4Exam(exam){
+  return String(exam || '').trim().toLowerCase() === 'group4';
+}
+
 function subtopicCandidates(raw){
   const s=String(raw||'').trim();
   if(!s) return [];
@@ -155,6 +207,7 @@ async function getUserFromSession(req) {
 
 async function requireAuth(req, res, next) {
   try {
+    if (req.user) return next();
     const user = await getUserFromSession(req);
     if (!user) return sendError(res, 401, 'ACCESS DENIED: Login required.');
     req.user = user;
@@ -213,9 +266,9 @@ async function ensureAdmin() {
 app.get('/health', async (req, res) => {
   try {
     await pool.query('SELECT 1');
-    res.json({ ok: true, service: 'Thiral V139', database: 'ok', time: new Date().toISOString() });
+    res.json({ ok: true, service: 'Thiral V158 Secure Fast', database: 'ok', time: new Date().toISOString() });
   } catch (e) {
-    res.status(503).json({ ok: false, service: 'Thiral V139', database: 'error' });
+    res.status(503).json({ ok: false, service: 'Thiral V158 Secure Fast', database: 'error' });
   }
 });
 
@@ -410,6 +463,7 @@ api.get('/questions', requireAuth, async (req, res) => {
     const limit = Math.min(Math.max(parseInt(req.query.limit || '20',10) || 20,1),200);
     const offset = Math.max(parseInt(req.query.offset || '0',10) || 0,0);
     if (!exam || !subject || !['ta','en'].includes(language)) return sendError(res,400,'Invalid question request.');
+    if (!requireGroup4Exam(exam)) return sendError(res,403,'Currently only TNPSC Group 4 is enabled.');
 
     const where = ['exam=$1','subject = ANY($2::text[])','language=$3','is_active=true'];
     const params = [exam, subjectCandidatesList, language];
@@ -421,8 +475,7 @@ api.get('/questions', requireAuth, async (req, res) => {
       where.push(`subtopic = ANY($${n}::text[])`); params.push(subCandidates); n++;
     }
 
-    /* Question Bank continuation: exclude only questions already used
-       in this user's Question Bank mode. Normal Practice/Mock are unchanged. */
+    /* Question Bank is user-specific, so it must never use the shared cache. */
     if (historyMode === 'bank') {
       where.push(`NOT EXISTS (
         SELECT 1 FROM question_history h
@@ -434,22 +487,34 @@ api.get('/questions', requireAuth, async (req, res) => {
       n++;
     }
 
-    const countQ = await pool.query(`SELECT count(*)::int AS total FROM questions WHERE ${where.join(' AND ')}`, params);
-    const total = Number(countQ.rows[0]?.total || 0);
+    const cacheKey = historyMode === 'bank' ? null : JSON.stringify({exam,subjectCandidatesList,language,subCandidates,limit,offset});
+    if(cacheKey){
+      const cached = getQuestionCache(cacheKey);
+      if(cached){ return res.json(cached); }
+    }
 
-    const dataParams = [...params, limit, offset];
+    /* Fetch one extra row instead of running a full COUNT(*) on every page.
+       This removes a second table scan under heavy traffic while preserving
+       the pagination contract used by the frontend. */
+    const fetchLimit = limit + 1;
+    const dataParams = [...params, fetchLimit, offset];
     const q = await pool.query(
-      `SELECT id,exam,subject,subtopic,language,question,options,explanation
+      `SELECT id,exam,subject,subtopic,language,question,options
        FROM questions
        WHERE ${where.join(' AND ')}
-       ORDER BY id LIMIT $${n} OFFSET $${n+1}`, dataParams
+       ORDER BY id LIMIT $${n} OFFSET $${n+1}`,
+      dataParams
     );
 
-    const nextOffset = offset + q.rows.length;
-    res.json({
-      questions:q.rows,
-      pagination:{limit,offset,returned:q.rows.length,total,hasMore:nextOffset<total,nextOffset}
-    });
+    const hasMore = q.rows.length > limit;
+    const rows = hasMore ? q.rows.slice(0,limit) : q.rows;
+    const nextOffset = offset + rows.length;
+    const payload = {
+      questions:rows,
+      pagination:{limit,offset,returned:rows.length,total:null,hasMore,nextOffset}
+    };
+    if(cacheKey) setQuestionCache(cacheKey,payload);
+    res.json(payload);
   } catch(e) { console.error(e); sendError(res,500,'Question service error.'); }
 });
 
@@ -465,78 +530,61 @@ api.get('/practice/questions', requireAuth, async (req, res) => {
     const subjectCandidatesList = subjectCandidates(rawSubject);
     const language = String(req.query.language || 'ta').trim();
     const subtopic = String(req.query.subtopic || '').trim();
-    const limit = Math.min(
-      Math.max(parseInt(req.query.limit || '10', 10) || 10, 1),
-      200
-    );
-
-    if (!exam || !subject || !['ta', 'en'].includes(language)) {
-      return sendError(res, 400, 'Invalid question request.');
-    }
-
-    const params = [req.user.id, exam, subjectCandidatesList, language];
-    let n = 5;
-
-    let where = `
-      q.exam = $2
-      AND q.subject = ANY($3::text[])
-      AND q.language = $4
-      AND q.is_active = true
-    `;
+    const limit = Math.min(Math.max(parseInt(req.query.limit || '10', 10) || 10, 1), 200);
+    if (!exam || !subject || !['ta','en'].includes(language)) return sendError(res,400,'Invalid question request.');
+    if (!requireGroup4Exam(exam)) return sendError(res,403,'Currently only TNPSC Group 4 is enabled.');
 
     const subCandidates = subtopicCandidates(subtopic);
+    const paramsBase = [req.user.id, exam, subjectCandidatesList, language];
+    let n = 5;
+    let where = `q.exam = $2 AND q.subject = ANY($3::text[]) AND q.language = $4 AND q.is_active = true`;
     if (subCandidates.length === 1) {
       where += ` AND q.subtopic = $${n}`;
-      params.push(subCandidates[0]);
-      n++;
+      paramsBase.push(subCandidates[0]); n++;
     } else if (subCandidates.length > 1) {
       where += ` AND q.subtopic = ANY($${n}::text[])`;
-      params.push(subCandidates);
-      n++;
+      paramsBase.push(subCandidates); n++;
     }
+    where += ` AND NOT EXISTS (
+      SELECT 1 FROM question_history h
+      WHERE h.user_id=$1 AND h.question_id=q.id AND h.mode='practice'
+    )`;
 
-    params.push(limit);
+    /* Avoid ORDER BY random(), which forces PostgreSQL to evaluate and sort a
+       large matching set. An indexed random pivot gives inexpensive variety. */
+    const pivotQ = await pool.query(`SELECT COALESCE(MAX(id),0)::bigint AS max_id FROM questions`);
+    const maxId = Number(pivotQ.rows[0]?.max_id || 0);
+    if(!maxId) return sendError(res,409,'இந்த பாடத்திற்கு புதிய கேள்விகள் இல்லை.');
+    const pivot = Math.floor(Math.random() * maxId) + 1;
 
-    const sql = `
-      SELECT
-        q.id,
-        q.exam,
-        q.subject,
-        q.subtopic,
-        q.language,
-        q.question,
-        q.options,
-        q.explanation
-      FROM questions q
-      WHERE ${where}
-        AND NOT EXISTS (
-          SELECT 1
-          FROM question_history h
-          WHERE h.user_id = $1
-            AND h.question_id = q.id
-            AND h.mode = 'practice'
-        )
-      ORDER BY random()
-      LIMIT $${n}
-    `;
+    const fetch = async (operator, extraLimit) => {
+      const params = [...paramsBase, pivot, extraLimit];
+      const pivotPos = n;
+      const limitPos = n + 1;
+      const sql = `SELECT q.id,q.exam,q.subject,q.subtopic,q.language,q.question,q.options\n`+
+        `FROM questions q WHERE ${where} AND q.id ${operator} $${pivotPos}\n`+
+        `ORDER BY q.id LIMIT $${limitPos}`;
+      return pool.query(sql, params);
+    };
 
-    const result = await pool.query(sql, params);
-
-    if (result.rows.length < limit) {
-      return sendError(
-        res,
-        409,
-        `???? ????????? ???????? ????? ????????? ${result.rows.length} ??????? ?????.`
+    let rows = (await fetch('>=', limit)).rows;
+    if(rows.length < limit){
+      const second = await pool.query(
+        `SELECT q.id,q.exam,q.subject,q.subtopic,q.language,q.question,q.options\n`+
+        `FROM questions q WHERE ${where} AND q.id < $${n}\n`+
+        `ORDER BY q.id LIMIT $${n+1}`,
+        [...paramsBase,pivot,limit-rows.length]
       );
+      rows = rows.concat(second.rows);
     }
 
-    res.json({
-      questions: result.rows,
-      count: result.rows.length
-    });
+    if (rows.length < limit) {
+      return sendError(res,409,`இந்த பாடத்தில் ${rows.length} புதிய கேள்விகள் மட்டுமே உள்ளன.`);
+    }
+    res.json({questions:rows,count:rows.length});
   } catch (e) {
     console.error('Practice question error:', e);
-    sendError(res, 500, 'Practice question service error.');
+    sendError(res,500,'Practice question service error.');
   }
 });
 
@@ -544,6 +592,7 @@ api.post('/attempts', requireAuth, async (req,res)=>{
   try {
     const {exam,subject,mode,language,questionIds}=req.body||{};
     if(!exam || !subject || !['practice','mock','bank'].includes(mode) || !['ta','en','mixed'].includes(language) || !Array.isArray(questionIds) || !questionIds.length) return sendError(res,400,'Invalid attempt.');
+    if(!requireGroup4Exam(exam)) return sendError(res,403,'Currently only TNPSC Group 4 is enabled.');
     const ids=[...new Set(questionIds.map(Number).filter(Number.isInteger))];
     if(!ids.length || ids.length>5000) return sendError(res,400,'Invalid question list.');
     const q = language==='mixed'
@@ -812,7 +861,16 @@ app.use('/api/admin', async (req, res, next) => {
 
 app.use('/api', api);
 
-app.use(express.static(path.join(__dirname,'frontend'), { index:'index.html' }));
+app.use(express.static(path.join(__dirname,'frontend'), {
+  index:'index.html',
+  etag:true,
+  lastModified:true,
+  maxAge:'1h',
+  setHeaders:(res,filePath)=>{
+    if(filePath.endsWith('.html')) res.setHeader('Cache-Control','no-cache');
+    else res.setHeader('Cache-Control','public, max-age=3600, stale-while-revalidate=86400');
+  }
+}));
 
 app.get('/{*splat}', (req,res)=>{
   res.sendFile(path.join(__dirname,'frontend','index.html'));
@@ -843,16 +901,47 @@ async function ensureQuestionHistory() {
    PostgreSQL advisory transaction lock. Existing users, questions,
    attempts, results and admin data are not deleted or rewritten.
 */
+async function ensurePerformanceIndexes() {
+  /* These indexes match the hot query paths. They are additive only. */
+  const statements = [
+    `CREATE INDEX IF NOT EXISTS idx_questions_exam_subject_lang_active_id
+       ON questions(exam, subject, language, is_active, id)`,
+    `CREATE INDEX IF NOT EXISTS idx_questions_exam_subject_lang_subtopic_active_id
+       ON questions(exam, subject, language, subtopic, is_active, id)`,
+    `CREATE INDEX IF NOT EXISTS idx_question_history_user_mode_question
+       ON question_history(user_id, mode, question_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_attempts_user_status_started
+       ON attempts(user_id, status, started_at DESC)`,
+    `CREATE INDEX IF NOT EXISTS idx_users_role_active_created
+       ON users(role, is_active, created_at DESC)`,
+    `CREATE INDEX IF NOT EXISTS idx_users_email_lower
+       ON users((lower(email)))`
+  ];
+  for (const sql of statements) {
+    try { await pool.query(sql); }
+    catch (e) { console.error('Performance index warning:', e.message); }
+  }
+}
+
 async function start(){
   try{
     await pool.query('SELECT 1');
     await ensureQuestionHistory();
+    await ensurePerformanceIndexes();
     await ensureAdmin();
-    app.listen(PORT,'0.0.0.0',()=>console.log(`Thiral V139 listening on port ${PORT}`));
+    app.listen(PORT,'0.0.0.0',()=>console.log(`Thiral V158 Secure Fast listening on port ${PORT}`));
   }catch(e){
     console.error('Startup failed:',e);
     process.exit(1);
   }
 }
+
+const shutdown = async (signal) => {
+  console.log(`${signal} received. Shutting down gracefully...`);
+  try { await pool.end(); } catch (_) {}
+  process.exit(0);
+};
+process.once('SIGTERM', () => shutdown('SIGTERM'));
+process.once('SIGINT', () => shutdown('SIGINT'));
 
 start();
