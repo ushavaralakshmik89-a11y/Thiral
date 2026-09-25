@@ -412,8 +412,8 @@ a{
 
 <section id="login" class="card hidden">
 <h2>🔐 Student Login</h2>
-<input id="email" type="email" placeholder="Email ID / மின்னஞ்சல்">
-<input id="pass" type="password" placeholder="Password / கடவுச்சொல்">
+<input id="email" type="email" name="thiral_student_login_id" autocomplete="off" autocapitalize="none" spellcheck="false" readonly onfocus="this.value=''; this.removeAttribute('readonly')" placeholder="Email ID / மின்னஞ்சல்">
+<input id="pass" type="password" name="thiral_student_login_password" autocomplete="new-password" readonly onfocus="this.value=''; this.removeAttribute('readonly')" placeholder="Password / கடவுச்சொல்">
 <p id="lm"></p>
 <button onclick="login()">Login</button>
 <button class="secondary" onclick="show('register')">New Registration</button>
@@ -624,9 +624,9 @@ a{
 <section id="adminLogin" class="card hidden">
 <h2>🛠️ Admin Login</h2>
 <label for="adminEmail">Admin ID</label>
-<input id="adminEmail" type="text" autocomplete="username" placeholder="Admin ID">
+<input id="adminEmail" type="text" name="thiral_admin_login_id" autocomplete="off" autocapitalize="none" spellcheck="false" readonly onfocus="this.value=''; this.removeAttribute('readonly')" placeholder="Admin ID">
 <label for="adminPass">Admin Password</label>
-<input id="adminPass" type="password" autocomplete="current-password" placeholder="Admin Password">
+<input id="adminPass" type="password" name="thiral_admin_login_password" autocomplete="new-password" readonly onfocus="this.value=''; this.removeAttribute('readonly')" placeholder="Admin Password">
 <p id="adminMsg"></p>
 <button onclick="adminLogin()">Admin Login</button>
 <button class="secondary" onclick="show('home')">← Back</button>
@@ -833,7 +833,26 @@ function labelForSub(s,t,sub){
 
 let currentSubject='',currentTopic='',currentSub='',questions=[],qi=0,total=10,correct=0,wrong=0,unanswered=0,timer=null,locked=false;
 
+function clearLoginFields(which){
+  const ids = which === 'adminLogin' ? ['adminEmail','adminPass','adminMsg'] : ['email','pass','lm'];
+  ids.forEach(id=>{
+    const n=document.getElementById(id);
+    if(!n)return;
+    if('value' in n)n.value='';
+    if(id==='adminMsg'||id==='lm'){n.textContent='';n.className='';}
+  });
+}
+function clearAllLoginFields(){clearLoginFields('login');clearLoginFields('adminLogin');}
+function clearLoginFieldsDelayed(which){
+  clearLoginFields(which);
+  setTimeout(()=>clearLoginFields(which),0);
+  setTimeout(()=>clearLoginFields(which),100);
+  setTimeout(()=>clearLoginFields(which),300);
+  setTimeout(()=>clearLoginFields(which),800);
+}
+
 function show(id){
+  if(id==='login' || id==='adminLogin') clearLoginFieldsDelayed(id);
   /* V142: Use the backend-authenticated V138 session for Admin access.
      The old V129 sessionStorage guard is no longer used because Admin login
      now authenticates through /api/auth/login and stores the authenticated
@@ -995,6 +1014,7 @@ function logout(){
   try{sessionStorage.removeItem('tnpsc_student_logged_in');}catch(e){}
   const u=document.getElementById('studentName');
   if(u) u.textContent='';
+  clearAllLoginFields();
   show('home');
 }
 function subject(s){
@@ -3012,6 +3032,7 @@ window.V91_ADV_NUM=V91_ADV_NUM;
     try { await api138('/auth/logout',{method:'POST'}); } catch(e) {}
     window.thiralV138User = null;
     setStudentName(null);
+    clearAllLoginFields();
     show('home');
   };
 
@@ -4205,6 +4226,25 @@ window.startPractice=async function(n){
     exam: 'group4',
     dbSubjects: { tamil:'tamil', gs:'பொது அறிவு', apt:'apt' }
   };
+})();
+</script>
+<script>
+(function(){
+  function wipe(){
+    if(typeof clearAllLoginFields==='function') clearAllLoginFields();
+  }
+  window.addEventListener('pageshow',function(){
+    wipe();
+    setTimeout(wipe,100);
+    setTimeout(wipe,500);
+  });
+  document.addEventListener('visibilitychange',function(){
+    if(document.visibilityState==='visible'){
+      wipe();
+      setTimeout(wipe,100);
+      setTimeout(wipe,500);
+    }
+  });
 })();
 </script>
 </body></html>
