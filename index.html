@@ -539,7 +539,7 @@ a{
 <section id="practice" class="card hidden">
 <div class="top"><h2>📝 Practice</h2><div class="timer">⏱️ <span id="timer">15</span>s</div></div>
 <p><span class="badge" id="level"></span> <span class="badge" id="progress"></span></p>
-<button id="questionBankExitReviewStatic" type="button" class="secondary" style="display:none;width:100%;margin:12px 0;font-weight:800;position:sticky;top:8px;z-index:50;background:#fff;border:2px solid #1d4ed8;" onclick="window.__THIRAL_QB_EXIT_REVIEW__ && window.__THIRAL_QB_EXIT_REVIEW__()">🚪 வெளியேறு & Review</button>
+<button id="questionBankExitReviewStatic" type="button" class="secondary" style="display:none;width:100%;margin:12px 0;font-weight:800;position:sticky;top:8px;z-index:9999;background:#fff;border:2px solid #1d4ed8;" onclick="window.__THIRAL_QB_EXIT_REVIEW__ && window.__THIRAL_QB_EXIT_REVIEW__()">🚪 வெளியேறு & Review</button>
 <div class="bar"><div id="bar"></div></div>
 <h3 id="question"></h3><div id="options"></div><p id="feedback"></p><button id="stopInfinitePractice" class="secondary hidden" onclick="stopInfinitePractice()">⏹ Practice நிறுத்தி Result பார்க்க</button>
 </section>
@@ -4609,32 +4609,52 @@ window.__THIRAL_QUESTION_BANK_REVIEW_V1__=true;
 
 <script id="thiral-qb-exit-final-bridge">
 (function(){
-  function button(){ return document.getElementById('questionBankExitReviewStatic'); }
-  function practiceVisible(){
+  function btn(){ return document.getElementById('questionBankExitReviewStatic'); }
+  function isQB(){
+    var title=document.getElementById('subTitle');
+    var t=title ? String(title.textContent||'') : '';
+    if(/Question Bank|தொடர்ச்சி/i.test(t)) return true;
     var p=document.getElementById('practice');
-    return !!(p && !p.classList.contains('hidden'));
-  }
-  function questionBankMode(){
-    var t=document.getElementById('subTitle');
-    var txt=t ? String(t.textContent||'') : '';
-    return /Question Bank|தொடர்ச்சி/i.test(txt);
+    if(p && !p.classList.contains('hidden')){
+      var level=document.getElementById('progress');
+      var s=level ? String(level.textContent||'') : '';
+      if(/\/\s*\d+/.test(s) && window.__THIRAL_QUESTION_BANK_REVIEW_V1__) return true;
+    }
+    return false;
   }
   function sync(){
-    var b=button();
+    var b=btn();
     if(!b) return;
-    var active=questionBankMode();
-    if(active && practiceVisible()){
-      b.style.display='block';
+    if(isQB()){
       b.classList.remove('hidden');
+      b.style.setProperty('display','block','important');
+      b.style.setProperty('visibility','visible','important');
+      b.style.setProperty('opacity','1','important');
       if(!b.disabled) b.textContent='🚪 வெளியேறு & Review';
-    }else if(!practiceVisible()){
-      b.style.display='none';
-      b.classList.add('hidden');
+    }else{
+      b.style.setProperty('display','none','important');
     }
   }
+  window.__THIRAL_QB_EXIT_REVIEW__=async function(){
+    var b=btn();
+    if(b){b.disabled=true;b.textContent='⏳ Review தயாராகிறது...';}
+    try{
+      if(typeof window.__THIRAL_QB_SUBMIT==='function'){
+        await window.__THIRAL_QB_SUBMIT(false);
+      }else if(typeof window.stopInfinitePractice==='function'){
+        window.stopInfinitePractice();
+      }else{
+        throw new Error('Question Bank Review செயல்பாடு ஏற்றப்படவில்லை.');
+      }
+    }catch(e){
+      if(b){b.disabled=false;b.textContent='🚪 வெளியேறு & Review';}
+      var f=document.getElementById('feedback');
+      if(f)f.innerHTML='<b>Review திறக்க முடியவில்லை.</b><br>'+String(e&&e.message||e);
+    }
+  };
   document.addEventListener('DOMContentLoaded',function(){
     sync();
-    setInterval(sync,250);
+    setInterval(sync,200);
   });
 })();
 </script>
