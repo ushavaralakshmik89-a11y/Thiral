@@ -4171,4 +4171,202 @@ window.startPractice=async function(n){
   };
 })();
 </script>
+
+<script id="thiral-group4-authoritative-controller-v1">
+(function(){
+'use strict';
+/*
+  FINAL Group 4 controller.
+  This is the only controller used by the visible Group 4 buttons.
+  Questions, answer checking, attempts and Question-Bank continuation all
+  come from the backend. Existing question data is never deleted or changed.
+*/
+const G4={
+  exam:'group4',mode:null,q:[],answers:{},checks:{},i:0,attempt:null,
+  busy:false,submitted:false,bank:false,batch:0
+};
+const g4$=id=>document.getElementById(id);
+const g4esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const g4text=q=>String(q?.question??q?.q??'');
+const g4opts=q=>Array.isArray(q?.options)?q.options:(Array.isArray(q?.o)?q.o:[]);
+const g4Lang=()=>typeof contentLanguage!=='undefined'&&contentLanguage==='en'?'en':'ta';
+const g4Subject=()=>{const s=String(typeof currentSubject!=='undefined'&&currentSubject?currentSubject:'');return ['tamil','gs','apt'].includes(s)?s:'tamil';};
+const g4Sub=()=>String(typeof currentSub!=='undefined'&&currentSub?currentSub:'').trim();
+async function g4api(path,init={}){
+  if(typeof window.thiralV138Api!=='function')throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
+  return window.thiralV138Api(path,init);
+}
+function g4StopTimer(){if(G4.timer){clearInterval(G4.timer);G4.timer=null;}}
+function g4ShowFeedback(html){const e=g4$('feedback');if(e)e.innerHTML=html;}
+function g4Lock(v){const e=g4$('options');if(e)e.querySelectorAll('button').forEach(b=>b.disabled=v);}
+function g4EnsureExitButton(){
+  let b=g4$('g4BankExitReview');
+  if(!b){
+    b=document.createElement('button');
+    b.id='g4BankExitReview';b.type='button';b.className='secondary';
+    b.textContent='🚪 வெளியேறு & Review';
+    b.style.display='none';b.style.width='100%';b.style.margin='12px 0';b.style.fontWeight='800';
+    const p=g4$('practice');
+    if(p){const anchor=g4$('stopInfinitePractice'); if(anchor)anchor.insertAdjacentElement('beforebegin',b); else p.appendChild(b);}
+    b.onclick=()=>g4Submit(true);
+  }
+  return b;
+}
+function g4Render(){
+  const q=G4.q[G4.i];if(!q)return;
+  g4StopTimer();G4.busy=false;
+  if(g4$('progress'))g4$('progress').textContent=(G4.i+1)+' / '+G4.q.length+(G4.bank?' • தொகுப்பு '+G4.batch:'');
+  if(g4$('bar'))g4$('bar').style.width=((G4.i+1)/G4.q.length*100)+'%';
+  if(g4$('level'))g4$('level').textContent=q.difficulty||q.d||'சாதாரணம்';
+  if(g4$('question'))g4$('question').textContent=(G4.i+1)+'. '+g4text(q);
+  if(g4$('options'))g4$('options').innerHTML=g4opts(q).map((o,j)=>
+    '<button class="option" type="button" onclick="window.__THIRAL_G4_ANSWER('+j+')">'+String.fromCharCode(65+j)+'. '+g4esc(o)+'</button>'
+  ).join('');
+  g4ShowFeedback('');
+  if(G4.bank){
+    const b=g4EnsureExitButton();b.style.display='block';
+    const stop=g4$('stopInfinitePractice');if(stop)stop.classList.add('hidden');
+  }
+  let sec=15;if(g4$('timer'))g4$('timer').textContent='15';
+  G4.timer=setInterval(()=>{sec--;if(g4$('timer'))g4$('timer').textContent=String(Math.max(0,sec));if(sec<=0){g4StopTimer();g4Answer(-1,true);}},1000);
+}
+async function g4Answer(value,timeout=false){
+  if(G4.busy||G4.submitted)return;
+  const q=G4.q[G4.i];if(!q)return;
+  const key=String(q.id);if(Object.prototype.hasOwnProperty.call(G4.checks,key))return;
+  G4.busy=true;g4StopTimer();g4Lock(true);G4.answers[key]=Number(value);
+  g4ShowFeedback('<b>விடை சரிபார்க்கப்படுகிறது...</b>');
+  try{
+    const d=await g4api('/attempts/'+G4.attempt+'/check-answer',{method:'POST',body:JSON.stringify({questionId:Number(q.id),answer:Number(value)})});
+    G4.checks[key]=d;
+    const o=g4opts(q),ci=Number(d.correct_option);
+    let h=timeout?'<div class="warn" style="font-size:20px;font-weight:800">⏱️ நேரம் முடிந்தது</div>':(d.correct?'<div class="good" style="font-size:20px;font-weight:800">✓ சரி</div>':'<div class="bad" style="font-size:20px;font-weight:800">✗ தவறு</div>');
+    h+='<p><b>சரியான பதில்:</b> '+g4esc(o[ci]||'')+'</p>';
+    if(d.explanation)h+='<p><b>விளக்கம்:</b> '+g4esc(d.explanation)+'</p>';
+    g4ShowFeedback(h);G4.busy=false;
+    setTimeout(()=>g4Next(),700);
+  }catch(e){
+    G4.busy=false;delete G4.answers[key];g4Lock(false);
+    g4ShowFeedback('<b>விடை சரிபார்க்க முடியவில்லை.</b><br>'+g4esc(e.message));
+    if(!timeout){let sec=15;if(g4$('timer'))g4$('timer').textContent='15';G4.timer=setInterval(()=>{sec--;if(g4$('timer'))g4$('timer').textContent=String(Math.max(0,sec));if(sec<=0){g4StopTimer();g4Answer(-1,true);}},1000);}
+  }
+}
+async function g4Next(){
+  if(G4.busy||G4.submitted)return;
+  if(G4.i<G4.q.length-1){G4.i++;g4Render();return;}
+  await g4Submit(false);
+}
+function g4BuildReview(){
+  const b=g4$('practiceReview');if(!b)return;
+  b.innerHTML='<h2>📝 Review</h2>'+G4.q.map((q,i)=>{
+    const d=G4.checks[String(q.id)]||{},o=g4opts(q),a=G4.answers[String(q.id)];
+    const your=Number(a)===-1?'விடையளிக்கவில்லை':(o[Number(a)]||'');
+    const right=o[Number(d.correct_option)]||'';
+    const status=Number(a)===-1?'⏱️ விடையளிக்கவில்லை':d.correct===true?'✓ சரி':'✗ தவறு';
+    return '<div class="card" style="box-shadow:none;border:1px solid #e5e7eb;margin:12px 0;padding:15px"><div style="font-weight:800">'+(i+1)+'. '+g4esc(g4text(q))+'</div><p><b>உங்கள் விடை:</b> '+g4esc(your)+'</p><p><b>சரியான பதில்:</b> '+g4esc(right)+'</p><p style="font-weight:800">'+status+'</p>'+(d.explanation?'<p><b>விளக்கம்:</b> '+g4esc(d.explanation)+'</p>':'')+'</div>';
+  }).join('');
+}
+function g4ShowResult(d,bankExit){
+  const total=Number(d?.total||G4.q.length),correct=Number(d?.correct||0),unanswered=Number(d?.unanswered||0),wrong=Math.max(0,total-correct-unanswered);
+  if(g4$('resultText'))g4$('resultText').innerHTML='<p><b>மொத்த கேள்விகள்:</b> '+total+'</p><p><b>சரி:</b> '+correct+'</p><p><b>தவறு:</b> '+wrong+'</p><p><b>விடையளிக்காதது:</b> '+unanswered+'</p><p><b>மதிப்பெண்:</b> '+Number(d?.score??0).toFixed(2)+'%</p>'+(bankExit?'<p class="small">இந்த தொகுப்பில் நீங்கள் பார்த்த கேள்விகள் மட்டும் Question Bank-ல் பயன்படுத்தப்பட்டதாக பதிவு செய்யப்பட்டது.</p>':'');
+  g4BuildReview();
+  if(g4$('practiceReview')){g4$('practiceReview').classList.remove('hidden','screen-review');g4$('practiceReview').style.display='block';}
+  if(typeof show==='function')show('result');
+}
+async function g4Submit(bankExit){
+  if(G4.submitted||!G4.attempt)return;
+  G4.submitted=true;g4StopTimer();
+  try{
+    const d=await g4api('/attempts/'+G4.attempt+'/submit',{method:'POST',body:JSON.stringify({answers:G4.answers})});
+    if(G4.bank && !bankExit){
+      G4.submitted=false;
+      G4.q=[];G4.answers={};G4.checks={};G4.i=0;G4.attempt=null;
+      G4.batch++;
+      g4ShowFeedback('<b>இந்த Question Bank தொகுப்பு முடிந்தது.</b><br>அடுத்த புதிய கேள்விகள் ஏற்றப்படுகின்றன...');
+      await g4StartBankBatch();
+      return;
+    }
+    const b=g4$('g4BankExitReview');if(b)b.style.display='none';
+    const stop=g4$('stopInfinitePractice');if(stop)stop.classList.add('hidden');
+    g4ShowResult(d,G4.bank);
+  }catch(e){G4.submitted=false;g4ShowFeedback('<b>Result சேமிக்க முடியவில்லை.</b><br>'+g4esc(e.message));}
+}
+async function g4StartBankBatch(){
+  G4.bank=true;G4.mode='bank';G4.submitted=false;G4.busy=false;
+  try{
+    const d=await g4api('/questions?exam=group4&subject='+encodeURIComponent(g4Subject())+'&language='+g4Lang()+'&subtopic='+encodeURIComponent(g4Sub())+'&historyMode=bank&limit=200&offset=0');
+    const rows=Array.isArray(d.questions)?d.questions:[];
+    if(!rows.length){
+      G4.bank=false;G4.mode=null;
+      if(g4$('feedback'))g4$('feedback').innerHTML='<b>இந்த Subtopic-ன் Question Bank தற்போது முழுமையாக பயன்படுத்தப்பட்டுள்ளது.</b><br>அடுத்த சுற்றில் மீண்டும் தொடங்கலாம்.';
+      return;
+    }
+    G4.q=rows;G4.answers={};G4.checks={};G4.i=0;G4.attempt=null;G4.submitted=false;
+    const a=await g4api('/attempts',{method:'POST',body:JSON.stringify({exam:'group4',subject:g4Subject(),mode:'bank',language:g4Lang(),questionIds:rows.map(q=>Number(q.id))})});
+    G4.attempt=a.id;G4.batch=G4.batch||1;
+    if(g4$('subTitle'))g4$('subTitle').textContent='📌 '+(g4Lang()==='en'?'Question Bank • English':'Question Bank • தமிழ்')+' • தொடர்ச்சி';
+    if(typeof show==='function')show('practice');
+    g4Render();
+  }catch(e){G4.bank=false;G4.mode=null;g4ShowFeedback('<b>Question Bank தொடங்க முடியவில்லை.</b><br>'+g4esc(e.message));}
+}
+async function g4StartPractice(n){
+  const S=g4Subject();
+  if(S!=='tamil' && typeof window.pendingPracticeStart!=='undefined')window.pendingPracticeStart=null;
+  selectedExam='group4';currentSubject=S;
+  const sub=g4Sub();
+  if(!sub){g4ShowFeedback('<b>முதலில் Subtopic தேர்வு செய்யவும்.</b>');return;}
+  const requested=Number(n||10);
+  if(![10,20,50,9999].includes(requested)){g4ShowFeedback('10, 20, 50 அல்லது Question Bank மட்டும்.');return;}
+  if(requested===9999){G4.batch=1;await g4StartBankBatch();return;}
+  G4.bank=false;G4.mode='practice';G4.submitted=false;G4.busy=false;
+  try{
+    const d=await g4api('/practice/questions?exam=group4&subject='+encodeURIComponent(S)+'&language='+g4Lang()+'&subtopic='+encodeURIComponent(sub)+'&limit='+requested);
+    const rows=Array.isArray(d.questions)?d.questions:[];
+    if(rows.length!==requested)throw new Error('தேவையான '+requested+' புதிய கேள்விகள் கிடைக்கவில்லை. கிடைத்தது: '+rows.length+'.');
+    G4.q=rows;G4.answers={};G4.checks={};G4.i=0;G4.attempt=null;
+    const a=await g4api('/attempts',{method:'POST',body:JSON.stringify({exam:'group4',subject:S,mode:'practice',language:g4Lang(),questionIds:rows.map(q=>Number(q.id))})});
+    G4.attempt=a.id;
+    const b=g4$('g4BankExitReview');if(b)b.style.display='none';
+    const stop=g4$('stopInfinitePractice');if(stop)stop.classList.add('hidden');
+    if(g4$('subTitle'))g4$('subTitle').textContent='📌 '+g4Sub()+' • '+requested+' கேள்விகள்';
+    if(typeof show==='function')show('practice');
+    g4Render();
+  }catch(e){g4ShowFeedback('<b>Practice தொடங்க முடியவில்லை.</b><br>'+g4esc(e.message));}
+}
+async function g4StartMock(){
+  if(G4.timer)g4StopTimer();
+  try{
+    const all=[];
+    for(const s of ['tamil','gs','apt']){
+      const d=await g4api('/questions?exam=group4&subject='+encodeURIComponent(s)+'&language='+g4Lang()+'&limit=200&offset=0');
+      for(const q of (d.questions||[]))if(!all.some(x=>String(x.id)===String(q.id)))all.push(q);
+    }
+    if(all.length<200)throw new Error('200 தனித்த Mock கேள்விகள் கிடைக்கவில்லை. கிடைத்தது: '+all.length+'.');
+    for(let i=all.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[all[i],all[j]]=[all[j],all[i]];}
+    G4.q=all.slice(0,200);G4.answers={};G4.i=0;G4.mode='mock';G4.bank=false;G4.submitted=false;
+    const a=await g4api('/attempts',{method:'POST',body:JSON.stringify({exam:'group4',subject:'mixed',mode:'mock',language:g4Lang(),questionIds:G4.q.map(q=>Number(q.id))})});
+    G4.attempt=a.id;G4.mockEnd=Date.now()+3*60*60*1000;
+    if(typeof show==='function')show('mockTest');
+    const paint=()=>{const sec=Math.max(0,Math.ceil((G4.mockEnd-Date.now())/1000));if(g4$('mockTimer'))g4$('mockTimer').textContent=String(Math.floor(sec/3600)).padStart(2,'0')+':'+String(Math.floor(sec%3600/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0');if(sec<=0){clearInterval(G4.mockTimer);g4SubmitMock();}};
+    if(G4.mockTimer)clearInterval(G4.mockTimer);paint();G4.mockTimer=setInterval(paint,1000);g4RenderMock();
+  }catch(e){if(g4$('mockQuestion'))g4$('mockQuestion').textContent='Mock Test தொடங்க முடியவில்லை: '+e.message;}
+}
+function g4RenderMock(){const q=G4.q[G4.i];if(!q)return;if(g4$('mockProgress'))g4$('mockProgress').textContent=(G4.i+1)+' / '+G4.q.length;if(g4$('mockQuestion'))g4$('mockQuestion').textContent=(G4.i+1)+'. '+g4text(q);if(g4$('mockOptions'))g4$('mockOptions').innerHTML=g4opts(q).map((o,j)=>'<button class="option" type="button" onclick="window.__THIRAL_G4_MOCK_ANSWER('+j+')">'+String.fromCharCode(65+j)+'. '+g4esc(o)+'</button>').join('');}
+async function g4MockAnswer(v){if(G4.submitted)return;G4.answers[String(G4.q[G4.i].id)]=Number(v);g4RenderMock();}
+function g4MockNext(){if(G4.i<G4.q.length-1){G4.i++;g4RenderMock();}}
+function g4MockPrev(){if(G4.i>0){G4.i--;g4RenderMock();}}
+async function g4SubmitMock(){if(G4.submitted||!G4.attempt)return;G4.submitted=true;if(G4.mockTimer)clearInterval(G4.mockTimer);try{const d=await g4api('/attempts/'+G4.attempt+'/submit',{method:'POST',body:JSON.stringify({answers:G4.answers})});if(g4$('mockSummary'))g4$('mockSummary').innerHTML='<p><b>மொத்த கேள்விகள்:</b> '+(d.total||200)+'</p><p><b>சரி:</b> '+(d.correct||0)+'</p><p><b>மதிப்பெண்:</b> '+(d.score??0)+'%</p>';if(typeof show==='function')show('mockResult');}catch(e){G4.submitted=false;if(g4$('mockSummary'))g4$('mockSummary').textContent='Result சேமிக்க முடியவில்லை: '+e.message;}}
+
+/* Authoritative global entry points. */
+window.subject=function(s){const S=String(s||'').trim();if(!['tamil','gs','apt'].includes(S))return;selectedExam='group4';currentSubject=S;currentTopic='';currentSub='';if(S==='tamil'){contentLanguage='ta';localStorage.setItem('tnpsc_content_language','ta');if(typeof renderSubjectPage==='function')renderSubjectPage();return;}window.pendingSubject=S;const m=g4$('languageModal');if(m)m.classList.remove('hidden');};
+window.chooseContentLanguage=function(lang){contentLanguage=String(lang||'ta').toLowerCase()==='en'?'en':'ta';localStorage.setItem('tnpsc_content_language',contentLanguage);const m=g4$('languageModal');if(m)m.classList.add('hidden');const l=g4$('selectedLanguageLabel');if(l)l.textContent=contentLanguage==='en'?'English':'தமிழ்';if(window.pendingSubject){currentSubject=window.pendingSubject;window.pendingSubject=null;currentTopic='';currentSub='';if(typeof renderSubjectPage==='function')renderSubjectPage();}};
+window.topic=function(t){currentTopic=String(t||'');const info=data[currentSubject];const list=info?.topics?.[currentTopic]||[];if(g4$('topicTitle'))g4$('topicTitle').textContent=labelForTopic(currentSubject,currentTopic)+' – Subtopics';if(g4$('subtopicGrid'))g4$('subtopicGrid').innerHTML=list.map(x=>'<button type="button" onclick="subtopic(\''+esc(x)+'\')">'+labelForSub(currentSubject,currentTopic,x)+'</button>').join('');if(typeof show==='function')show('subtopics');};
+window.subtopic=function(s){currentSub=String(s||'');if(g4$('subTitle'))g4$('subTitle').textContent='📌 '+labelForSub(currentSubject,currentTopic,currentSub);if(g4$('materialText'))g4$('materialText').textContent=(contentLanguage==='en'&&currentSubject!=='tamil')?'Study material and practice questions for this subtopic.':currentSub+' தொடர்பான Study Material மற்றும் கேள்விகள்.';if(typeof show==='function')show('actions');};
+window.startPractice=g4StartPractice;window.stopInfinitePractice=()=>g4Submit(true);window.__THIRAL_G4_ANSWER=g4Answer;window.__THIRAL_G4_MOCK_ANSWER=g4MockAnswer;window.mockNext=g4MockNext;window.mockPrev=g4MockPrev;window.submitMock=g4SubmitMock;window.startMock=g4StartMock;
+window.buildPracticeReview=g4BuildReview;window.togglePracticeReview=function(){const b=g4$('practiceReview');if(!b)return;const h=b.classList.contains('hidden')||b.classList.contains('screen-review')||b.style.display==='none';if(h){g4BuildReview();b.classList.remove('hidden','screen-review');b.style.display='block';}else{b.classList.add('hidden','screen-review');b.style.display='none';}};
+/* Logout keeps backend session authoritative and never deletes question data. */
+const g4OldLogout=window.logout;
+window.logout=async function(){try{g4StopTimer();if(G4.mockTimer)clearInterval(G4.mockTimer);if(G4.bank&&G4.attempt&&!G4.submitted){await g4Submit(true);} }catch(e){} if(typeof g4OldLogout==='function')return g4OldLogout();};
+})();
+</script>
 </body></html>
