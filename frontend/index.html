@@ -3675,7 +3675,7 @@ window.V91_ADV_NUM=V91_ADV_NUM;
           '<td>'+escapeHtml138(formatAdminDOB138(x.dob))+'</td>'+
           '<td>'+escapeHtml138(x.last_login_at?new Date(x.last_login_at).toLocaleString():'-')+'</td>'+
           '<td>'+escapeHtml138(statusText)+'</td>'+
-          '<td><button class="'+actionClass+'" onclick="toggleStudentStatus(\\''+escapeHtml138(x.student_id||'')+'\\','+(active?'true':'false')+')">'+actionText+'</button></td></tr>';
+          '<td><button class="'+actionClass+'" onclick="toggleStudentStatus(\''+escapeHtml138(x.student_id||'')+'\','+(active?'true':'false')+')">'+actionText+'</button></td></tr>';
       }).join('');
       if(el('adminStudentList')) el('adminStudentList').innerHTML=
         '<p class="small">Deactivate செய்தால் அந்த Student ID-ன் புதிய Login உடனடியாக தடுக்கப்படும்; பழைய Results/Attempts அழிக்கப்படாது.</p>'+
