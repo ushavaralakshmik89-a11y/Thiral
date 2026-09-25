@@ -392,12 +392,7 @@ a{
 <button class="secondary" onclick="show('register')">📝 New Registration</button>
 <button class="secondary" onclick="show('termsPage')">📜 Terms & Conditions</button>
 <button class="secondary" onclick="show('adminLogin')">🛠️ Admin</button>
-
-<div id="thiralContactUs" style="margin-top:24px;padding:20px;border-radius:16px;border:1px solid rgba(0,0,0,.12);background:rgba(255,255,255,.72);text-align:center">
-<h3 style="margin:0 0 10px">📞 Contact Us / தொடர்புக்கு</h3>
-<p style="margin:8px 0"><strong>📧 Email:</strong> <a href="mailto:thiral.admin@gmail.com">thiral.admin@gmail.com</a></p>
-<p style="margin:8px 0"><strong>📱 Cell:</strong> <a href="tel:6374668933">6374668933</a></p>
-</div>
+<button class="secondary" onclick="show('contactUs')">📞 Contact Us</button>
 </section>
 
 <section id="register" class="card hidden">
@@ -625,6 +620,26 @@ a{
 </ul>
 <p class="small">Prototype-ல் browser storage பயன்படுத்தப்படுகிறது. Production-ல் secure server/database, password hashing மற்றும் role-based access control கட்டாயம்.</p>
 <button class="secondary" onclick="show('home')">← Back</button>
+</section>
+
+<section id="contactUs" class="card hidden">
+<h2>📞 Contact Us / தொடர்புக்கு</h2>
+<p class="small">திறல் தொடர்பு மற்றும் உதவிக்கு கீழே உள்ள வழிகளில் எங்களை அணுகலாம்.</p>
+
+<div class="grid" style="margin-top:18px">
+  <div class="card" style="margin:0;text-align:center;background:rgba(255,255,255,.82);border:1px solid rgba(0,0,0,.10)">
+    <div style="width:64px;height:64px;margin:0 auto 12px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:32px;background:rgba(37,99,235,.12)">📧</div>
+    <h3 style="margin:6px 0">Email</h3>
+    <a href="mailto:thiral.admin@gmail.com" style="font-weight:700;word-break:break-word">thiral.admin@gmail.com</a>
+  </div>
+  <div class="card" style="margin:0;text-align:center;background:rgba(255,255,255,.82);border:1px solid rgba(0,0,0,.10)">
+    <div style="width:64px;height:64px;margin:0 auto 12px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:32px;background:rgba(22,163,74,.12)">📱</div>
+    <h3 style="margin:6px 0">Cell</h3>
+    <a href="tel:6374668933" style="font-weight:700">6374668933</a>
+  </div>
+</div>
+
+<button class="secondary" onclick="show('home')">← Back to Home</button>
 </section>
 
 <section id="adminLogin" class="card hidden">
