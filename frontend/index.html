@@ -412,8 +412,8 @@ a{
 
 <section id="login" class="card hidden">
 <h2>🔐 Student Login</h2>
-<input id="email" type="email" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Email ID / மின்னஞ்சல்">
-<input id="pass" type="password" autocomplete="new-password" placeholder="Password / கடவுச்சொல்">
+<input id="email" type="email" placeholder="Email ID / மின்னஞ்சல்">
+<input id="pass" type="password" placeholder="Password / கடவுச்சொல்">
 <p id="lm"></p>
 <button onclick="login()">Login</button>
 <button class="secondary" onclick="show('register')">New Registration</button>
@@ -624,9 +624,9 @@ a{
 <section id="adminLogin" class="card hidden">
 <h2>🛠️ Admin Login</h2>
 <label for="adminEmail">Admin ID</label>
-<input id="adminEmail" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Admin ID">
+<input id="adminEmail" type="text" autocomplete="username" placeholder="Admin ID">
 <label for="adminPass">Admin Password</label>
-<input id="adminPass" type="password" autocomplete="new-password" placeholder="Admin Password">
+<input id="adminPass" type="password" autocomplete="current-password" placeholder="Admin Password">
 <p id="adminMsg"></p>
 <button onclick="adminLogin()">Admin Login</button>
 <button class="secondary" onclick="show('home')">← Back</button>
@@ -833,46 +833,15 @@ function labelForSub(s,t,sub){
 
 let currentSubject='',currentTopic='',currentSub='',questions=[],qi=0,total=10,correct=0,wrong=0,unanswered=0,timer=null,locked=false;
 
-function clearLoginFields(which){
-  const ids = which === 'adminLogin'
-    ? ['adminEmail','adminPass','adminMsg']
-    : ['email','pass','lm'];
-
-  ids.forEach(id => {
-    const node = document.getElementById(id);
-    if(!node) return;
-    if('value' in node) node.value = '';
-    if(id === 'adminMsg' || id === 'lm'){
-      node.textContent = '';
-      node.className = '';
-    }
-  });
-}
-
-function clearAllLoginFields(){
-  clearLoginFields('login');
-  clearLoginFields('adminLogin');
-}
-
-/* Browser autofill can run after page scripts. Clear once immediately and
-   again on the next event loop turn when a login screen is opened. */
-function clearLoginFieldsDelayed(which){
-  clearLoginFields(which);
-  setTimeout(() => clearLoginFields(which), 0);
-  setTimeout(() => clearLoginFields(which), 150);
-}
-
 function show(id){
-  if(id === 'login' || id === 'adminLogin'){
-    clearLoginFieldsDelayed(id);
-  }
-
-  /* V128: Admin dashboard is never opened without an authenticated ADMIN session. */
+  /* V142: Use the backend-authenticated V138 session for Admin access.
+     The old V129 sessionStorage guard is no longer used because Admin login
+     now authenticates through /api/auth/login and stores the authenticated
+     user in window.thiralV138User. */
   if(id==='admin'){
     try{
-      const a=JSON.parse(sessionStorage.getItem('thiral_admin_session_v129')||'null');
-      if(!a || a.role!=='ADMIN' || a.id!=='admin' || !a.expiresAt || Date.now()>a.expiresAt){
-        sessionStorage.removeItem('thiral_admin_session_v129');
+      const a=window.thiralV138User || null;
+      if(!a || a.role!=='ADMIN'){
         id='adminLogin';
         const m=document.getElementById('adminMsg');
         if(m){m.className='bad';m.textContent='Admin session இல்லை அல்லது காலாவதியாகிவிட்டது. மீண்டும் Login செய்யவும்.';}
@@ -1026,7 +995,6 @@ function logout(){
   try{sessionStorage.removeItem('tnpsc_student_logged_in');}catch(e){}
   const u=document.getElementById('studentName');
   if(u) u.textContent='';
-  clearAllLoginFields();
   show('home');
 }
 function subject(s){
@@ -3044,7 +3012,6 @@ window.V91_ADV_NUM=V91_ADV_NUM;
     try { await api138('/auth/logout',{method:'POST'}); } catch(e) {}
     window.thiralV138User = null;
     setStudentName(null);
-    clearAllLoginFields();
     show('home');
   };
 
@@ -4238,17 +4205,6 @@ window.startPractice=async function(n){
     exam: 'group4',
     dbSubjects: { tamil:'tamil', gs:'பொது அறிவு', apt:'apt' }
   };
-})();
-</script>
-<script>
-(function(){
-  function wipe(){
-    if(typeof clearAllLoginFields === 'function') clearAllLoginFields();
-  }
-  window.addEventListener('pageshow', wipe);
-  window.addEventListener('visibilitychange', function(){
-    if(document.visibilityState === 'visible') wipe();
-  });
 })();
 </script>
 </body></html>
