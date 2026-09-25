@@ -1,10 +1,14 @@
 {
-  "name": "thiral-v160-backend",
-  "version": "160.0.0",
+  "name": "thiral-v161-backend",
+  "version": "161.0.0",
   "private": true,
   "type": "module",
-  "scripts": {"start": "node server.js"},
-  "engines": {"node": ">=20"},
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
     "argon2": "^0.44.0",
     "compression": "^1.8.1",
