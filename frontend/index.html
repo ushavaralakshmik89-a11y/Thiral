@@ -412,8 +412,8 @@ a{
 
 <section id="login" class="card hidden">
 <h2>🔐 Student Login</h2>
-<input id="email" type="email" placeholder="Email ID / மின்னஞ்சல்">
-<input id="pass" type="password" placeholder="Password / கடவுச்சொல்">
+<input id="email" type="email" name="thiral_student_login_id" autocomplete="off" autocapitalize="none" spellcheck="false" readonly onfocus="this.value=''; this.removeAttribute('readonly')" placeholder="Email ID / மின்னஞ்சல்">
+<input id="pass" type="password" name="thiral_student_login_password" autocomplete="new-password" readonly onfocus="this.value=''; this.removeAttribute('readonly')" placeholder="Password / கடவுச்சொல்">
 <p id="lm"></p>
 <button onclick="login()">Login</button>
 <button class="secondary" onclick="show('register')">New Registration</button>
@@ -624,9 +624,9 @@ a{
 <section id="adminLogin" class="card hidden">
 <h2>🛠️ Admin Login</h2>
 <label for="adminEmail">Admin ID</label>
-<input id="adminEmail" type="text" autocomplete="username" placeholder="Admin ID">
+<input id="adminEmail" type="text" name="thiral_admin_login_id" autocomplete="off" autocapitalize="none" spellcheck="false" readonly onfocus="this.value=''; this.removeAttribute('readonly')" placeholder="Admin ID">
 <label for="adminPass">Admin Password</label>
-<input id="adminPass" type="password" autocomplete="current-password" placeholder="Admin Password">
+<input id="adminPass" type="password" name="thiral_admin_login_password" autocomplete="new-password" readonly onfocus="this.value=''; this.removeAttribute('readonly')" placeholder="Admin Password">
 <p id="adminMsg"></p>
 <button onclick="adminLogin()">Admin Login</button>
 <button class="secondary" onclick="show('home')">← Back</button>
@@ -833,13 +833,34 @@ function labelForSub(s,t,sub){
 
 let currentSubject='',currentTopic='',currentSub='',questions=[],qi=0,total=10,correct=0,wrong=0,unanswered=0,timer=null,locked=false;
 
+function clearLoginFields(which){
+  const ids = which === 'adminLogin' ? ['adminEmail','adminPass','adminMsg'] : ['email','pass','lm'];
+  ids.forEach(id=>{
+    const n=document.getElementById(id);
+    if(!n)return;
+    if('value' in n)n.value='';
+    if(id==='adminMsg'||id==='lm'){n.textContent='';n.className='';}
+  });
+}
+function clearAllLoginFields(){clearLoginFields('login');clearLoginFields('adminLogin');}
+function clearLoginFieldsDelayed(which){
+  clearLoginFields(which);
+  setTimeout(()=>clearLoginFields(which),0);
+  setTimeout(()=>clearLoginFields(which),100);
+  setTimeout(()=>clearLoginFields(which),300);
+  setTimeout(()=>clearLoginFields(which),800);
+}
+
 function show(id){
-  /* V128: Admin dashboard is never opened without an authenticated ADMIN session. */
+  if(id==='login' || id==='adminLogin') clearLoginFieldsDelayed(id);
+  /* V142: Use the backend-authenticated V138 session for Admin access.
+     The old V129 sessionStorage guard is no longer used because Admin login
+     now authenticates through /api/auth/login and stores the authenticated
+     user in window.thiralV138User. */
   if(id==='admin'){
     try{
-      const a=JSON.parse(sessionStorage.getItem('thiral_admin_session_v129')||'null');
-      if(!a || a.role!=='ADMIN' || a.id!=='admin' || !a.expiresAt || Date.now()>a.expiresAt){
-        sessionStorage.removeItem('thiral_admin_session_v129');
+      const a=window.thiralV138User || null;
+      if(!a || a.role!=='ADMIN'){
         id='adminLogin';
         const m=document.getElementById('adminMsg');
         if(m){m.className='bad';m.textContent='Admin session இல்லை அல்லது காலாவதியாகிவிட்டது. மீண்டும் Login செய்யவும்.';}
@@ -993,6 +1014,7 @@ function logout(){
   try{sessionStorage.removeItem('tnpsc_student_logged_in');}catch(e){}
   const u=document.getElementById('studentName');
   if(u) u.textContent='';
+  clearAllLoginFields();
   show('home');
 }
 function subject(s){
@@ -2916,7 +2938,12 @@ window.V91_ADV_NUM=V91_ADV_NUM;
     }));
     var d = {};
     try { d = await r.json(); } catch(e) {}
-    if(!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    if(!r.ok){
+      if(r.status === 401 || r.status === 403){
+        throw new Error('ACCESS DENIED: இந்த தரவை அணுக உங்களுக்கு அனுமதி இல்லை.');
+      }
+      throw new Error(d.error || ('HTTP ' + r.status));
+    }
     return d;
   }
   window.thiralV138Api = api138;
@@ -3005,6 +3032,7 @@ window.V91_ADV_NUM=V91_ADV_NUM;
     try { await api138('/auth/logout',{method:'POST'}); } catch(e) {}
     window.thiralV138User = null;
     setStudentName(null);
+    clearAllLoginFields();
     show('home');
   };
 
@@ -3023,7 +3051,15 @@ window.V91_ADV_NUM=V91_ADV_NUM;
       await loadAdminV138();
       show('admin');
     }catch(e){
-      if(msg){ msg.className='bad'; msg.textContent='Admin access: ' + e.message; }
+      var denied = String(e && e.message || '').indexOf('ACCESS DENIED') === 0;
+      if(msg){
+        msg.className='bad';
+        msg.textContent = denied ? 'ACCESS DENIED' : ('Admin access: ' + (e && e.message || e));
+      }
+      if(denied){
+        window.thiralV138Students = [];
+      }
+      return false;
     }
   };
 
@@ -4192,90 +4228,23 @@ window.startPractice=async function(n){
   };
 })();
 </script>
-
 <script>
-/* V144: Group 4 is the only exam for which the current question bank is valid.
-   Non-Group-4 exam screens remain available, but they must never reuse Group 4
-   questions or any legacy/local fallback question bank. No stored data is deleted. */
 (function(){
-  'use strict';
-  function isGroup4(){
-    try { return String(window.selectedExam || 'group4').trim().toLowerCase() === 'group4'; }
-    catch(e){ return false; }
+  function wipe(){
+    if(typeof clearAllLoginFields==='function') clearAllLoginFields();
   }
-  function denyQuestions(){
-    var msg = document.getElementById('feedback');
-    if(msg){
-      msg.innerHTML = '<b>இந்தத் தேர்விற்கான கேள்விகள் தற்போது இல்லை.</b><br>கேள்விகள் Group 4 தேர்விற்கு மட்டும் வழங்கப்பட்டுள்ளன.';
+  window.addEventListener('pageshow',function(){
+    wipe();
+    setTimeout(wipe,100);
+    setTimeout(wipe,500);
+  });
+  document.addEventListener('visibilitychange',function(){
+    if(document.visibilityState==='visible'){
+      wipe();
+      setTimeout(wipe,100);
+      setTimeout(wipe,500);
     }
-    try{ if(typeof window.stop === 'function') window.stop(); }catch(e){}
-  }
-
-  /* Backend question loader used by the current secure practice flow. */
-  if(typeof window.getQuestionsV138 === 'function'){
-    var oldGetQuestionsV138 = window.getQuestionsV138;
-    window.getQuestionsV138 = async function(examId, subject, lang, count){
-      if(String(examId || '').trim().toLowerCase() !== 'group4') return [];
-      return oldGetQuestionsV138.apply(this, arguments);
-    };
-  }
-
-  /* Current secure practice entry point. */
-  if(typeof window.startPractice === 'function'){
-    var oldStartPractice = window.startPractice;
-    window.startPractice = async function(n){
-      if(!isGroup4()){ denyQuestions(); return; }
-      return oldStartPractice.apply(this, arguments);
-    };
-  }
-
-  /* Older practice entry point still present in this large legacy frontend. */
-  if(typeof window.start === 'function'){
-    var oldStart = window.start;
-    window.start = async function(n){
-      if(!isGroup4()){ denyQuestions(); return; }
-      return oldStart.apply(this, arguments);
-    };
-  }
-
-  /* Mock-test paths: prevent legacy/local question-bank fallback for other exams. */
-  if(typeof window._startMock === 'function'){
-    var oldStartMockInternal = window._startMock;
-    window._startMock = async function(){
-      if(!isGroup4()){ denyQuestions(); return; }
-      return oldStartMockInternal.apply(this, arguments);
-    };
-  }
-  if(typeof window.startMock === 'function'){
-    var oldStartMock = window.startMock;
-    window.startMock = function(){
-      if(!isGroup4()){ denyQuestions(); return; }
-      return oldStartMock.apply(this, arguments);
-    };
-  }
-
-  /* Last-resort guard for any direct frontend /api/questions call made with a
-     non-Group-4 exam. Group 4 requests continue unchanged. */
-  if(window.fetch && !window.__THIRAL_V144_FETCH_GUARD){
-    window.__THIRAL_V144_FETCH_GUARD = true;
-    var nativeFetch = window.fetch.bind(window);
-    window.fetch = function(input, init){
-      try{
-        var url = typeof input === 'string' ? input : (input && input.url) || '';
-        if(url.indexOf('/api/questions') !== -1){
-          var u = new URL(url, window.location.origin);
-          var exam = String(u.searchParams.get('exam') || 'group4').trim().toLowerCase();
-          if(exam !== 'group4'){
-            return Promise.resolve(new Response(JSON.stringify({questions:[],pagination:{hasMore:false,total:0}}),{
-              status:200,
-              headers:{'Content-Type':'application/json'}
-            }));
-          }
-        }
-      }catch(e){}
-      return nativeFetch(input, init);
-    };
-  }
+  });
 })();
 </script>
 </body></html>
