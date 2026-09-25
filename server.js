@@ -6,6 +6,7 @@ import cookieParser from 'cookie-parser';
 import compression from 'compression';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import nodemailer from 'nodemailer';
 import argon2 from 'argon2';
 import pg from 'pg';
 
@@ -43,42 +44,13 @@ if (!process.env.DATABASE_URL) {
   console.error('DATABASE_URL is missing. Set it in Render Environment Variables.');
 }
 
-const PG_POOL_MAX = Math.max(5, Math.min(Number(process.env.PG_POOL_MAX || 20), 50));
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : undefined,
-  max: PG_POOL_MAX,
-  min: 2,
+  max: 5,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 10000,
-  keepAlive: true
+  connectionTimeoutMillis: 10000
 });
-
-/* Keep individual slow SQL calls from occupying a pooled connection forever. */
-pool.on('connect', client => {
-  client.query(`SET statement_timeout = '10000ms'; SET idle_in_transaction_session_timeout = '15000ms'`).catch(()=>{});
-});
-pool.on('error', err => console.error('PostgreSQL pool error:', err));
-
-/* Small per-process cache for identical public question-list queries.
-   User-specific Question Bank/history requests deliberately bypass this cache. */
-const QUESTION_CACHE_TTL_MS = 15000;
-const QUESTION_CACHE_MAX = 500;
-const questionCache = new Map();
-function getQuestionCache(key){
-  const hit = questionCache.get(key);
-  if(!hit) return null;
-  if(hit.expiresAt <= Date.now()){ questionCache.delete(key); return null; }
-  return hit.value;
-}
-function setQuestionCache(key,value){
-  if(questionCache.size >= QUESTION_CACHE_MAX){
-    const firstKey = questionCache.keys().next().value;
-    if(firstKey) questionCache.delete(firstKey);
-  }
-  questionCache.set(key,{value,expiresAt:Date.now()+QUESTION_CACHE_TTL_MS});
-}
-function clearQuestionCache(){ questionCache.clear(); }
 
 app.use(helmet({
   contentSecurityPolicy: false,
@@ -88,27 +60,62 @@ app.use(compression());
 app.use(express.json({ limit: '2mb' }));
 app.use(cookieParser());
 
-/* Cheap HTTP-level protections that also reduce repeat work at the server. */
-app.disable('x-powered-by');
-app.use((req,res,next)=>{
-  if(req.method==='GET' && req.path.startsWith('/api/questions')){
-    res.setHeader('Cache-Control','private, max-age=10, stale-while-revalidate=20');
-  }
-  next();
+// express-rate-limit v8 default IP key generation is IPv6-safe.
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false });
+const apiLimiter = rateLimit({ windowMs: 60 * 1000, max: 180, standardHeaders: true, legacyHeaders: false });
+
+
+const forgotOtpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 8,
+  standardHeaders: true,
+  legacyHeaders: false
 });
 
-const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false });
-const apiLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 300,
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: req => {
-    const sid = req.cookies?.thiral_session;
-    if (sid) return 'session:' + crypto.createHash('sha256').update(sid).digest('hex');
-    return 'ip:' + req.ip;
-  }
+const smtpTransport = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || 'smtp.gmail.com',
+  port: Number(process.env.SMTP_PORT || 465),
+  secure: String(process.env.SMTP_SECURE || 'true').toLowerCase() === 'true',
+  auth: {
+    user: process.env.SMTP_USER || '',
+    pass: process.env.SMTP_PASS || ''
+  },
+  connectionTimeout: 10000,
+  greetingTimeout: 10000,
+  socketTimeout: 15000
 });
+
+function otpHash(value) {
+  const pepper = process.env.OTP_PEPPER || '';
+  return crypto.createHash('sha256').update(`${pepper}:${String(value)}`).digest('hex');
+}
+
+function newOtp() {
+  return String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+}
+
+function newResetToken() {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+function resetTokenHash(value) {
+  const pepper = process.env.OTP_PEPPER || '';
+  return crypto.createHash('sha256').update(`${pepper}:reset:${String(value)}`).digest('hex');
+}
+
+async function sendForgotOtpEmail(to, otp) {
+  const from = process.env.SMTP_FROM || process.env.SMTP_USER || '';
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS || !from) {
+    throw new Error('SMTP email service is not configured.');
+  }
+  await smtpTransport.sendMail({
+    from: `Thiral Admin <${from}>`,
+    to,
+    subject: 'Thiral Password Reset OTP',
+    text: `Your Thiral password reset OTP is ${otp}. It is valid for 10 minutes. If you did not request this, ignore this email.`,
+    html: `<div style="font-family:Arial,sans-serif;line-height:1.6"><h2>Thiral / திறல்</h2><p>Password reset OTP:</p><p style="font-size:30px;font-weight:800;letter-spacing:6px">${otp}</p><p>This OTP is valid for 10 minutes and can be used only once.</p><p>If you did not request a password reset, you can ignore this email.</p></div>`
+  });
+}
 
 function sendError(res, status, error) {
   return res.status(status).json({ error });
@@ -165,10 +172,6 @@ function subjectCandidates(raw){
     .map(([label])=>label);
   return [...new Set([canonical,s,...aliases].filter(Boolean))];
 }
-function requireGroup4Exam(exam){
-  return String(exam || '').trim().toLowerCase() === 'group4';
-}
-
 function subtopicCandidates(raw){
   const s=String(raw||'').trim();
   if(!s) return [];
@@ -207,7 +210,6 @@ async function getUserFromSession(req) {
 
 async function requireAuth(req, res, next) {
   try {
-    if (req.user) return next();
     const user = await getUserFromSession(req);
     if (!user) return sendError(res, 401, 'ACCESS DENIED: Login required.');
     req.user = user;
@@ -266,9 +268,9 @@ async function ensureAdmin() {
 app.get('/health', async (req, res) => {
   try {
     await pool.query('SELECT 1');
-    res.json({ ok: true, service: 'Thiral V158 Secure Fast', database: 'ok', time: new Date().toISOString() });
+    res.json({ ok: true, service: 'Thiral V139', database: 'ok', time: new Date().toISOString() });
   } catch (e) {
-    res.status(503).json({ ok: false, service: 'Thiral V158 Secure Fast', database: 'error' });
+    res.status(503).json({ ok: false, service: 'Thiral V139', database: 'error' });
   }
 });
 
@@ -442,6 +444,132 @@ api.post('/auth/register', authLimiter, async (req, res) => {
   }
 });
 
+
+api.post('/auth/forgot/request', forgotOtpLimiter, async (req,res)=>{
+  const generic = 'If the account exists, an OTP has been sent to the registered email.';
+  try{
+    const email=String(req.body?.email||'').trim().toLowerCase();
+    if(!email || email.length>254) return res.json({ok:true,message:generic});
+
+    const userQ=await pool.query(
+      `SELECT id,email,is_active FROM users WHERE lower(email)=lower($1) AND role='STUDENT' LIMIT 1`,
+      [email]
+    );
+    if(!userQ.rowCount || !userQ.rows[0].is_active) return res.json({ok:true,message:generic});
+
+    const recent=await pool.query(
+      `SELECT id FROM password_reset_otps
+       WHERE user_id=$1 AND created_at > now()-interval '60 seconds'
+       ORDER BY created_at DESC LIMIT 1`,
+      [userQ.rows[0].id]
+    );
+    if(recent.rowCount) return res.json({ok:true,message:generic});
+
+    const otp=newOtp();
+    await pool.query(
+      `UPDATE password_reset_otps SET used_at=now()
+       WHERE user_id=$1 AND used_at IS NULL`,
+      [userQ.rows[0].id]
+    );
+    await pool.query(
+      `INSERT INTO password_reset_otps(user_id,email,otp_hash,expires_at,attempts,used_at)
+       VALUES($1,$2,$3,now()+interval '10 minutes',0,NULL)`,
+      [userQ.rows[0].id,email,otpHash(otp)]
+    );
+
+    try{
+      await sendForgotOtpEmail(email,otp);
+    }catch(mailErr){
+      await pool.query(
+        `UPDATE password_reset_otps SET used_at=now() WHERE user_id=$1 AND otp_hash=$2 AND used_at IS NULL`,
+        [userQ.rows[0].id,otpHash(otp)]
+      );
+      console.error('Forgot password email error:',mailErr?.message||mailErr);
+    }
+
+    return res.json({ok:true,message:generic});
+  }catch(e){
+    console.error('Forgot password request error:',e);
+    return res.json({ok:true,message:generic});
+  }
+});
+
+api.post('/auth/forgot/verify', forgotOtpLimiter, async (req,res)=>{
+  try{
+    const email=String(req.body?.email||'').trim().toLowerCase();
+    const otp=String(req.body?.otp||'').trim();
+    if(!email || !/^\d{6}$/.test(otp)) return sendError(res,400,'Invalid OTP.');
+
+    const q=await pool.query(
+      `SELECT id,user_id,otp_hash,expires_at,attempts
+       FROM password_reset_otps
+       WHERE lower(email)=lower($1) AND used_at IS NULL
+       ORDER BY created_at DESC LIMIT 1`,
+      [email]
+    );
+    if(!q.rowCount) return sendError(res,400,'Invalid or expired OTP.');
+    const row=q.rows[0];
+    if(new Date(row.expires_at).getTime()<=Date.now()) return sendError(res,400,'Invalid or expired OTP.');
+    if(Number(row.attempts)>=5) return sendError(res,429,'Too many OTP attempts. Request a new OTP.');
+
+    const ok=crypto.timingSafeEqual(Buffer.from(row.otp_hash),Buffer.from(otpHash(otp)));
+    if(!ok){
+      await pool.query(`UPDATE password_reset_otps SET attempts=attempts+1 WHERE id=$1`,[row.id]);
+      return sendError(res,400,'Invalid or expired OTP.');
+    }
+
+    const token=newResetToken();
+    await pool.query(
+      `UPDATE password_reset_otps
+       SET used_at=now(), reset_token_hash=$1, reset_token_expires_at=now()+interval '10 minutes'
+       WHERE id=$2`,
+      [resetTokenHash(token),row.id]
+    );
+    return res.json({ok:true,reset_token:token});
+  }catch(e){
+    console.error('Forgot password verify error:',e);
+    return sendError(res,500,'OTP verification service error.');
+  }
+});
+
+api.post('/auth/forgot/reset', forgotOtpLimiter, async (req,res)=>{
+  const client=await pool.connect();
+  try{
+    const email=String(req.body?.email||'').trim().toLowerCase();
+    const token=String(req.body?.reset_token||'').trim();
+    const password=String(req.body?.password||'');
+    if(!email || !token || password.length<8) return sendError(res,400,'Email, reset token and password (minimum 8 characters) are required.');
+
+    await client.query('BEGIN');
+    const q=await client.query(
+      `SELECT o.id,o.user_id
+       FROM password_reset_otps o
+       JOIN users u ON u.id=o.user_id
+       WHERE lower(o.email)=lower($1)
+         AND o.reset_token_hash=$2
+         AND o.reset_token_expires_at > now()
+         AND u.is_active=true
+         AND u.role='STUDENT'
+       ORDER BY o.created_at DESC LIMIT 1
+       FOR UPDATE`,
+      [email,resetTokenHash(token)]
+    );
+    if(!q.rowCount){ await client.query('ROLLBACK'); return sendError(res,400,'Invalid or expired password reset session.'); }
+
+    const hash=await argon2.hash(password);
+    await client.query(`UPDATE users SET password_hash=$1 WHERE id=$2`,[hash,q.rows[0].user_id]);
+    await client.query(`DELETE FROM sessions WHERE user_id=$1`,[q.rows[0].user_id]);
+    await client.query(`UPDATE password_reset_otps SET reset_token_hash=NULL,reset_token_expires_at=NULL WHERE id=$1`,[q.rows[0].id]);
+    await client.query(`INSERT INTO activity_events(user_id,event_type,metadata) VALUES($1,'PASSWORD_RESET',$2)`,[q.rows[0].user_id,JSON.stringify({via:'otp'})]);
+    await client.query('COMMIT');
+    return res.json({ok:true,message:'Password reset successful. Please login again.'});
+  }catch(e){
+    try{await client.query('ROLLBACK');}catch(_){ }
+    console.error('Forgot password reset error:',e);
+    return sendError(res,500,'Password reset service error.');
+  }finally{client.release();}
+});
+
 api.post('/auth/logout', async (req, res) => {
   try {
     const sid = req.cookies?.thiral_session;
@@ -463,7 +591,6 @@ api.get('/questions', requireAuth, async (req, res) => {
     const limit = Math.min(Math.max(parseInt(req.query.limit || '20',10) || 20,1),200);
     const offset = Math.max(parseInt(req.query.offset || '0',10) || 0,0);
     if (!exam || !subject || !['ta','en'].includes(language)) return sendError(res,400,'Invalid question request.');
-    if (!requireGroup4Exam(exam)) return sendError(res,403,'Currently only TNPSC Group 4 is enabled.');
 
     const where = ['exam=$1','subject = ANY($2::text[])','language=$3','is_active=true'];
     const params = [exam, subjectCandidatesList, language];
@@ -475,7 +602,8 @@ api.get('/questions', requireAuth, async (req, res) => {
       where.push(`subtopic = ANY($${n}::text[])`); params.push(subCandidates); n++;
     }
 
-    /* Question Bank is user-specific, so it must never use the shared cache. */
+    /* Question Bank continuation: exclude only questions already used
+       in this user's Question Bank mode. Normal Practice/Mock are unchanged. */
     if (historyMode === 'bank') {
       where.push(`NOT EXISTS (
         SELECT 1 FROM question_history h
@@ -487,34 +615,22 @@ api.get('/questions', requireAuth, async (req, res) => {
       n++;
     }
 
-    const cacheKey = historyMode === 'bank' ? null : JSON.stringify({exam,subjectCandidatesList,language,subCandidates,limit,offset});
-    if(cacheKey){
-      const cached = getQuestionCache(cacheKey);
-      if(cached){ return res.json(cached); }
-    }
+    const countQ = await pool.query(`SELECT count(*)::int AS total FROM questions WHERE ${where.join(' AND ')}`, params);
+    const total = Number(countQ.rows[0]?.total || 0);
 
-    /* Fetch one extra row instead of running a full COUNT(*) on every page.
-       This removes a second table scan under heavy traffic while preserving
-       the pagination contract used by the frontend. */
-    const fetchLimit = limit + 1;
-    const dataParams = [...params, fetchLimit, offset];
+    const dataParams = [...params, limit, offset];
     const q = await pool.query(
-      `SELECT id,exam,subject,subtopic,language,question,options
+      `SELECT id,exam,subject,subtopic,language,question,options,explanation
        FROM questions
        WHERE ${where.join(' AND ')}
-       ORDER BY id LIMIT $${n} OFFSET $${n+1}`,
-      dataParams
+       ORDER BY id LIMIT $${n} OFFSET $${n+1}`, dataParams
     );
 
-    const hasMore = q.rows.length > limit;
-    const rows = hasMore ? q.rows.slice(0,limit) : q.rows;
-    const nextOffset = offset + rows.length;
-    const payload = {
-      questions:rows,
-      pagination:{limit,offset,returned:rows.length,total:null,hasMore,nextOffset}
-    };
-    if(cacheKey) setQuestionCache(cacheKey,payload);
-    res.json(payload);
+    const nextOffset = offset + q.rows.length;
+    res.json({
+      questions:q.rows,
+      pagination:{limit,offset,returned:q.rows.length,total,hasMore:nextOffset<total,nextOffset}
+    });
   } catch(e) { console.error(e); sendError(res,500,'Question service error.'); }
 });
 
@@ -530,61 +646,78 @@ api.get('/practice/questions', requireAuth, async (req, res) => {
     const subjectCandidatesList = subjectCandidates(rawSubject);
     const language = String(req.query.language || 'ta').trim();
     const subtopic = String(req.query.subtopic || '').trim();
-    const limit = Math.min(Math.max(parseInt(req.query.limit || '10', 10) || 10, 1), 200);
-    if (!exam || !subject || !['ta','en'].includes(language)) return sendError(res,400,'Invalid question request.');
-    if (!requireGroup4Exam(exam)) return sendError(res,403,'Currently only TNPSC Group 4 is enabled.');
+    const limit = Math.min(
+      Math.max(parseInt(req.query.limit || '10', 10) || 10, 1),
+      200
+    );
+
+    if (!exam || !subject || !['ta', 'en'].includes(language)) {
+      return sendError(res, 400, 'Invalid question request.');
+    }
+
+    const params = [req.user.id, exam, subjectCandidatesList, language];
+    let n = 5;
+
+    let where = `
+      q.exam = $2
+      AND q.subject = ANY($3::text[])
+      AND q.language = $4
+      AND q.is_active = true
+    `;
 
     const subCandidates = subtopicCandidates(subtopic);
-    const paramsBase = [req.user.id, exam, subjectCandidatesList, language];
-    let n = 5;
-    let where = `q.exam = $2 AND q.subject = ANY($3::text[]) AND q.language = $4 AND q.is_active = true`;
     if (subCandidates.length === 1) {
       where += ` AND q.subtopic = $${n}`;
-      paramsBase.push(subCandidates[0]); n++;
+      params.push(subCandidates[0]);
+      n++;
     } else if (subCandidates.length > 1) {
       where += ` AND q.subtopic = ANY($${n}::text[])`;
-      paramsBase.push(subCandidates); n++;
+      params.push(subCandidates);
+      n++;
     }
-    where += ` AND NOT EXISTS (
-      SELECT 1 FROM question_history h
-      WHERE h.user_id=$1 AND h.question_id=q.id AND h.mode='practice'
-    )`;
 
-    /* Avoid ORDER BY random(), which forces PostgreSQL to evaluate and sort a
-       large matching set. An indexed random pivot gives inexpensive variety. */
-    const pivotQ = await pool.query(`SELECT COALESCE(MAX(id),0)::bigint AS max_id FROM questions`);
-    const maxId = Number(pivotQ.rows[0]?.max_id || 0);
-    if(!maxId) return sendError(res,409,'இந்த பாடத்திற்கு புதிய கேள்விகள் இல்லை.');
-    const pivot = Math.floor(Math.random() * maxId) + 1;
+    params.push(limit);
 
-    const fetch = async (operator, extraLimit) => {
-      const params = [...paramsBase, pivot, extraLimit];
-      const pivotPos = n;
-      const limitPos = n + 1;
-      const sql = `SELECT q.id,q.exam,q.subject,q.subtopic,q.language,q.question,q.options\n`+
-        `FROM questions q WHERE ${where} AND q.id ${operator} $${pivotPos}\n`+
-        `ORDER BY q.id LIMIT $${limitPos}`;
-      return pool.query(sql, params);
-    };
+    const sql = `
+      SELECT
+        q.id,
+        q.exam,
+        q.subject,
+        q.subtopic,
+        q.language,
+        q.question,
+        q.options,
+        q.explanation
+      FROM questions q
+      WHERE ${where}
+        AND NOT EXISTS (
+          SELECT 1
+          FROM question_history h
+          WHERE h.user_id = $1
+            AND h.question_id = q.id
+            AND h.mode = 'practice'
+        )
+      ORDER BY random()
+      LIMIT $${n}
+    `;
 
-    let rows = (await fetch('>=', limit)).rows;
-    if(rows.length < limit){
-      const second = await pool.query(
-        `SELECT q.id,q.exam,q.subject,q.subtopic,q.language,q.question,q.options\n`+
-        `FROM questions q WHERE ${where} AND q.id < $${n}\n`+
-        `ORDER BY q.id LIMIT $${n+1}`,
-        [...paramsBase,pivot,limit-rows.length]
+    const result = await pool.query(sql, params);
+
+    if (result.rows.length < limit) {
+      return sendError(
+        res,
+        409,
+        `???? ????????? ???????? ????? ????????? ${result.rows.length} ??????? ?????.`
       );
-      rows = rows.concat(second.rows);
     }
 
-    if (rows.length < limit) {
-      return sendError(res,409,`இந்த பாடத்தில் ${rows.length} புதிய கேள்விகள் மட்டுமே உள்ளன.`);
-    }
-    res.json({questions:rows,count:rows.length});
+    res.json({
+      questions: result.rows,
+      count: result.rows.length
+    });
   } catch (e) {
     console.error('Practice question error:', e);
-    sendError(res,500,'Practice question service error.');
+    sendError(res, 500, 'Practice question service error.');
   }
 });
 
@@ -592,7 +725,6 @@ api.post('/attempts', requireAuth, async (req,res)=>{
   try {
     const {exam,subject,mode,language,questionIds}=req.body||{};
     if(!exam || !subject || !['practice','mock','bank'].includes(mode) || !['ta','en','mixed'].includes(language) || !Array.isArray(questionIds) || !questionIds.length) return sendError(res,400,'Invalid attempt.');
-    if(!requireGroup4Exam(exam)) return sendError(res,403,'Currently only TNPSC Group 4 is enabled.');
     const ids=[...new Set(questionIds.map(Number).filter(Number.isInteger))];
     if(!ids.length || ids.length>5000) return sendError(res,400,'Invalid question list.');
     const q = language==='mixed'
@@ -861,16 +993,7 @@ app.use('/api/admin', async (req, res, next) => {
 
 app.use('/api', api);
 
-app.use(express.static(path.join(__dirname,'frontend'), {
-  index:'index.html',
-  etag:true,
-  lastModified:true,
-  maxAge:'1h',
-  setHeaders:(res,filePath)=>{
-    if(filePath.endsWith('.html')) res.setHeader('Cache-Control','no-cache');
-    else res.setHeader('Cache-Control','public, max-age=3600, stale-while-revalidate=86400');
-  }
-}));
+app.use(express.static(path.join(__dirname,'frontend'), { index:'index.html' }));
 
 app.get('/{*splat}', (req,res)=>{
   res.sendFile(path.join(__dirname,'frontend','index.html'));
@@ -901,47 +1024,39 @@ async function ensureQuestionHistory() {
    PostgreSQL advisory transaction lock. Existing users, questions,
    attempts, results and admin data are not deleted or rewritten.
 */
-async function ensurePerformanceIndexes() {
-  /* These indexes match the hot query paths. They are additive only. */
-  const statements = [
-    `CREATE INDEX IF NOT EXISTS idx_questions_exam_subject_lang_active_id
-       ON questions(exam, subject, language, is_active, id)`,
-    `CREATE INDEX IF NOT EXISTS idx_questions_exam_subject_lang_subtopic_active_id
-       ON questions(exam, subject, language, subtopic, is_active, id)`,
-    `CREATE INDEX IF NOT EXISTS idx_question_history_user_mode_question
-       ON question_history(user_id, mode, question_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_attempts_user_status_started
-       ON attempts(user_id, status, started_at DESC)`,
-    `CREATE INDEX IF NOT EXISTS idx_users_role_active_created
-       ON users(role, is_active, created_at DESC)`,
-    `CREATE INDEX IF NOT EXISTS idx_users_email_lower
-       ON users((lower(email)))`
-  ];
-  for (const sql of statements) {
-    try { await pool.query(sql); }
-    catch (e) { console.error('Performance index warning:', e.message); }
-  }
+
+async function ensurePasswordResetTable(){
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS password_reset_otps (
+      id BIGSERIAL PRIMARY KEY,
+      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      email TEXT NOT NULL,
+      otp_hash CHAR(64) NOT NULL,
+      expires_at TIMESTAMPTZ NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      used_at TIMESTAMPTZ NULL,
+      reset_token_hash CHAR(64) NULL,
+      reset_token_expires_at TIMESTAMPTZ NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_password_reset_email_created ON password_reset_otps(email,created_at DESC)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_password_reset_user_created ON password_reset_otps(user_id,created_at DESC)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_password_reset_token ON password_reset_otps(reset_token_hash) WHERE reset_token_hash IS NOT NULL`);
+  await pool.query(`DELETE FROM password_reset_otps WHERE created_at < now()-interval '1 day'`);
 }
 
 async function start(){
   try{
     await pool.query('SELECT 1');
     await ensureQuestionHistory();
-    await ensurePerformanceIndexes();
+    await ensurePasswordResetTable();
     await ensureAdmin();
-    app.listen(PORT,'0.0.0.0',()=>console.log(`Thiral V158 Secure Fast listening on port ${PORT}`));
+    app.listen(PORT,'0.0.0.0',()=>console.log(`Thiral V160 Secure OTP listening on port ${PORT}`));
   }catch(e){
     console.error('Startup failed:',e);
     process.exit(1);
   }
 }
-
-const shutdown = async (signal) => {
-  console.log(`${signal} received. Shutting down gracefully...`);
-  try { await pool.end(); } catch (_) {}
-  process.exit(0);
-};
-process.once('SIGTERM', () => shutdown('SIGTERM'));
-process.once('SIGINT', () => shutdown('SIGINT'));
 
 start();
