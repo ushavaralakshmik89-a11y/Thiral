@@ -1,14 +1,10 @@
 {
-  "name": "thiral-v139-backend",
-  "version": "139.0.0",
+  "name": "thiral-v160-backend",
+  "version": "160.0.0",
   "private": true,
   "type": "module",
-  "scripts": {
-    "start": "node server.js"
-  },
-  "engines": {
-    "node": ">=20"
-  },
+  "scripts": {"start": "node server.js"},
+  "engines": {"node": ">=20"},
   "dependencies": {
     "argon2": "^0.44.0",
     "compression": "^1.8.1",
@@ -16,6 +12,7 @@
     "express": "^5.1.0",
     "express-rate-limit": "^8.1.0",
     "helmet": "^8.1.0",
-    "pg": "^8.16.3"
+    "pg": "^8.16.3",
+    "nodemailer": "^7.0.6"
   }
 }
