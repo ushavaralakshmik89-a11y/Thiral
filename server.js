@@ -245,6 +245,8 @@ api.get('/questions', requireAuth, async (req, res) => {
       'பொது அறிவு':'gs',
       'General Knowledge':'gs',
       'general knowledge':'gs',
+      'General Studies':'gs',
+      'general studies':'gs',
       'Aptitude':'apt',
       'aptitude':'apt',
       'தமிழ்':'tamil',
@@ -281,24 +283,13 @@ api.get('/questions', requireAuth, async (req, res) => {
 });
 
 /* ===== FAST PRACTICE API =====
-   Practice questions are fetched directly from PostgreSQL.
-   Only the requested number is returned to the browser.
-   Existing question-bank rows are never deleted or modified.
+   Existing /questions API is intentionally left unchanged.
+   Practice gets only the requested number of fresh questions.
 */
 api.get('/practice/questions', requireAuth, async (req, res) => {
   try {
     const exam = String(req.query.exam || '').trim();
-    const rawSubject = String(req.query.subject || '').trim();
-    const subjectAliases = {
-      'பொது அறிவு':'gs',
-      'General Knowledge':'gs',
-      'general knowledge':'gs',
-      'Aptitude':'apt',
-      'aptitude':'apt',
-      'தமிழ்':'tamil',
-      'Tamil':'tamil'
-    };
-    const subject = subjectAliases[rawSubject] || rawSubject;
+    const subject = String(req.query.subject || '').trim();
     const language = String(req.query.language || 'ta').trim();
     const subtopic = String(req.query.subtopic || '').trim();
 
@@ -375,10 +366,12 @@ api.get('/practice/questions', requireAuth, async (req, res) => {
 api.post('/attempts', requireAuth, async (req,res)=>{
   try {
     const {exam,subject,mode,language,questionIds}=req.body||{};
-    if(!exam || !subject || !['practice','mock'].includes(mode) || !['ta','en'].includes(language) || !Array.isArray(questionIds) || !questionIds.length) return sendError(res,400,'Invalid attempt.');
+    if(!exam || !subject || !['practice','mock'].includes(mode) || !['ta','en','mixed'].includes(language) || !Array.isArray(questionIds) || !questionIds.length) return sendError(res,400,'Invalid attempt.');
     const ids=[...new Set(questionIds.map(Number).filter(Number.isInteger))];
     if(!ids.length || ids.length>5000) return sendError(res,400,'Invalid question list.');
-    const q=await pool.query(`SELECT id FROM questions WHERE id=ANY($1::bigint[]) AND exam=$2 AND language=$3 AND is_active=true`,[ids,exam,language]);
+    const q = language==='mixed'
+      ? await pool.query(`SELECT id FROM questions WHERE id=ANY($1::bigint[]) AND exam=$2 AND is_active=true`,[ids,exam])
+      : await pool.query(`SELECT id FROM questions WHERE id=ANY($1::bigint[]) AND exam=$2 AND language=$3 AND is_active=true`,[ids,exam,language]);
     const valid=new Set(q.rows.map(x=>String(x.id)));
     const clean=ids.filter(id=>valid.has(String(id)));
     if(clean.length!==ids.length) return sendError(res,400,'Some questions are not valid for this exam/language.');
