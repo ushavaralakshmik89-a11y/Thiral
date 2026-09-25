@@ -6,7 +6,6 @@ import cookieParser from 'cookie-parser';
 import compression from 'compression';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import nodemailer from 'nodemailer';
 import argon2 from 'argon2';
 import pg from 'pg';
 
@@ -37,7 +36,7 @@ app.use((req, res, next) => {
 });
 
 const PORT = process.env.PORT || 10000;
-const THIRAL_SECURITY_VERSION = 'V161';
+const THIRAL_SECURITY_VERSION = 'V162';
 const isProd = process.env.NODE_ENV === 'production';
 
 if (!process.env.DATABASE_URL) {
@@ -60,63 +59,8 @@ app.use(compression());
 app.use(express.json({ limit: '2mb' }));
 app.use(cookieParser());
 
-// express-rate-limit v8 default IP key generation is IPv6-safe.
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false });
 const apiLimiter = rateLimit({ windowMs: 60 * 1000, max: 180, standardHeaders: true, legacyHeaders: false });
-
-
-const forgotOtpLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 8,
-  standardHeaders: true,
-  legacyHeaders: false
-});
-
-const smtpTransport = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: Number(process.env.SMTP_PORT || 465),
-  secure: String(process.env.SMTP_SECURE || 'true').toLowerCase() === 'true',
-  auth: {
-    user: process.env.SMTP_USER || '',
-    pass: process.env.SMTP_PASS || ''
-  },
-  connectionTimeout: 10000,
-  greetingTimeout: 10000,
-  socketTimeout: 15000
-});
-
-function otpHash(value) {
-  const pepper = process.env.OTP_PEPPER || '';
-  return crypto.createHash('sha256').update(`${pepper}:${String(value)}`).digest('hex');
-}
-
-function newOtp() {
-  return String(crypto.randomInt(0, 1000000)).padStart(6, '0');
-}
-
-function newResetToken() {
-  return crypto.randomBytes(32).toString('hex');
-}
-
-function resetTokenHash(value) {
-  const pepper = process.env.OTP_PEPPER || '';
-  return crypto.createHash('sha256').update(`${pepper}:reset:${String(value)}`).digest('hex');
-}
-
-async function sendForgotOtpEmail(to, otp) {
-  const from = process.env.SMTP_FROM || process.env.SMTP_USER || '';
-  if (!process.env.SMTP_USER || !process.env.SMTP_PASS || !from) {
-    throw new Error('SMTP email service is not configured.');
-  }
-  const result = await smtpTransport.sendMail({
-    from: `Thiral Admin <${from}>`,
-    to,
-    subject: 'Thiral Password Reset OTP',
-    text: `Your Thiral password reset OTP is ${otp}. It is valid for 10 minutes. If you did not request this, ignore this email.`,
-    html: `<div style="font-family:Arial,sans-serif;line-height:1.6"><h2>Thiral / திறல்</h2><p>Password reset OTP:</p><p style="font-size:30px;font-weight:800;letter-spacing:6px">${otp}</p><p>This OTP is valid for 10 minutes and can be used only once.</p><p>If you did not request a password reset, you can ignore this email.</p></div>`
-  });
-  return result;
-}
 
 function sendError(res, status, error) {
   return res.status(status).json({ error });
@@ -269,9 +213,9 @@ async function ensureAdmin() {
 app.get('/health', async (req, res) => {
   try {
     await pool.query('SELECT 1');
-    res.json({ ok: true, service: 'Thiral V139', database: 'ok', time: new Date().toISOString() });
+    res.json({ ok: true, service: 'Thiral V162 Secure OTP', database: 'ok', time: new Date().toISOString() });
   } catch (e) {
-    res.status(503).json({ ok: false, service: 'Thiral V139', database: 'error' });
+    res.status(503).json({ ok: false, service: 'Thiral V162 Secure OTP', database: 'error' });
   }
 });
 
@@ -446,137 +390,300 @@ api.post('/auth/register', authLimiter, async (req, res) => {
 });
 
 
-api.post('/auth/forgot/request', forgotOtpLimiter, async (req,res)=>{
-  console.log('[OTP] Forgot-password request received.');
-  const generic = 'If the account exists, an OTP has been sent to the registered email.';
-  try{
-    const email=String(req.body?.email||'').trim().toLowerCase();
-    console.log('[OTP] Request validated:', Boolean(email), 'emailLength=', email.length);
-    if(!email || email.length>254) return res.json({ok:true,message:generic});
+/* =========================================================
+   THIRAL V162 SECURE OTP
+   Password reset uses:
+   Render -> HTTPS -> Google Apps Script -> Gmail
+   No SMTP connection is required on Render.
+   ========================================================= */
 
-    const userQ=await pool.query(
-      `SELECT id,email,is_active FROM users WHERE lower(email)=lower($1) AND role='STUDENT' LIMIT 1`,
+function otpConfigReady(){
+  return Boolean(
+    String(process.env.THIRAL_APPS_SCRIPT_URL || '').trim() &&
+    String(process.env.THIRAL_API_KEY || '').trim()
+  );
+}
+
+function hashOtp(value){
+  const pepper = String(process.env.OTP_PEPPER || '').trim();
+  return crypto
+    .createHash('sha256')
+    .update(pepper + ':' + String(value))
+    .digest('hex');
+}
+
+function newOtp(){
+  return String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+}
+
+function newResetToken(){
+  return crypto.randomBytes(32).toString('hex');
+}
+
+async function sendOtpThroughAppsScript(to, otp){
+  const url = String(process.env.THIRAL_APPS_SCRIPT_URL || '').trim();
+  const apiKey = String(process.env.THIRAL_API_KEY || '').trim();
+
+  if(!url || !apiKey) throw new Error('OTP bridge configuration is missing.');
+
+  const response = await fetch(url, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    redirect:'follow',
+    body:JSON.stringify({
+      api_key:apiKey,
+      to:String(to || '').trim().toLowerCase(),
+      otp:String(otp || '')
+    })
+  });
+
+  const text = await response.text();
+  let data = {};
+  try { data = JSON.parse(text); } catch (_) {}
+
+  if(!response.ok || data.ok !== true){
+    const err = new Error('OTP email delivery failed.');
+    err.status = response.status;
+    err.bridgeMessage = String(data.message || '').slice(0,200);
+    throw err;
+  }
+  return true;
+}
+
+function otpPublicMessage(){
+  return 'If the registered email exists, an OTP has been sent.';
+}
+
+api.post('/auth/forgot-password/request', authLimiter, async (req,res)=>{
+  try{
+    const email = String(req.body?.email || '').trim().toLowerCase();
+
+    if(!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+      return sendError(res,400,'Valid email is required.');
+    }
+
+    if(!otpConfigReady()){
+      console.error('[OTP] Bridge configuration missing.');
+      return sendError(res,503,'OTP service is not configured.');
+    }
+
+    const q = await pool.query(
+      `SELECT id,email,is_active,role
+       FROM users
+       WHERE lower(email)=lower($1)
+       LIMIT 1`,
       [email]
     );
-    if(!userQ.rowCount || !userQ.rows[0].is_active){
-      console.log('[OTP] No active student account matched request.');
-      return res.json({ok:true,message:generic});
+
+    /*
+      Do not reveal whether an email is registered.
+      Only active STUDENT accounts can use student password reset.
+    */
+    const user = q.rows[0];
+    if(!user || !user.is_active || user.role !== 'STUDENT'){
+      return res.json({ok:true,message:otpPublicMessage()});
     }
-    console.log('[OTP] Active student account matched. Preparing OTP email.');
 
-    const recent=await pool.query(
-      `SELECT id FROM password_reset_otps
-       WHERE user_id=$1 AND created_at > now()-interval '60 seconds'
-       ORDER BY created_at DESC LIMIT 1`,
-      [userQ.rows[0].id]
+    const recent = await pool.query(
+      `SELECT id
+       FROM password_reset_otps
+       WHERE user_id=$1
+         AND created_at > now() - interval '60 seconds'
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [user.id]
     );
-    if(recent.rowCount) return res.json({ok:true,message:generic});
 
-    const otp=newOtp();
+    if(recent.rowCount){
+      return sendError(res,429,'Please wait before requesting another OTP.');
+    }
+
+    const otp = newOtp();
+    const otpHash = hashOtp(otp);
+
     await pool.query(
-      `UPDATE password_reset_otps SET used_at=now()
+      `UPDATE password_reset_otps
+       SET used_at=now()
        WHERE user_id=$1 AND used_at IS NULL`,
-      [userQ.rows[0].id]
+      [user.id]
     );
-    await pool.query(
-      `INSERT INTO password_reset_otps(user_id,email,otp_hash,expires_at,attempts,used_at)
-       VALUES($1,$2,$3,now()+interval '10 minutes',0,NULL)`,
-      [userQ.rows[0].id,email,otpHash(otp)]
+
+    const ins = await pool.query(
+      `INSERT INTO password_reset_otps
+       (user_id,otp_hash,expires_at,attempts,used_at)
+       VALUES($1,$2,now()+interval '10 minutes',0,NULL)
+       RETURNING id`,
+      [user.id,otpHash]
     );
 
     try{
-      const mailInfo = await sendForgotOtpEmail(email,otp);
-      console.log('[OTP] SMTP send succeeded:', { messageId: mailInfo?.messageId || null, accepted: Array.isArray(mailInfo?.accepted) ? mailInfo.accepted.length : 0, rejected: Array.isArray(mailInfo?.rejected) ? mailInfo.rejected.length : 0 });
+      await sendOtpThroughAppsScript(user.email,otp);
+      console.log('[OTP] Apps Script mail sent successfully.');
     }catch(mailErr){
       await pool.query(
-        `UPDATE password_reset_otps SET used_at=now() WHERE user_id=$1 AND otp_hash=$2 AND used_at IS NULL`,
-        [userQ.rows[0].id,otpHash(otp)]
+        `UPDATE password_reset_otps SET used_at=now() WHERE id=$1`,
+        [ins.rows[0].id]
       );
-      console.error('[OTP] SMTP send FAILED:', { code: mailErr?.code || null, command: mailErr?.command || null, responseCode: mailErr?.responseCode || null, message: mailErr?.message || String(mailErr) });
+      console.error('[OTP] Apps Script mail failed:', {
+        status:mailErr?.status || null,
+        message:mailErr?.message || String(mailErr),
+        bridgeMessage:mailErr?.bridgeMessage || null
+      });
+      return sendError(res,502,'OTP email delivery failed.');
     }
 
-    return res.json({ok:true,message:generic});
+    return res.json({ok:true,message:otpPublicMessage()});
   }catch(e){
-    console.error('[OTP] Forgot password request FAILED:', { code:e?.code||null, message:e?.message||String(e) });
-    return res.json({ok:true,message:generic});
+    console.error('[OTP] Request error:',e);
+    return sendError(res,500,'OTP service error.');
   }
 });
 
-api.post('/auth/forgot/verify', forgotOtpLimiter, async (req,res)=>{
+api.post('/auth/forgot-password/verify', authLimiter, async (req,res)=>{
   try{
-    const email=String(req.body?.email||'').trim().toLowerCase();
-    const otp=String(req.body?.otp||'').trim();
-    if(!email || !/^\d{6}$/.test(otp)) return sendError(res,400,'Invalid OTP.');
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const otp = String(req.body?.otp || '').trim();
 
-    const q=await pool.query(
-      `SELECT id,user_id,otp_hash,expires_at,attempts
-       FROM password_reset_otps
-       WHERE lower(email)=lower($1) AND used_at IS NULL
-       ORDER BY created_at DESC LIMIT 1`,
+    if(!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !/^\d{6}$/.test(otp)){
+      return sendError(res,400,'Email and 6-digit OTP are required.');
+    }
+
+    const q = await pool.query(
+      `SELECT o.id,o.user_id,o.otp_hash,o.expires_at,o.attempts,
+              u.email,u.is_active,u.role
+       FROM password_reset_otps o
+       JOIN users u ON u.id=o.user_id
+       WHERE lower(u.email)=lower($1)
+         AND o.used_at IS NULL
+       ORDER BY o.created_at DESC
+       LIMIT 1`,
       [email]
     );
-    if(!q.rowCount) return sendError(res,400,'Invalid or expired OTP.');
-    const row=q.rows[0];
-    if(new Date(row.expires_at).getTime()<=Date.now()) return sendError(res,400,'Invalid or expired OTP.');
-    if(Number(row.attempts)>=5) return sendError(res,429,'Too many OTP attempts. Request a new OTP.');
 
-    const ok=crypto.timingSafeEqual(Buffer.from(row.otp_hash),Buffer.from(otpHash(otp)));
-    if(!ok){
-      await pool.query(`UPDATE password_reset_otps SET attempts=attempts+1 WHERE id=$1`,[row.id]);
+    if(!q.rowCount) return sendError(res,400,'Invalid or expired OTP.');
+
+    const row = q.rows[0];
+
+    if(!row.is_active || row.role !== 'STUDENT'){
       return sendError(res,400,'Invalid or expired OTP.');
     }
 
-    const token=newResetToken();
+    if(new Date(row.expires_at).getTime() <= Date.now()){
+      return sendError(res,400,'OTP has expired.');
+    }
+
+    if(Number(row.attempts) >= 5){
+      return sendError(res,429,'Too many incorrect OTP attempts.');
+    }
+
+    const suppliedHash = hashOtp(otp);
+
+    if(!crypto.timingSafeEqual(
+      Buffer.from(suppliedHash,'utf8'),
+      Buffer.from(String(row.otp_hash),'utf8')
+    )){
+      await pool.query(
+        `UPDATE password_reset_otps
+         SET attempts=attempts+1
+         WHERE id=$1`,
+        [row.id]
+      );
+      return sendError(res,400,'Invalid or expired OTP.');
+    }
+
+    const resetToken = newResetToken();
+    const resetTokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
+
     await pool.query(
       `UPDATE password_reset_otps
-       SET used_at=now(), reset_token_hash=$1, reset_token_expires_at=now()+interval '10 minutes'
+       SET verified_at=now(),reset_token_hash=$1
        WHERE id=$2`,
-      [resetTokenHash(token),row.id]
+      [resetTokenHash,row.id]
     );
-    return res.json({ok:true,reset_token:token});
+
+    return res.json({ok:true,reset_token:resetToken});
   }catch(e){
-    console.error('Forgot password verify error:',e);
+    console.error('[OTP] Verify error:',e);
     return sendError(res,500,'OTP verification service error.');
   }
 });
 
-api.post('/auth/forgot/reset', forgotOtpLimiter, async (req,res)=>{
-  const client=await pool.connect();
+api.post('/auth/forgot-password/reset', authLimiter, async (req,res)=>{
   try{
-    const email=String(req.body?.email||'').trim().toLowerCase();
-    const token=String(req.body?.reset_token||'').trim();
-    const password=String(req.body?.password||'');
-    if(!email || !token || password.length<8) return sendError(res,400,'Email, reset token and password (minimum 8 characters) are required.');
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const resetToken = String(req.body?.reset_token || '').trim();
+    const newPassword = String(req.body?.password || '');
 
-    await client.query('BEGIN');
-    const q=await client.query(
-      `SELECT o.id,o.user_id
+    if(!email || !resetToken || newPassword.length < 8){
+      return sendError(res,400,'Email, reset token and password (minimum 8 characters) are required.');
+    }
+
+    const tokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
+
+    const q = await pool.query(
+      `SELECT o.id,o.user_id,o.reset_token_hash,o.verified_at,
+              u.email,u.is_active,u.role
        FROM password_reset_otps o
        JOIN users u ON u.id=o.user_id
-       WHERE lower(o.email)=lower($1)
+       WHERE lower(u.email)=lower($1)
          AND o.reset_token_hash=$2
-         AND o.reset_token_expires_at > now()
-         AND u.is_active=true
-         AND u.role='STUDENT'
-       ORDER BY o.created_at DESC LIMIT 1
-       FOR UPDATE`,
-      [email,resetTokenHash(token)]
+         AND o.used_at IS NULL
+         AND o.verified_at IS NOT NULL
+         AND o.expires_at > now()
+       ORDER BY o.created_at DESC
+       LIMIT 1`,
+      [email,tokenHash]
     );
-    if(!q.rowCount){ await client.query('ROLLBACK'); return sendError(res,400,'Invalid or expired password reset session.'); }
 
-    const hash=await argon2.hash(password);
-    await client.query(`UPDATE users SET password_hash=$1 WHERE id=$2`,[hash,q.rows[0].user_id]);
-    await client.query(`DELETE FROM sessions WHERE user_id=$1`,[q.rows[0].user_id]);
-    await client.query(`UPDATE password_reset_otps SET reset_token_hash=NULL,reset_token_expires_at=NULL WHERE id=$1`,[q.rows[0].id]);
-    await client.query(`INSERT INTO activity_events(user_id,event_type,metadata) VALUES($1,'PASSWORD_RESET',$2)`,[q.rows[0].user_id,JSON.stringify({via:'otp'})]);
-    await client.query('COMMIT');
-    return res.json({ok:true,message:'Password reset successful. Please login again.'});
+    if(!q.rowCount) return sendError(res,400,'Invalid or expired password reset token.');
+
+    const row = q.rows[0];
+
+    if(!row.is_active || row.role !== 'STUDENT'){
+      return sendError(res,400,'Invalid password reset request.');
+    }
+
+    const passwordHash = await argon2.hash(newPassword);
+
+    await pool.query('BEGIN');
+    try{
+      await pool.query(
+        `UPDATE users SET password_hash=$1 WHERE id=$2`,
+        [passwordHash,row.user_id]
+      );
+
+      await pool.query(
+        `UPDATE password_reset_otps
+         SET used_at=now(),reset_token_hash=NULL
+         WHERE id=$1`,
+        [row.id]
+      );
+
+      /* Password reset invalidates all existing sessions for this student. */
+      await pool.query(
+        `DELETE FROM sessions WHERE user_id=$1`,
+        [row.user_id]
+      );
+
+      await pool.query(
+        `INSERT INTO activity_events(user_id,event_type,metadata)
+         VALUES($1,'PASSWORD_RESET',$2)`,
+        [row.user_id,JSON.stringify({method:'OTP'})]
+      );
+
+      await pool.query('COMMIT');
+    }catch(e){
+      await pool.query('ROLLBACK');
+      throw e;
+    }
+
+    return res.json({ok:true,message:'Password reset successfully.'});
   }catch(e){
-    try{await client.query('ROLLBACK');}catch(_){ }
-    console.error('Forgot password reset error:',e);
+    console.error('[OTP] Password reset error:',e);
     return sendError(res,500,'Password reset service error.');
-  }finally{client.release();}
+  }
 });
+
 
 api.post('/auth/logout', async (req, res) => {
   try {
@@ -1008,6 +1115,33 @@ app.get('/{*splat}', (req,res)=>{
 });
 
 /* Create the history table/index without touching existing question data. */
+
+async function ensurePasswordResetTables() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS password_reset_otps (
+      id BIGSERIAL PRIMARY KEY,
+      user_id BIGINT NOT NULL,
+      otp_hash TEXT NOT NULL,
+      expires_at TIMESTAMPTZ NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      verified_at TIMESTAMPTZ NULL,
+      reset_token_hash TEXT NULL,
+      used_at TIMESTAMPTZ NULL
+    )
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_password_reset_otps_user_created
+    ON password_reset_otps(user_id, created_at DESC)
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_password_reset_otps_token
+    ON password_reset_otps(reset_token_hash)
+  `);
+}
+
 async function ensureQuestionHistory() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS question_history (
@@ -1032,36 +1166,13 @@ async function ensureQuestionHistory() {
    PostgreSQL advisory transaction lock. Existing users, questions,
    attempts, results and admin data are not deleted or rewritten.
 */
-
-async function ensurePasswordResetTable(){
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS password_reset_otps (
-      id BIGSERIAL PRIMARY KEY,
-      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      email TEXT NOT NULL,
-      otp_hash CHAR(64) NOT NULL,
-      expires_at TIMESTAMPTZ NOT NULL,
-      attempts INTEGER NOT NULL DEFAULT 0,
-      used_at TIMESTAMPTZ NULL,
-      reset_token_hash CHAR(64) NULL,
-      reset_token_expires_at TIMESTAMPTZ NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    )
-  `);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_password_reset_email_created ON password_reset_otps(email,created_at DESC)`);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_password_reset_user_created ON password_reset_otps(user_id,created_at DESC)`);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_password_reset_token ON password_reset_otps(reset_token_hash) WHERE reset_token_hash IS NOT NULL`);
-  await pool.query(`DELETE FROM password_reset_otps WHERE created_at < now()-interval '1 day'`);
-}
-
 async function start(){
   try{
     await pool.query('SELECT 1');
+    await ensurePasswordResetTables();
     await ensureQuestionHistory();
-    await ensurePasswordResetTable();
     await ensureAdmin();
-    console.log('[OTP] SMTP configuration present:', { host: process.env.SMTP_HOST || null, port: process.env.SMTP_PORT || null, secure: String(process.env.SMTP_SECURE || 'true'), userPresent: Boolean(process.env.SMTP_USER), passPresent: Boolean(process.env.SMTP_PASS), fromPresent: Boolean(process.env.SMTP_FROM), pepperPresent: Boolean(process.env.OTP_PEPPER) });
-    app.listen(PORT,'0.0.0.0',()=>console.log(`Thiral V161 Secure OTP Diagnostics listening on port ${PORT}`));
+    app.listen(PORT,'0.0.0.0',()=>console.log(`Thiral V162 Secure OTP listening on port ${PORT}`));
   }catch(e){
     console.error('Startup failed:',e);
     process.exit(1);
