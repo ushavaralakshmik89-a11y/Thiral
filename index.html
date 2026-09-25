@@ -3752,6 +3752,25 @@ async function answer(value,timeout=false){
     if(!timeout){T.seconds=15;timer(15);T.timer=setInterval(()=>{T.seconds--;timer(T.seconds);if(T.seconds<=0){stop();answer(-1,true);}},1000);}
   }
 }
+async function thiralFetchSubjectRows(examName, subjectName, languageName, subtopicName, limitName, offsetName){
+  const candidates = subjectName==='gs'
+    ? ['gs','பொது அறிவு','General Knowledge','General Studies']
+    : [subjectName];
+  let lastRows=[];
+  for(const candidate of candidates){
+    const u='/questions?exam='+encodeURIComponent(examName)+
+      '&subject='+encodeURIComponent(candidate)+
+      '&language='+encodeURIComponent(languageName)+
+      (subtopicName ? '&subtopic='+encodeURIComponent(subtopicName) : '')+
+      '&limit='+encodeURIComponent(limitName)+'&offset='+encodeURIComponent(offsetName);
+    const d=await api(u);
+    const rows=Array.isArray(d.questions)?d.questions:[];
+    if(rows.length) return {data:d,rows};
+    lastRows=rows;
+  }
+  return {data:null,rows:lastRows};
+}
+
 async function loadPracticeQuestions(requested){
   const selectedSubtopic=(typeof currentSub!=='undefined'?String(currentSub||'').trim():'');
   if(!selectedSubtopic) throw new Error('Subtopic தேர்வு செய்யப்படவில்லை.');
@@ -3771,24 +3790,20 @@ async function loadPracticeQuestions(requested){
   /* 10/20/50: do NOT download the whole bank. Fetch a small page first.
      “முழுவதும்” மட்டும் எல்லா pages-ஐ தொடர்ந்து பெறும். */
   if(requested!==9999){
-    const d=await api('/questions?exam='+encodeURIComponent(String(selectedExam||'group4'))+
-      '&subject='+encodeURIComponent(dbSubject)+
-      '&language='+encodeURIComponent(contentLanguage==='en'?'en':'ta')+
-      '&subtopic='+encodeURIComponent(dbSubtopic)+
-      '&limit=200&offset=0');
-    return Array.isArray(d.questions)?d.questions:[];
+    const r=await thiralFetchSubjectRows(
+      String(selectedExam||'group4'),dbSubject,contentLanguage==='en'?'en':'ta',dbSubtopic,200,0
+    );
+    return r.rows;
   }
 
   const out=[];
   let offset=0;
   const pageSize=200;
   while(true){
-    const d=await api('/questions?exam='+encodeURIComponent(String(selectedExam||'group4'))+
-      '&subject='+encodeURIComponent(dbSubject)+
-      '&language='+encodeURIComponent(contentLanguage==='en'?'en':'ta')+
-      '&subtopic='+encodeURIComponent(dbSubtopic)+
-      '&limit='+pageSize+'&offset='+offset);
-    const rows=Array.isArray(d.questions)?d.questions:[];
+    const r=await thiralFetchSubjectRows(
+      String(selectedExam||'group4'),dbSubject,contentLanguage==='en'?'en':'ta',dbSubtopic,pageSize,offset
+    );
+    const rows=r.rows;
     out.push(...rows);
     if(!d.pagination || !d.pagination.hasMore || rows.length===0) break;
     offset=Number(d.pagination.nextOffset ?? (offset+rows.length));
@@ -4314,13 +4329,18 @@ async function qbLoadAll(){
   const ex=String(typeof selectedExam!=='undefined'&&selectedExam?selectedExam:'group4');
   const su=qbSubject(),la=qbLanguage(),st=qbSubtopic();
   while(true){
-    const url='/questions?exam='+encodeURIComponent(ex)+
-      '&subject='+encodeURIComponent(su)+
-      '&language='+encodeURIComponent(la)+
-      '&subtopic='+encodeURIComponent(st)+
-      '&historyMode=bank&limit='+pageSize+'&offset='+offset;
-    const d=await qbApi(url);
-    const rows=Array.isArray(d.questions)?d.questions:[];
+    const subjects=su==='gs'?['gs','பொது அறிவு','General Knowledge','General Studies']:[su];
+    let rows=[];
+    for(const candidate of subjects){
+      const url='/questions?exam='+encodeURIComponent(ex)+
+        '&subject='+encodeURIComponent(candidate)+
+        '&language='+encodeURIComponent(la)+
+        '&subtopic='+encodeURIComponent(st)+
+        '&historyMode=bank&limit='+pageSize+'&offset='+offset;
+      const d=await qbApi(url);
+      rows=Array.isArray(d.questions)?d.questions:[];
+      if(rows.length)break;
+    }
     out.push(...rows);
     if(qb$('feedback'))qb$('feedback').innerHTML='<b>Question Bank ஏற்றப்படுகிறது...</b><br>இதுவரை: '+out.length+' கேள்விகள்';
     if(!d.pagination||!d.pagination.hasMore||!rows.length)break;
@@ -4589,4 +4609,5 @@ window.__THIRAL_QUESTION_BANK_REVIEW_V1__=true;
   }
 })();
 </script>
+<script>window.__THIRAL_GK_LANGUAGE_FALLBACK__='gs/பொது அறிவு/General Knowledge/General Studies + ta/en';</script>
 </body></html>
