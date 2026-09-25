@@ -833,7 +833,29 @@ function labelForSub(s,t,sub){
 
 let currentSubject='',currentTopic='',currentSub='',questions=[],qi=0,total=10,correct=0,wrong=0,unanswered=0,timer=null,locked=false;
 
+function clearLoginFields(which){
+  if(which === 'login'){
+    var email = document.getElementById('email');
+    var pass = document.getElementById('pass');
+    var msg = document.getElementById('lm');
+    if(email) email.value = '';
+    if(pass) pass.value = '';
+    if(msg){ msg.textContent = ''; msg.className = ''; }
+  }
+  if(which === 'adminLogin'){
+    var adminEmail = document.getElementById('adminEmail');
+    var adminPass = document.getElementById('adminPass');
+    var adminMsg = document.getElementById('adminMsg');
+    if(adminEmail) adminEmail.value = '';
+    if(adminPass) adminPass.value = '';
+    if(adminMsg){ adminMsg.textContent = ''; adminMsg.className = ''; }
+  }
+}
+
 function show(id){
+  /* Keep the existing navigation exactly as-is. Only clear old login text. */
+  if(id === 'login' || id === 'adminLogin') clearLoginFields(id);
+
   /* V128: Admin dashboard is never opened without an authenticated ADMIN session. */
   if(id==='admin'){
     try{
