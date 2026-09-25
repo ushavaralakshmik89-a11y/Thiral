@@ -4431,29 +4431,114 @@ window.startPractice=async function(n){
   window.__THIRAL_GROUP4_ONLY_FINAL__=true;
 })();
 </script>
-
-<script id="thiral-v158-fast-client">
-/* THIRAL V158 client performance layer.
-   Only de-duplicates identical in-flight question GETs in this browser tab.
-   It never caches student/admin/private data and never changes question content. */
+<script id="thiral-forgot-password-otp-v158">
 (function(){
   'use strict';
-  var base=window.thiralV138Api;
-  if(typeof base!=='function' || window.__THIRAL_V158_FAST_CLIENT__) return;
-  var pending=new Map();
-  window.thiralV138Api=function(path,opt){
-    opt=opt||{};
-    var method=String(opt.method||'GET').toUpperCase();
-    var key=method+' '+String(path||'');
-    var isQuestionGet=method==='GET' && /^\/questions\?/.test(String(path||'')) && !/[?&]historyMode=bank(?:&|$)/.test(String(path||''));
-    if(!isQuestionGet) return base(path,opt);
-    if(pending.has(key)) return pending.get(key);
-    var p=Promise.resolve(base(path,opt));
-    pending.set(key,p);
-    p.finally(function(){ if(pending.get(key)===p) pending.delete(key); }).catch(function(){});
-    return p;
+  var resetToken = '';
+
+  function fpApi(){
+    if(typeof window.thiralV138Api !== 'function') throw new Error('Security service is not ready. Please refresh and try again.');
+    return window.thiralV138Api;
+  }
+  function setText(id,msg,cls){
+    var e=document.getElementById(id);
+    if(e){e.textContent=msg||'';e.className=cls||'';}
+  }
+  function showStep(n){
+    ['fpStep1','fpStep2','fpStep3'].forEach(function(id,i){
+      var e=document.getElementById(id);
+      if(e)e.classList.toggle('hidden',i!==n-1);
+    });
+  }
+  function cleanEmail(){
+    return String((document.getElementById('fpemail')||{}).value||'').trim().toLowerCase();
+  }
+
+  window.sendForgotOTP = async function(){
+    var email=cleanEmail();
+    setText('fpmsg','','');
+    if(!email){setText('fpmsg','Registered Email ID-ஐ உள்ளிடுங்கள்.','bad');return;}
+    try{
+      var api=fpApi();
+      var d=await api('/auth/forgot/request',{method:'POST',body:JSON.stringify({email:email})});
+      setText('fpmsg',d.message||'If the account exists, an OTP has been sent to the registered email.','good');
+      document.getElementById('fpotp').value='';
+      showStep(2);
+    }catch(e){
+      setText('fpmsg',e.message||'OTP அனுப்ப முடியவில்லை.','bad');
+    }
   };
-  window.__THIRAL_V158_FAST_CLIENT__=true;
+
+  window.resendForgotOTP = async function(){
+    var email=cleanEmail();
+    setText('fpOtpMsg','','');
+    if(!email){setText('fpOtpMsg','Email ID இல்லை.','bad');return;}
+    try{
+      var api=fpApi();
+      var d=await api('/auth/forgot/request',{method:'POST',body:JSON.stringify({email:email})});
+      setText('fpOtpMsg',d.message||'OTP அனுப்பப்பட்டது.','good');
+      document.getElementById('fpotp').value='';
+    }catch(e){
+      setText('fpOtpMsg',e.message||'OTP மீண்டும் அனுப்ப முடியவில்லை.','bad');
+    }
+  };
+
+  window.verifyForgotOTP = async function(){
+    var email=cleanEmail();
+    var otp=String((document.getElementById('fpotp')||{}).value||'').replace(/\D/g,'').slice(0,6);
+    document.getElementById('fpotp').value=otp;
+    setText('fpOtpMsg','','');
+    if(!/^\d{6}$/.test(otp)){setText('fpOtpMsg','6 இலக்க OTP-ஐ உள்ளிடுங்கள்.','bad');return;}
+    try{
+      var api=fpApi();
+      var d=await api('/auth/forgot/verify',{method:'POST',body:JSON.stringify({email:email,otp:otp})});
+      resetToken=d.reset_token||'';
+      if(!resetToken)throw new Error('OTP verification failed.');
+      setText('fpOtpMsg','OTP சரிபார்க்கப்பட்டது. புதிய Password அமைக்கலாம்.','good');
+      setText('fpPassMsg','','');
+      showStep(3);
+    }catch(e){
+      setText('fpOtpMsg',e.message||'OTP சரிபார்க்க முடியவில்லை.','bad');
+    }
+  };
+
+  window.resetPasswordAfterOTP = async function(){
+    var email=cleanEmail();
+    var p=String((document.getElementById('fppass')||{}).value||'');
+    var cp=String((document.getElementById('fpcpass')||{}).value||'');
+    setText('fpPassMsg','','');
+    if(!resetToken){setText('fpPassMsg','முதலில் OTP சரிபார்க்க வேண்டும்.','bad');return;}
+    if(p.length<8){setText('fpPassMsg','Password குறைந்தது 8 characters இருக்க வேண்டும்.','bad');return;}
+    if(p!==cp){setText('fpPassMsg','Password மற்றும் Confirm Password ஒன்றாக இருக்க வேண்டும்.','bad');return;}
+    try{
+      var api=fpApi();
+      var d=await api('/auth/forgot/reset',{method:'POST',body:JSON.stringify({email:email,reset_token:resetToken,password:p})});
+      resetToken='';
+      document.getElementById('fppass').value='';
+      document.getElementById('fpcpass').value='';
+      showStep(1);
+      setText('fpmsg',d.message||'Password reset successful. Please login again.','good');
+      show('login');
+    }catch(e){
+      resetToken='';
+      setText('fpPassMsg',e.message||'Password reset முடியவில்லை.','bad');
+    }
+  };
+
+  document.addEventListener('input',function(e){
+    if(e.target && e.target.id==='fpotp') e.target.value=e.target.value.replace(/\D/g,'').slice(0,6);
+  });
+
+  var originalShow=window.show;
+  if(typeof originalShow==='function'){
+    window.show=function(id){
+      if(id==='login'){
+        resetToken='';
+        showStep(1);
+      }
+      return originalShow.apply(this,arguments);
+    };
+  }
 })();
 </script>
 </body></html>
