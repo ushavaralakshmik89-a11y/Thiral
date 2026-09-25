@@ -4369,4 +4369,150 @@ const g4OldLogout=window.logout;
 window.logout=async function(){try{g4StopTimer();if(G4.mockTimer)clearInterval(G4.mockTimer);if(G4.bank&&G4.attempt&&!G4.submitted){await g4Submit(true);} }catch(e){} if(typeof g4OldLogout==='function')return g4OldLogout();};
 })();
 </script>
+
+<script id="thiral-g4-authoritative-practice">
+/* THIRAL GROUP 4 AUTHORITATIVE PRACTICE CONTROLLER v1
+   This is intentionally the LAST practice controller.
+   It bypasses all legacy startPractice/loaders and talks directly to /api/questions.
+*/
+(function(){
+  'use strict';
+  window.__THIRAL_G4_AUTHORITATIVE_PRACTICE__='v1';
+
+  const E='group4';
+  const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const el=id=>document.getElementById(id);
+  const qText=q=>String(q?.question??q?.q??'');
+  const qOpts=q=>Array.isArray(q?.options)?q.options:(Array.isArray(q?.o)?q.o:[]);
+  const dbSubject=()=>currentSubject==='gs'?'gs':currentSubject==='apt'?'apt':'tamil';
+  const dbLang=()=>currentSubject==='tamil'?'ta':(contentLanguage==='en'?'en':'ta');
+  const sub=()=>String(currentSub||'').trim();
+  const topic=()=>String(currentTopic||'').trim();
+  const api=async(path,opt={})=>{
+    const r=await fetch('/api'+path,Object.assign({},opt,{credentials:'include',headers:Object.assign({'Content-Type':'application/json'},opt.headers||{})}));
+    let d={}; try{d=await r.json();}catch(e){}
+    if(!r.ok) throw new Error(d.error||('HTTP '+r.status));
+    return d;
+  };
+
+  async function fetchPage(subject,language,subtopic,offset){
+    let url='/questions?exam='+encodeURIComponent(E)+'&subject='+encodeURIComponent(subject)+'&language='+encodeURIComponent(language)+'&limit=200&offset='+offset;
+    if(subtopic) url+='&subtopic='+encodeURIComponent(subtopic);
+    return api(url);
+  }
+
+  async function loadExact(){
+    const S=dbSubject(), L=dbLang(), ST=sub();
+    if(!ST) throw new Error('Subtopic தேர்வு செய்யப்படவில்லை.');
+    const out=[]; let offset=0;
+    while(true){
+      const d=await fetchPage(S,L,ST,offset);
+      const rows=Array.isArray(d.questions)?d.questions:[];
+      out.push(...rows);
+      if(!d.pagination?.hasMore || !rows.length) break;
+      offset=Number(d.pagination.nextOffset ?? (offset+rows.length));
+      if(!Number.isFinite(offset)) break;
+    }
+    const seen=new Set();
+    return out.filter(q=>{const k=String(q.id||qText(q));if(seen.has(k))return false;seen.add(k);return true;});
+  }
+
+  async function loadSubjectFallback(){
+    /* Only used to diagnose a subtopic-name mismatch. Do not display these
+       questions as the selected subtopic. */
+    const S=dbSubject(),L=dbLang();
+    const d=await fetchPage(S,L,'',0);
+    return Array.isArray(d.questions)?d.questions:[];
+  }
+
+  function historyKey(){return 'thiral_g4_practice_v1|'+E+'|'+dbSubject()+'|'+dbLang()+'|'+sub();}
+  function getUsed(){try{const x=JSON.parse(localStorage.getItem(historyKey())||'[]');return new Set(Array.isArray(x)?x.map(String):[]);}catch(e){return new Set();}}
+  function saveUsed(set){localStorage.setItem(historyKey(),JSON.stringify(Array.from(set)));}
+  function shuffle(a){return a.slice().sort(()=>Math.random()-0.5);}
+
+  let state={q:[],i:0,answers:{},checks:{},attempt:null,timer:null,seconds:15,requested:10,used:new Set()};
+  function stop(){if(state.timer){clearInterval(state.timer);state.timer=null;}}
+  function paintTimer(){if(el('timer'))el('timer').textContent=String(Math.max(0,state.seconds));}
+  function render(){
+    const q=state.q[state.i]; if(!q)return;
+    stop();
+    if(el('level'))el('level').textContent='Group 4';
+    if(el('progress'))el('progress').textContent=(state.i+1)+' / '+state.q.length;
+    if(el('bar'))el('bar').style.width=((state.i+1)/state.q.length*100)+'%';
+    if(el('question'))el('question').textContent=(state.i+1)+'. '+qText(q);
+    const o=qOpts(q), optsEl=el('options');
+    if(optsEl)optsEl.innerHTML=o.map((x,i)=>'<button type="button" onclick="window.__THIRAL_G4_ANSWER('+i+')">'+String.fromCharCode(65+i)+'. '+esc(x)+'</button>').join('');
+    state.seconds=15;paintTimer();
+    state.timer=setInterval(()=>{state.seconds--;paintTimer();if(state.seconds<=0){stop();answer(-1,true);}},1000);
+  }
+  async function answer(v,timeout){
+    if(!state.q[state.i]||state.busy)return;
+    state.busy=true;stop();
+    const q=state.q[state.i],key=String(q.id);
+    state.answers[key]=Number(v);
+    try{
+      let d;
+      if(state.attempt){
+        d=await api('/attempts/'+state.attempt+'/check-answer',{method:'POST',body:JSON.stringify({questionId:Number(q.id),answer:Number(v)})});
+      }
+      state.checks[key]=d||{};
+      const o=qOpts(q),ci=Number(d?.correct_option);
+      if(el('feedback'))el('feedback').innerHTML=timeout?'<b>⏱️ நேரம் முடிந்தது</b>':(d?.correct===true?'<b>✓ சரி</b>':'<b>✗ தவறு</b>')+'<p><b>சரியான பதில்:</b> '+esc(o[ci]||'')+'</p>'+(d?.explanation?'<p><b>விளக்கம்:</b> '+esc(d.explanation)+'</p>':'')+'<button type="button" onclick="window.__THIRAL_G4_NEXT()">'+(state.i===state.q.length-1?'முடித்து Result பார்க்க':'அடுத்த கேள்வி →')+'</button>';
+    }catch(e){
+      if(el('feedback'))el('feedback').innerHTML='<b>கேள்வி சரிபார்க்க முடியவில்லை.</b><br>'+esc(e.message);
+    }
+    state.busy=false;
+  }
+  async function next(){
+    const q=state.q[state.i];if(q)state.used.add(String(q.id));saveUsed(state.used);
+    if(state.i<state.q.length-1){state.i++;if(el('feedback'))el('feedback').textContent='';render();return;}
+    stop();
+    try{if(state.attempt)await api('/attempts/'+state.attempt+'/submit',{method:'POST',body:JSON.stringify({answers:state.answers})});}catch(e){}
+    const vals=Object.values(state.checks),correct=vals.filter(x=>x&&x.correct===true).length;
+    if(el('resultText'))el('resultText').innerHTML='<p><b>மொத்த கேள்விகள்:</b> '+state.q.length+'</p><p><b>சரி:</b> '+correct+'</p><p><b>மதிப்பெண்:</b> '+(state.q.length?Math.round(correct/state.q.length*100):0)+'%</p>';
+    if(typeof show==='function')show('result');
+  }
+
+  window.__THIRAL_G4_ANSWER=answer;
+  window.__THIRAL_G4_NEXT=next;
+
+  window.startPractice=async function(n){
+    const requested=Number(n||10);
+    if(![10,20,50,9999].includes(requested))return;
+    selectedExam=E;
+    const S=dbSubject(),L=dbLang(),ST=sub();
+    if(!ST){if(el('feedback'))el('feedback').textContent='முதலில் Subtopic தேர்வு செய்யவும்.';return;}
+    if(el('feedback'))el('feedback').innerHTML='<b>கேள்விகள் ஏற்றப்படுகிறது...</b>';
+    state={q:[],i:0,answers:{},checks:{},attempt:null,timer:null,seconds:15,requested,used:getUsed()};
+    try{
+      let bank=await loadExact();
+      if(!bank.length){
+        const all=await loadSubjectFallback();
+        const sample=all.slice(0,3).map(q=>String(q.subtopic||q.sub||'')).filter(Boolean);
+        throw new Error('இந்த Subtopic-க்கு backend-ல் exact match இல்லை. தேர்ந்தெடுத்த Subtopic: '+ST+(sample.length?' | DB-ல் காணப்பட்ட sample subtopic: '+sample.join(', '):'')+'.');
+      }
+      let fresh=shuffle(bank.filter(q=>!state.used.has(String(q.id))));
+      if(requested===9999){
+        if(!fresh.length){state.used=new Set();saveUsed(state.used);fresh=shuffle(bank);}
+        state.q=fresh;
+      }else{
+        if(fresh.length<requested){
+          if(bank.length<requested){
+            throw new Error(ST+' பகுதியில் '+requested+' தனித்த கேள்விகள் இல்லை. கிடைத்தது '+bank.length+'.');
+          }
+          state.q=fresh;
+        }else state.q=fresh.slice(0,requested);
+      }
+      const a=await api('/attempts',{method:'POST',body:JSON.stringify({exam:E,subject:S,mode:'practice',language:L,questionIds:state.q.map(q=>Number(q.id))})});
+      state.attempt=a.id;
+      show('practice');
+      if(el('feedback'))el('feedback').textContent='';
+      render();
+    }catch(e){
+      if(el('feedback'))el('feedback').innerHTML='<b>கேள்விகள் வரவில்லை.</b><br>'+esc(e.message);
+      else alert(e.message);
+    }
+  };
+})();
+</script>
 </body></html>
