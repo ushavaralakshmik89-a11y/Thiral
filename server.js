@@ -255,6 +255,7 @@ api.post('/auth/login', authLimiter, async (req, res) => {
 });
 
 api.post('/auth/register', authLimiter, async (req, res) => {
+  let client;
   try {
     const name = String(req.body?.name || '').trim();
     const email = String(req.body?.email || '').trim().toLowerCase();
@@ -262,32 +263,87 @@ api.post('/auth/register', authLimiter, async (req, res) => {
     const phone = String(req.body?.phone || '').trim();
     const dob = String(req.body?.dob || '').trim() || null;
     const gender = String(req.body?.gender || '').trim();
-    if (!name || !email || password.length < 8) return sendError(res, 400, 'Name, valid email and password (minimum 8 characters) are required.');
-    const exists = await pool.query('SELECT 1 FROM users WHERE lower(email)=lower($1)', [email]);
-    if (exists.rowCount) return sendError(res, 409, 'This email is already registered.');
-    const seq = await pool.query(`SELECT next_student_number() AS n`);
-    const studentId = `THR-${String(seq.rows[0].n).padStart(6,'0')}`;
+
+    if (!name || !email || password.length < 8) {
+      return sendError(res, 400, 'Name, valid email and password (minimum 8 characters) are required.');
+    }
+
+    /*
+       Registration-safe student number allocation.
+       This version does NOT depend on a custom PostgreSQL function or sequence.
+       It uses a transaction-scoped advisory lock so two simultaneous
+       registrations cannot receive the same THR number.
+       Existing rows are only read; nothing is deleted or rewritten.
+    */
+    client = await pool.connect();
+    await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_xact_lock($1)', [741926]);
+
+    const exists = await client.query(
+      'SELECT 1 FROM users WHERE lower(email)=lower($1) LIMIT 1',
+      [email]
+    );
+    if (exists.rowCount) {
+      await client.query('ROLLBACK');
+      return sendError(res, 409, 'This email is already registered.');
+    }
+
+    const numberQ = await client.query(`
+      SELECT COALESCE(
+        MAX((substring(student_id FROM '^THR-([0-9]+)$'))::BIGINT),
+        0
+      ) + 1 AS next_number
+      FROM users
+      WHERE student_id ~ '^THR-[0-9]+$'
+    `);
+
+    const nextNumber = Number(numberQ.rows[0]?.next_number || 1);
+    if (!Number.isSafeInteger(nextNumber) || nextNumber < 1) {
+      await client.query('ROLLBACK');
+      return sendError(res, 500, 'Unable to allocate a new student ID safely.');
+    }
+
+    const studentId = `THR-${String(nextNumber).padStart(6, '0')}`;
     const hash = await argon2.hash(password);
-    const ins = await pool.query(
+
+    const ins = await client.query(
       `INSERT INTO users(student_id,name,email,password_hash,phone,dob,gender,role,is_active)
        VALUES($1,$2,$3,$4,$5,$6,$7,'STUDENT',true)
        RETURNING id,student_id,name,email,phone,dob,gender,role,is_active,created_at,last_login_at`,
-      [studentId,name,email,hash,phone,dob,gender]
+      [studentId, name, email, hash, phone, dob, gender]
     );
+
     const u = ins.rows[0];
     const sid = newSessionId();
-    await pool.query(`INSERT INTO sessions(id,user_id,expires_at) VALUES($1,$2,now()+interval '30 minutes')`, [sid, u.id]);
+    await client.query(
+      `INSERT INTO sessions(id,user_id,expires_at)
+       VALUES($1,$2,now()+interval '30 minutes')`,
+      [sid, u.id]
+    );
+
+    await client.query('COMMIT');
     setSessionCookie(res, sid);
-    res.json({ user: u });
+    return res.json({ user: u });
   } catch (e) {
+    if (client) {
+      try { await client.query('ROLLBACK'); } catch (_) {}
+    }
+
     console.error('Registration service error:', {
       code: e?.code || null,
       message: e?.message || String(e),
       detail: e?.detail || null,
-      constraint: e?.constraint || null
+      constraint: e?.constraint || null,
+      table: e?.table || null,
+      column: e?.column || null
     });
-    if (e.code === '23505') return sendError(res, 409, 'Email or student ID already exists.');
-    sendError(res, 500, 'Registration service error.');
+
+    if (e?.code === '23505') {
+      return sendError(res, 409, 'Email or student ID already exists.');
+    }
+    return sendError(res, 500, 'Registration service error.');
+  } finally {
+    if (client) client.release();
   }
 });
 
@@ -667,69 +723,16 @@ async function ensureQuestionHistory() {
 }
 
 
-/* Student ID generator safety:
-   Registration uses next_student_number(). Create it only if it is missing.
-   Existing users/question data are not deleted or rewritten.
-   The sequence is synchronized with existing THR-###### student IDs so new
-   registrations do not reuse an existing student number. */
-async function ensureStudentNumberGenerator() {
-  await pool.query(`
-    CREATE SEQUENCE IF NOT EXISTS thiral_student_number_seq
-    MINVALUE 1
-    START WITH 1
-    INCREMENT BY 1
-  `);
-
-  await pool.query(`
-    DO $$
-    BEGIN
-      IF to_regprocedure('next_student_number()') IS NULL THEN
-        EXECUTE $fn$
-          CREATE FUNCTION next_student_number()
-          RETURNS BIGINT
-          LANGUAGE plpgsql
-          AS $body$
-          BEGIN
-            RETURN nextval('thiral_student_number_seq');
-          END;
-          $body$;
-        $fn$;
-      END IF;
-    END
-    $$;
-  `);
-
-  const maxQ = await pool.query(`
-    SELECT COALESCE(
-      MAX((substring(student_id FROM '^THR-([0-9]+)$'))::BIGINT),
-      0
-    ) AS max_id
-    FROM users
-    WHERE student_id ~ '^THR-[0-9]+$'
-  `);
-
-  const seqQ = await pool.query(`
-    SELECT last_value, is_called
-    FROM thiral_student_number_seq
-  `);
-
-  const maxId = Number(maxQ.rows[0]?.max_id || 0);
-  const lastValue = Number(seqQ.rows[0]?.last_value || 1);
-  const isCalled = Boolean(seqQ.rows[0]?.is_called);
-
-  if (maxId > 0 && (!isCalled || lastValue < maxId)) {
-    await pool.query(
-      `SELECT setval('thiral_student_number_seq', $1::BIGINT, true)`,
-      [maxId]
-    );
-  }
-}
-
+/*
+   No database schema change is required for registration.
+   Student IDs are allocated inside the registration transaction using a
+   PostgreSQL advisory transaction lock. Existing users, questions,
+   attempts, results and admin data are not deleted or rewritten.
+*/
 async function start(){
   try{
     await pool.query('SELECT 1');
     await ensureQuestionHistory();
-    await ensureStudentNumberGenerator();
     await ensureAdmin();
     app.listen(PORT,'0.0.0.0',()=>console.log(`Thiral V139 listening on port ${PORT}`));
   }catch(e){
