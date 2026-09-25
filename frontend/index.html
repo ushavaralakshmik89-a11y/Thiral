@@ -2,6 +2,10 @@
 <html lang="ta">
 <head>
 <script>
+/* Global compatibility bridge for legacy question-bank wrappers.
+   The actual question source is still the backend; later normalized code replaces this function. */
+var getQuestionBank = window.getQuestionBank || function(){ return []; };
+window.getQuestionBank = getQuestionBank;
 window.THIRAL_V137_SECURITY={
   noClientSecrets:true,
   serverAuthenticationRequired:true,
@@ -11,8 +15,6 @@ window.THIRAL_V137_SECURITY={
 };
 </script>
 
-<meta http-equiv="Content-Security-Policy-Report-Only"
- content="default-src 'self' https:; connect-src 'self' https:; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https:; script-src 'self' 'unsafe-inline' https:; font-src 'self' https:; object-src 'none'; base-uri 'self'; form-action 'self';">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -338,6 +340,27 @@ a{
 }
 </style>
 
+
+<script id="dob-auto-slash-fix">
+(function(){
+  function formatDOB(el){
+    if(!el) return;
+    var digits=String(el.value||'').replace(/\D/g,'').slice(0,8);
+    var v='';
+    if(digits.length<=2){
+      v=digits;
+      if(digits.length===2) v += '/';
+    }else if(digits.length<=4){
+      v=digits.slice(0,2)+'/'+digits.slice(2);
+      if(digits.length===4) v += '/';
+    }else{
+      v=digits.slice(0,2)+'/'+digits.slice(2,4)+'/'+digits.slice(4);
+    }
+    el.value=v.slice(0,10);
+  }
+  window.formatDOB=formatDOB;
+})();
+</script>
 </head>
 <body>
 <header class="thiral-final-hero">
@@ -811,17 +834,18 @@ function labelForSub(s,t,sub){
 let currentSubject='',currentTopic='',currentSub='',questions=[],qi=0,total=10,correct=0,wrong=0,unanswered=0,timer=null,locked=false;
 
 function show(id){
-  /* V128: Admin dashboard is never opened without an authenticated ADMIN session. */
+  /* Admin access is based on the server-authenticated user kept in memory.
+     The server remains the real security boundary; this only controls the UI. */
   if(id==='admin'){
-    try{
-      const a=JSON.parse(sessionStorage.getItem('thiral_admin_session_v129')||'null');
-      if(!a || a.role!=='ADMIN' || a.id!=='admin' || !a.expiresAt || Date.now()>a.expiresAt){
-        sessionStorage.removeItem('thiral_admin_session_v129');
-        id='adminLogin';
-        const m=document.getElementById('adminMsg');
-        if(m){m.className='bad';m.textContent='Admin session இல்லை அல்லது காலாவதியாகிவிட்டது. மீண்டும் Login செய்யவும்.';}
+    const u = window.thiralV138User;
+    if(!u || u.role !== 'ADMIN'){
+      id='adminLogin';
+      const m=document.getElementById('adminMsg');
+      if(m){
+        m.className='bad';
+        m.textContent = 'ACCESS DENIED: Admin authorization required.';
       }
-    }catch(e){ id='adminLogin'; }
+    }
   }
   document.querySelectorAll('section').forEach(sec=>{
     sec.classList.add('hidden');
@@ -1771,6 +1795,10 @@ window.addEventListener('load',()=>{const u=getActiveStudent() || JSON.parse(loc
         The old “குறியீடு” starter records are repetitive one-step arithmetic.
         For this subtopic, use an exam-owned bank with multi-step, rule-based
         coding questions. Each exam receives its own records. */
+  var getQuestionBank = window.getQuestionBank;
+  if(typeof getQuestionBank !== 'function') getQuestionBank=function(){ return []; };
+  window.getQuestionBank=getQuestionBank;
+
   const v90OldGet = getQuestionBank;
   getQuestionBank = function(subject, lang){
     let base = (typeof v90OldGet==='function') ? (v90OldGet(subject,lang)||[]) : [];
@@ -2866,7 +2894,7 @@ window.V91_ADV_NUM=V91_ADV_NUM;
 (function(){
   'use strict';
 
-  window.THIRAL_API = window.THIRAL_API || '';
+  window.THIRAL_API = '';
   var V138_API = window.THIRAL_API;
 
   window.thiralV138 = {
@@ -2889,7 +2917,12 @@ window.V91_ADV_NUM=V91_ADV_NUM;
     }));
     var d = {};
     try { d = await r.json(); } catch(e) {}
-    if(!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    if(!r.ok){
+      if(r.status === 401 || r.status === 403){
+        throw new Error('ACCESS DENIED: இந்த தரவை அணுக உங்களுக்கு அனுமதி இல்லை.');
+      }
+      throw new Error(d.error || ('HTTP ' + r.status));
+    }
     return d;
   }
   window.thiralV138Api = api138;
@@ -2984,6 +3017,8 @@ window.V91_ADV_NUM=V91_ADV_NUM;
   window.adminLogin = async function(){
     var msg = el('adminMsg');
     try{
+      if(msg){ msg.className=''; msg.textContent='Admin login சரிபார்க்கப்படுகிறது...'; }
+
       var d = await api138('/auth/login',{
         method:'POST',
         body:JSON.stringify({
@@ -2991,16 +3026,36 @@ window.V91_ADV_NUM=V91_ADV_NUM;
           password: el('adminPass').value
         })
       });
-      if(!d.user || d.user.role !== 'ADMIN') throw new Error('Admin authorization required.');
-      enterV138(d.user);
-      await loadAdminV138();
-      show('admin');
+
+      if(!d.user || d.user.role !== 'ADMIN'){
+        throw new Error('ACCESS DENIED: Admin authorization required.');
+      }
+
+      /* Keep the server-authenticated ADMIN user in memory.
+         Do not use sessionStorage/localStorage as an authorization source. */
+      window.thiralV138User = d.user;
+      setStudentName(d.user);
+
+      var ok = await loadAdminV138();
+      if(ok !== false){
+        if(msg){ msg.className='good'; msg.textContent='Admin login successful.'; }
+        show('admin');
+      }
     }catch(e){
-      if(msg){ msg.className='bad'; msg.textContent='Admin access: ' + e.message; }
+      window.thiralV138User = null;
+      if(msg){
+        msg.className='bad';
+        msg.textContent = String(e && e.message || e);
+      }
     }
   };
 
-  window.adminLogout = window.logout;
+  window.adminLogout = async function(){
+    try { await api138('/auth/logout',{method:'POST'}); } catch(e) {}
+    window.thiralV138User = null;
+    setStudentName(null);
+    show('home');
+  };
 
   window.openExam = function(id){
     selectedExam = id;
@@ -3535,14 +3590,21 @@ window.V91_ADV_NUM=V91_ADV_NUM;
         body+'</table>';
       if(el('students')) el('students').innerHTML=body;
       window.thiralV138Students=students;
+      return true;
     }catch(e){
-      if(el('adminMsg')) el('adminMsg').textContent='Admin data: '+e.message;
+      window.thiralV138Students=[];
+      if(el('adminMsg')){
+        el('adminMsg').className='bad';
+        el('adminMsg').textContent = String(e && e.message || e);
+      }
+      return false;
     }
   }
 
   window.admin = loadAdminV138;
   window.openAdminStudentView = async function(filter){
-    await loadAdminV138();
+    var loaded = await loadAdminV138();
+    if(loaded === false) return;
     var list=window.thiralV138Students||[];
     var title='மாணவர் விவரங்கள்';
     var now=new Date();
@@ -3688,14 +3750,8 @@ const subject=()=>{const s=String(typeof currentSubject!=='undefined'&&currentSu
 const lang=()=>typeof contentLanguage!=='undefined'&&contentLanguage==='en'?'en':'ta';
 
 async function api(path,init={}){
-  const r=await fetch('/api'+path,Object.assign({
-    credentials:'same-origin',
-    headers:{'Content-Type':'application/json'}
-  },init));
-  let d={};
-  try{d=await r.json();}catch(_){}
-  if(!r.ok) throw new Error(d.error||('API error '+r.status));
-  return d;
+  if(typeof window.thiralV138Api==='function') return window.thiralV138Api(path,init);
+  throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
 }
 function stop(){if(T.timer){clearInterval(T.timer);T.timer=null;}}
 function timer(n){if($('timer'))$('timer').textContent=String(Math.max(0,n));}
@@ -3754,7 +3810,10 @@ async function answer(value,timeout=false){
 async function loadPracticeQuestions(requested){
   const selectedSubtopic=(typeof currentSub!=='undefined'?String(currentSub||'').trim():'');
   if(!selectedSubtopic) throw new Error('Subtopic தேர்வு செய்யப்படவில்லை.');
-  const dbSubject=subject();
+  const dbSubject =
+    currentSubject==='gs' ? 'பொது அறிவு' :
+    currentSubject==='apt' ? 'apt' :
+    currentSubject==='tamil' ? 'tamil' : '';
   let dbSubtopic=selectedSubtopic;
   /* Group 4 database uses Tamil subtopic keys for GK in both languages,
      while Aptitude English uses English subtopic keys. */
@@ -3867,7 +3926,7 @@ async function startPractice(n){
     const a=await api('/attempts',{
       method:'POST',
       body:JSON.stringify({
-        exam:String(selectedExam||'group4'),subject:subject(),mode:'practice',language:(contentLanguage==='en'?'en':'ta'),
+        exam:String(selectedExam||'group4'),subject:(currentSubject==='gs'?'பொது அறிவு':currentSubject==='apt'?'apt':'tamil'),mode:'practice',language:(contentLanguage==='en'?'en':'ta'),
         questionIds:T.q.map(q=>Number(q.id))
       })
     });
@@ -3950,8 +4009,9 @@ async function startMock(){
     const subjects=['gs','apt'];
     const all=[];
     for(const s of subjects){
+      const dbSubject=(s==='gs'?'பொது அறிவு':'apt');
       const d=await api('/questions?exam='+encodeURIComponent(String(selectedExam||'group4'))+
-        '&subject='+encodeURIComponent(s)+'&language='+encodeURIComponent(lang())+'&limit=200');
+        '&subject='+encodeURIComponent(dbSubject)+'&language='+encodeURIComponent(lang())+'&limit=200');
       (d.questions||[]).forEach(q=>{if(!all.some(x=>String(x.id)===String(q.id)))all.push(q);});
     }
     if(all.length<200)throw new Error('3 மணி நேர Mock Test-க்கு 200 கேள்விகள் கிடைக்கவில்லை. கிடைத்தது: '+all.length);
@@ -4149,6 +4209,22 @@ window.startPractice=async function(n){
   if(!String(currentSub||'').trim()){ if(document.getElementById('feedback')) document.getElementById('feedback').textContent='முதலில் Subtopic தேர்வு செய்யவும்.'; return; }
   return previousStart.call(this,n);
 };
+})();
+</script>
+<script>
+/* THIRAL GROUP 4 FINAL WORKING PATCH
+   - fixed backend API origin
+   - backend session login remains authoritative
+   - fixed database subject mapping
+   - removed invalid report-only CSP meta
+*/
+(function(){
+  'use strict';
+  window.__THIRAL_GROUP4_FINAL_WORKING__ = {
+    api: '/api',
+    exam: 'group4',
+    dbSubjects: { tamil:'tamil', gs:'பொது அறிவு', apt:'apt' }
+  };
 })();
 </script>
 </body></html>
