@@ -3654,16 +3654,23 @@ window.V91_ADV_NUM=V91_ADV_NUM;
       if(el('statSuggestions')) el('statSuggestions').textContent='-';
 
       var body=students.map(function(x){
+        var active = x.is_active !== false;
+        var statusText = active ? 'Active / செயல்பாட்டில்' : 'Inactive / முடக்கப்பட்டது';
+        var actionText = active ? '🚫 Deactivate' : '♻️ Reactivate';
+        var actionClass = active ? '' : 'secondary';
         return '<tr><td>'+escapeHtml138(x.student_id||'')+'</td>'+
           '<td>'+escapeHtml138(x.name||'')+'</td>'+
           '<td>'+escapeHtml138(x.email||'')+'</td>'+
           '<td>'+escapeHtml138(x.phone||'')+'</td>'+
           '<td>'+escapeHtml138(x.gender||'')+'</td>'+
           '<td>'+escapeHtml138(x.dob||'')+'</td>'+
-          '<td>'+escapeHtml138(x.last_login_at?new Date(x.last_login_at).toLocaleString():'-')+'</td></tr>';
+          '<td>'+escapeHtml138(x.last_login_at?new Date(x.last_login_at).toLocaleString():'-')+'</td>'+
+          '<td>'+escapeHtml138(statusText)+'</td>'+
+          '<td><button class="'+actionClass+'" onclick="toggleStudentStatus(&quot;'+escapeHtml138(x.student_id||'')+'&quot;,'+(active?'true':'false')+')">'+actionText+'</button></td></tr>';
       }).join('');
       if(el('adminStudentList')) el('adminStudentList').innerHTML=
-        '<table><tr><th>Student ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Gender</th><th>DOB</th><th>Last Login</th></tr>'+
+        '<p class="small">Deactivate செய்தால் அந்த Student ID-ன் புதிய Login உடனடியாக தடுக்கப்படும்; பழைய Results/Attempts அழிக்கப்படாது.</p>'+
+        '<table><tr><th>Student ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Gender</th><th>DOB</th><th>Last Login</th><th>Status</th><th>Action</th></tr>'+
         body+'</table>';
       if(el('students')) el('students').innerHTML=body;
       window.thiralV138Students=students;
@@ -3699,6 +3706,24 @@ window.V91_ADV_NUM=V91_ADV_NUM;
       '</td><td>'+escapeHtml138(x.last_login_at?new Date(x.last_login_at).toLocaleString():'-')+
       '</td></tr>';}).join('')+'</table>';
     if(el('adminStudentDetailModal')){el('adminStudentDetailModal').classList.remove('hidden');el('adminStudentDetailModal').style.display='flex';}
+  };
+
+  window.toggleStudentStatus = async function(studentId, currentlyActive){
+    var action = currentlyActive ? 'Deactivate / முடக்க' : 'Reactivate / மீண்டும் செயல்படுத்த';
+    var message = currentlyActive
+      ? 'இந்த Student ID-ஐ Deactivate செய்யவா?\n\nLogin உடனடியாக தடுக்கப்படும். Results/Attempts அழிக்கப்படாது.'
+      : 'இந்த Student ID-ஐ Reactivate செய்யவா?';
+    if(!confirm(message)) return;
+    try{
+      await api138('/admin/students/'+encodeURIComponent(studentId)+'/status',{
+        method:'PATCH',
+        body:JSON.stringify({is_active:!currentlyActive})
+      });
+      alert(action+' செய்யப்பட்டுவிட்டது.');
+      await loadAdminV138();
+    }catch(e){
+      alert(e.message || 'Student status மாற்ற முடியவில்லை.');
+    }
   };
 
   window.closeAdminStudentView=function(){
