@@ -255,6 +255,7 @@ api.get('/questions', requireAuth, async (req, res) => {
     const subject = subjectAliases[rawSubject] || rawSubject;
     const language = String(req.query.language || 'ta').trim();
     const subtopic = String(req.query.subtopic || '').trim();
+    const historyMode = String(req.query.historyMode || '').trim();
     const limit = Math.min(Math.max(parseInt(req.query.limit || '20',10) || 20,1),200);
     const offset = Math.max(parseInt(req.query.offset || '0',10) || 0,0);
     if (!exam || !subject || !['ta','en'].includes(language)) return sendError(res,400,'Invalid question request.');
@@ -264,13 +265,27 @@ api.get('/questions', requireAuth, async (req, res) => {
     let n = 4;
     if (subtopic) { where.push(`subtopic=$${n++}`); params.push(subtopic); }
 
+    /* Question Bank continuation: exclude only questions already used
+       in this user's Question Bank mode. Normal Practice/Mock are unchanged. */
+    if (historyMode === 'bank') {
+      where.push(`NOT EXISTS (
+        SELECT 1 FROM question_history h
+        WHERE h.user_id = ${n}
+          AND h.question_id = questions.id
+          AND h.mode = 'bank'
+      )`);
+      params.push(req.user.id);
+      n++;
+    }
+
     const countQ = await pool.query(`SELECT count(*)::int AS total FROM questions WHERE ${where.join(' AND ')}`, params);
     const total = Number(countQ.rows[0]?.total || 0);
 
     const dataParams = [...params, limit, offset];
     const q = await pool.query(
       `SELECT id,exam,subject,subtopic,language,question,options,explanation
-       FROM questions WHERE ${where.join(' AND ')}
+       FROM questions
+       WHERE ${where.join(' AND ')}
        ORDER BY id LIMIT $${n} OFFSET $${n+1}`, dataParams
     );
 
@@ -292,7 +307,6 @@ api.get('/practice/questions', requireAuth, async (req, res) => {
     const subject = String(req.query.subject || '').trim();
     const language = String(req.query.language || 'ta').trim();
     const subtopic = String(req.query.subtopic || '').trim();
-
     const limit = Math.min(
       Math.max(parseInt(req.query.limit || '10', 10) || 10, 1),
       200
@@ -366,7 +380,7 @@ api.get('/practice/questions', requireAuth, async (req, res) => {
 api.post('/attempts', requireAuth, async (req,res)=>{
   try {
     const {exam,subject,mode,language,questionIds}=req.body||{};
-    if(!exam || !subject || !['practice','mock'].includes(mode) || !['ta','en','mixed'].includes(language) || !Array.isArray(questionIds) || !questionIds.length) return sendError(res,400,'Invalid attempt.');
+    if(!exam || !subject || !['practice','mock','bank'].includes(mode) || !['ta','en','mixed'].includes(language) || !Array.isArray(questionIds) || !questionIds.length) return sendError(res,400,'Invalid attempt.');
     const ids=[...new Set(questionIds.map(Number).filter(Number.isInteger))];
     if(!ids.length || ids.length>5000) return sendError(res,400,'Invalid question list.');
     const q = language==='mixed'
@@ -377,15 +391,19 @@ api.post('/attempts', requireAuth, async (req,res)=>{
     if(clean.length!==ids.length) return sendError(res,400,'Some questions are not valid for this exam/language.');
     const ins=await pool.query(`INSERT INTO attempts(user_id,exam,subject,mode,language,question_ids) VALUES($1,$2,$3,$4,$5,$6) RETURNING id`,[req.user.id,exam,subject,mode,language,clean]);
 
-    /* Practice/Mock history is kept separate by mode. */
-    await pool.query(
-      `INSERT INTO question_history(user_id, question_id, mode)
-       SELECT $1, x, $2
-       FROM unnest($3::bigint[]) AS x
-       ON CONFLICT (user_id, question_id, mode)
-       DO NOTHING`,
-      [req.user.id, mode, clean]
-    );
+    /* Normal Practice/Mock questions are reserved immediately.
+       Question Bank is different: a question becomes 'used' only when
+       the student actually finishes/logs out of that bank session. */
+    if (mode !== 'bank') {
+      await pool.query(
+        `INSERT INTO question_history(user_id, question_id, mode)
+         SELECT $1, x, $2
+         FROM unnest($3::bigint[]) AS x
+         ON CONFLICT (user_id, question_id, mode)
+         DO NOTHING`,
+        [req.user.id, mode, clean]
+      );
+    }
 
     res.json({id:ins.rows[0].id});
   }catch(e){console.error(e);sendError(res,500,'Attempt service error.');}
@@ -461,18 +479,42 @@ api.post('/attempts/:id/submit', requireAuth, async (req,res)=>{
     const attempt=a.rows[0];
     if(attempt.status==='SUBMITTED') return res.json({score:attempt.score,correct:attempt.correct_count,total:attempt.total_count});
     const answers=req.body?.answers && typeof req.body.answers==='object' ? req.body.answers : {};
-    const qs=await pool.query(`SELECT id,correct_option FROM questions WHERE id=ANY($1::bigint[])`,[attempt.question_ids]);
+    const allIds=Array.isArray(attempt.question_ids) ? attempt.question_ids.map(Number) : [];
+    /* For Question Bank, only questions actually reached/answered in this
+       session count toward the Review percentage and become permanently used.
+       Unseen questions remain available next time. */
+    const usedIds = attempt.mode === 'bank'
+      ? allIds.filter(qid => Object.prototype.hasOwnProperty.call(answers,String(qid)) && Number.isInteger(Number(answers[String(qid)])))
+      : allIds;
+
+    const qs=usedIds.length
+      ? await pool.query(`SELECT id,correct_option FROM questions WHERE id=ANY($1::bigint[])`,[usedIds])
+      : {rows:[]};
+
     let correct=0;
     for(const q of qs.rows){
       const raw=answers[String(q.id)] ?? answers[q.id];
       const idx=Number(raw);
-      if(Number.isInteger(idx) && idx===Number(q.correct_option)) correct++;
+      if(Number.isInteger(idx) && idx>=0 && idx===Number(q.correct_option)) correct++;
     }
-    const total=attempt.question_ids.length;
+
+    const total=usedIds.length;
+    const unanswered=usedIds.filter(qid => Number(answers[String(qid)])===-1).length;
     const score=total ? Number(((correct*100)/total).toFixed(2)) : 0;
+
+    if (attempt.mode === 'bank' && usedIds.length) {
+      await pool.query(
+        `INSERT INTO question_history(user_id, question_id, mode)
+         SELECT $1, x, 'bank'
+         FROM unnest($2::bigint[]) AS x
+         ON CONFLICT (user_id, question_id, mode) DO NOTHING`,
+        [req.user.id, usedIds]
+      );
+    }
+
     await pool.query(`UPDATE attempts SET status='SUBMITTED',score=$1,correct_count=$2,total_count=$3,submitted_at=now() WHERE id=$4`,[score,correct,total,id]);
-    await pool.query(`INSERT INTO activity_events(user_id,event_type,metadata) VALUES($1,'ATTEMPT_SUBMITTED',$2)`,[req.user.id,JSON.stringify({attempt_id:id,mode:attempt.mode,exam:attempt.exam,score})]);
-    res.json({score,correct,total});
+    await pool.query(`INSERT INTO activity_events(user_id,event_type,metadata) VALUES($1,'ATTEMPT_SUBMITTED',$2)`,[req.user.id,JSON.stringify({attempt_id:id,mode:attempt.mode,exam:attempt.exam,score,used_questions:total,unanswered})]);
+    res.json({score,correct,total,unanswered,usedQuestionIds:usedIds});
   }catch(e){console.error(e);sendError(res,500,'Grading service error.');}
 });
 
