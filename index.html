@@ -4341,13 +4341,38 @@ function qbAddLogoutButton(){
     b.id='qbLogoutReview';
     b.type='button';
     b.className='secondary';
-    b.textContent='🚪 Logout & Review';
-    b.style.marginTop='10px';
-    const target=qb$('stopInfinitePractice')?.parentElement||qb$('feedback')?.parentElement;
-    if(target)target.appendChild(b);
-    b.onclick=()=>window.logout();
+    b.textContent='🚪 வெளியேறு & Review';
+    b.title='இந்த Question Bank session-ஐ முடித்து பயன்படுத்திய கேள்விகளுக்கான Review பார்க்க';
+    b.style.margin='10px 0 14px';
+    b.style.display='block';
+    b.style.width='100%';
+    b.style.position='sticky';
+    b.style.top='8px';
+    b.style.zIndex='20';
+    b.style.fontWeight='800';
+    b.style.boxShadow='0 3px 10px rgba(0,0,0,.12)';
+    const progress=qb$('progress');
+    const practice=qb$('practice');
+    if(progress && progress.parentElement) progress.parentElement.insertAdjacentElement('afterend',b);
+    else if(practice) practice.insertBefore(b,practice.firstChild);
+    else if(qb$('feedback')?.parentElement) qb$('feedback').parentElement.appendChild(b);
+    b.onclick=async()=>{
+      if(QB.busy||QB.submitted)return;
+      b.disabled=true;
+      b.textContent='⏳ Review தயாராகிறது...';
+      try{
+        await qbSubmit(false);
+      }catch(e){
+        b.disabled=false;
+        b.textContent='🚪 வெளியேறு & Review';
+      }
+    };
   }
+  const oldStop=qb$('stopInfinitePractice');
+  if(oldStop) oldStop.classList.add('hidden');
   b.classList.remove('hidden');
+  b.disabled=false;
+  b.textContent='🚪 வெளியேறு & Review';
 }
 function qbHideLogoutButton(){
   const b=qb$('qbLogoutReview');if(b)b.classList.add('hidden');
