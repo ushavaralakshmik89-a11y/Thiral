@@ -345,38 +345,20 @@ a{
 (function(){
   function formatDOB(el){
     if(!el) return;
-
-    var digits = String(el.value || '').replace(/\D/g, '').slice(0, 8);
-    var value = '';
-
-    if(digits.length <= 2){
-      value = digits;
-      if(digits.length === 2) value += '/';
-    }else if(digits.length <= 4){
-      value = digits.slice(0, 2) + '/' + digits.slice(2);
-      if(digits.length === 4) value += '/';
+    var digits=String(el.value||'').replace(/\D/g,'').slice(0,8);
+    var v='';
+    if(digits.length<=2){
+      v=digits;
+      if(digits.length===2) v += '/';
+    }else if(digits.length<=4){
+      v=digits.slice(0,2)+'/'+digits.slice(2);
+      if(digits.length===4) v += '/';
     }else{
-      value = digits.slice(0, 2) + '/' + digits.slice(2, 4) + '/' + digits.slice(4);
+      v=digits.slice(0,2)+'/'+digits.slice(2,4)+'/'+digits.slice(4);
     }
-
-    el.value = value.slice(0, 10);
+    el.value=v.slice(0,10);
   }
-
-  window.formatDOB = formatDOB;
-
-  document.addEventListener('DOMContentLoaded', function(){
-    var dob = document.getElementById('rdob');
-    if(!dob) return;
-
-    dob.removeAttribute('oninput');
-    dob.addEventListener('input', function(){
-      formatDOB(this);
-    });
-
-    dob.addEventListener('keyup', function(){
-      formatDOB(this);
-    });
-  });
+  window.formatDOB=formatDOB;
 })();
 </script>
 </head>
@@ -415,13 +397,7 @@ a{
 <section id="register" class="card hidden">
 <h2>📝 Student Registration / மாணவர் பதிவு</h2><p class="small">தமிழ் அல்லது English-ல் உங்கள் பெயர் உள்ளிட்ட விவரங்களை உள்ளிடலாம். Questions/Study content எந்த மொழியில் இருக்க வேண்டும் என்பது தேர்வைப் பொறுத்தது.</p>
 <input id="rname" placeholder="முழுப் பெயர் / Full Name">
-<input
-  id="rdob"
-  type="text"
-  inputmode="numeric"
-  autocomplete="bday"
-  placeholder="DOB (DD/MM/YYYY) / பிறந்த தேதி"
-  maxlength="10">
+<input type="text" id="rdob" placeholder="DOB (DD/MM/YYYY) / பிறந்த தேதி" maxlength="10" oninput="formatDOB(this)">
 <input id="rphone" placeholder="Phone Number / தொலைபேசி எண்">
 <select id="rgender"><option value="">Select Gender</option><option>ஆண்</option><option>பெண்</option><option>மூன்றாம் பாலினம்</option></select>
 <input id="remail" type="email" placeholder="Email ID / மின்னஞ்சல்">
