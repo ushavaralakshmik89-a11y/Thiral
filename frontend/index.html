@@ -3638,6 +3638,15 @@ window.V91_ADV_NUM=V91_ADV_NUM;
     }catch(e){ alert(e.message); }
   };
 
+  function formatAdminDOB138(raw){
+    var v=String(raw||'').trim();
+    if(!v) return '-';
+    if(/^\d{2}\/\d{2}\/\d{4}$/.test(v)) return v;
+    var m=v.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if(m) return m[3]+'/'+m[2]+'/'+m[1];
+    return v;
+  }
+
   async function loadAdminV138(){
     try{
       var s=await api138('/admin/summary');
@@ -3663,10 +3672,10 @@ window.V91_ADV_NUM=V91_ADV_NUM;
           '<td>'+escapeHtml138(x.email||'')+'</td>'+
           '<td>'+escapeHtml138(x.phone||'')+'</td>'+
           '<td>'+escapeHtml138(x.gender||'')+'</td>'+
-          '<td>'+escapeHtml138(x.dob||'')+'</td>'+
+          '<td>'+escapeHtml138(formatAdminDOB138(x.dob))+'</td>'+
           '<td>'+escapeHtml138(x.last_login_at?new Date(x.last_login_at).toLocaleString():'-')+'</td>'+
           '<td>'+escapeHtml138(statusText)+'</td>'+
-          '<td><button class="'+actionClass+'" onclick="toggleStudentStatus(&quot;'+escapeHtml138(x.student_id||'')+'&quot;,'+(active?'true':'false')+')">'+actionText+'</button></td></tr>';
+          '<td><button class="'+actionClass+'" onclick="toggleStudentStatus(\\''+escapeHtml138(x.student_id||'')+'\\','+(active?'true':'false')+')">'+actionText+'</button></td></tr>';
       }).join('');
       if(el('adminStudentList')) el('adminStudentList').innerHTML=
         '<p class="small">Deactivate செய்தால் அந்த Student ID-ன் புதிய Login உடனடியாக தடுக்கப்படும்; பழைய Results/Attempts அழிக்கப்படாது.</p>'+
