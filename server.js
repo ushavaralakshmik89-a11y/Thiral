@@ -254,6 +254,47 @@ api.post('/auth/login', authLimiter, async (req, res) => {
   }
 });
 
+
+/*
+ * Registration date normalization.
+ * The frontend may send DOB as DD/MM/YYYY (for example 21/07/1991),
+ * while PostgreSQL DATE expects ISO YYYY-MM-DD.
+ * Existing database rows are not changed.
+ */
+function normalizeRegistrationDate(raw) {
+  const value = String(raw || '').trim();
+  if (!value) return null;
+
+  // Already ISO: YYYY-MM-DD
+  let m = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (m) {
+    const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+    const dt = new Date(Date.UTC(y, mo - 1, d));
+    if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d) {
+      throw new Error('Invalid date of birth.');
+    }
+    return value;
+  }
+
+  // Common Indian form: DD/MM/YYYY
+  m = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!m) {
+    // Also accept DD-MM-YYYY without changing the frontend.
+    m = value.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  }
+
+  if (m) {
+    const d = Number(m[1]), mo = Number(m[2]), y = Number(m[3]);
+    const dt = new Date(Date.UTC(y, mo - 1, d));
+    if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d) {
+      throw new Error('Invalid date of birth.');
+    }
+    return `${String(y).padStart(4, '0')}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  }
+
+  throw new Error('Invalid date of birth. Use DD/MM/YYYY.');
+}
+
 api.post('/auth/register', authLimiter, async (req, res) => {
   let client;
   try {
@@ -261,7 +302,7 @@ api.post('/auth/register', authLimiter, async (req, res) => {
     const email = String(req.body?.email || '').trim().toLowerCase();
     const password = String(req.body?.password || '');
     const phone = String(req.body?.phone || '').trim();
-    const dob = String(req.body?.dob || '').trim() || null;
+    const dob = normalizeRegistrationDate(req.body?.dob);
     const gender = String(req.body?.gender || '').trim();
 
     if (!name || !email || password.length < 8) {
