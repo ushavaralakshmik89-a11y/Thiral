@@ -4659,4 +4659,86 @@ window.__THIRAL_QUESTION_BANK_REVIEW_V1__=true;
 })();
 </script>
 
+
+<script id="thiral-qb-exit-v4">
+(function(){
+  function practice(){ return document.getElementById('practice'); }
+  function btn(){ return document.getElementById('questionBankExitReviewStatic'); }
+  function isPracticeVisible(){
+    var p=practice();
+    return !!(p && getComputedStyle(p).display!=='none' && !p.classList.contains('hidden'));
+  }
+  function isQuestionBank(){
+    var sub=document.getElementById('subTitle');
+    var title=sub ? String(sub.textContent||'') : '';
+    if(/Question Bank|தொடர்ச்சி/i.test(title)) return true;
+
+    var prog=document.getElementById('progress');
+    var s=prog ? String(prog.textContent||'') : '';
+    var m=s.match(/(\d+)\s*\/\s*(\d+)/);
+    if(m && Number(m[2]) >= 100) return true;
+
+    var stop=document.getElementById('stopInfinitePractice');
+    if(stop && !stop.classList.contains('hidden')) return true;
+    return false;
+  }
+
+  function ensureButton(){
+    var p=practice();
+    if(!p) return null;
+    var b=btn();
+    if(!b){
+      b=document.createElement('button');
+      b.id='questionBankExitReviewStatic';
+      b.type='button';
+      b.className='secondary';
+      b.textContent='🚪 வெளியேறு & Review';
+      b.onclick=function(){
+        if(typeof window.__THIRAL_QB_EXIT_REVIEW__==='function'){
+          window.__THIRAL_QB_EXIT_REVIEW__();
+        }else if(typeof window.stopInfinitePractice==='function'){
+          window.stopInfinitePractice();
+        }else{
+          alert('Review செயல்பாடு தற்போது கிடைக்கவில்லை.');
+        }
+      };
+      var bar=p.querySelector('.bar');
+      if(bar) p.insertBefore(b,bar);
+      else p.insertBefore(b,p.firstChild);
+    }
+    return b;
+  }
+
+  function sync(){
+    var p=practice();
+    if(!p) return;
+    var b=ensureButton();
+    if(!b) return;
+
+    if(isPracticeVisible() && isQuestionBank()){
+      b.classList.remove('hidden');
+      b.style.setProperty('display','block','important');
+      b.style.setProperty('visibility','visible','important');
+      b.style.setProperty('opacity','1','important');
+      b.style.setProperty('width','100%','important');
+      b.style.setProperty('position','sticky','important');
+      b.style.setProperty('top','8px','important');
+      b.style.setProperty('z-index','99999','important');
+      b.textContent='🚪 வெளியேறு & Review';
+      b.disabled=false;
+    }else{
+      b.style.setProperty('display','none','important');
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded',function(){
+    sync();
+    setInterval(sync,150);
+    try{
+      new MutationObserver(sync).observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['class','style']});
+    }catch(e){}
+  });
+})();
+</script>
+
 </body></html>
