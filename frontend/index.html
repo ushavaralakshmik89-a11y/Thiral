@@ -4247,4 +4247,85 @@ window.startPractice=async function(n){
   });
 })();
 </script>
+
+<script id="thiral-group4-only-final-lock">
+/* THIRAL: GROUP 4 ONLY MODE
+   Keep the existing UI/data intact. Only Group 4 is allowed to open or run.
+   All other exam headings may remain visible, but their buttons are disabled.
+   No database/data deletion or migration is performed here. */
+(function(){
+  'use strict';
+  var G4='group4';
+  function forceGroup4(){
+    try{ selectedExam=G4; }catch(e){}
+    try{ localStorage.setItem('tnpsc_selected_exam',G4); }catch(e){}
+  }
+  forceGroup4();
+
+  /* Final authority for exam navigation. */
+  window.openExam=function(id){
+    if(String(id)!==G4){
+      forceGroup4();
+      return false;
+    }
+    forceGroup4();
+    if(typeof renderExamHome==='function') renderExamHome();
+    show('examHome');
+    return false;
+  };
+
+  /* If any older code calls renderExamHome after a stale exam value,
+     it is forced back to Group 4. */
+  if(typeof window.renderExamHome==='function'){
+    var oldRenderExamHome=window.renderExamHome;
+    window.renderExamHome=function(){
+      forceGroup4();
+      return oldRenderExamHome.apply(this,arguments);
+    };
+  }
+
+  /* Practice and Mock Test can only run under Group 4. */
+  if(typeof window.startPractice==='function'){
+    var oldStartPractice=window.startPractice;
+    window.startPractice=function(){
+      forceGroup4();
+      return oldStartPractice.apply(this,arguments);
+    };
+  }
+  if(typeof window.startMock==='function'){
+    var oldStartMock=window.startMock;
+    window.startMock=function(){
+      forceGroup4();
+      return oldStartMock.apply(this,arguments);
+    };
+  }
+  window.startSelectedMock=function(){
+    forceGroup4();
+    if(typeof window.startMock==='function') return window.startMock();
+  };
+
+  /* Keep other exam headings visible, but make their entry buttons inactive. */
+  function lockOtherExamButtons(){
+    document.querySelectorAll('button[onclick]').forEach(function(btn){
+      var m=String(btn.getAttribute('onclick')||'').match(/openExam\(['"]([^'"]+)['"]\)/);
+      if(m && m[1]!==G4){
+        btn.disabled=true;
+        btn.setAttribute('aria-disabled','true');
+        btn.title='தற்போது TNPSC Group 4 மட்டும் செயல்பாட்டில் உள்ளது';
+        btn.style.opacity='0.55';
+        btn.style.cursor='not-allowed';
+      }
+    });
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',lockOtherExamButtons);
+  else lockOtherExamButtons();
+  window.addEventListener('load',lockOtherExamButtons);
+
+  /* Guard against an old saved exam value after reload. */
+  window.addEventListener('pageshow',forceGroup4);
+  window.addEventListener('visibilitychange',function(){ if(document.visibilityState==='visible') forceGroup4(); });
+
+  window.__THIRAL_GROUP4_ONLY_FINAL__=true;
+})();
+</script>
 </body></html>
