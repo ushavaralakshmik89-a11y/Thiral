@@ -4471,6 +4471,11 @@ async function qbSubmit(autoFinish){
       qb$('practiceReview').style.display='block';
     }
     qbHideLogoutButton();
+    var exitBtn=document.getElementById('questionBankExitReviewStatic');
+    if(exitBtn){
+      exitBtn.style.display='none';
+      exitBtn.classList.add('hidden');
+    }
     return d;
   }catch(e){
     QB.submitted=false;
@@ -4536,8 +4541,20 @@ window.startPractice=async function(n){
     if(typeof show==='function')show('practice');
     if(qb$('practiceReview')){qb$('practiceReview').innerHTML='';qb$('practiceReview').classList.add('hidden','screen-review');qb$('practiceReview').style.display='none';}
     qbRender();
+    var exitBtn=document.getElementById('questionBankExitReviewStatic');
+    if(exitBtn){
+      exitBtn.style.display='block';
+      exitBtn.classList.remove('hidden');
+      exitBtn.disabled=false;
+      exitBtn.textContent='🚪 வெளியேறு & Review';
+    }
   }catch(e){
     QB.active=false;qbHideLogoutButton();
+    var exitBtn=document.getElementById('questionBankExitReviewStatic');
+    if(exitBtn){
+      exitBtn.style.display='none';
+      exitBtn.classList.add('hidden');
+    }
     if(qb$('feedback'))qb$('feedback').innerHTML='<b>Question Bank தொடங்க முடியவில்லை.</b><br>'+qbEsc(e.message);
   }
 };
@@ -4589,4 +4606,37 @@ window.__THIRAL_QUESTION_BANK_REVIEW_V1__=true;
   }
 })();
 </script>
+
+<script id="thiral-qb-exit-final-bridge">
+(function(){
+  function button(){ return document.getElementById('questionBankExitReviewStatic'); }
+  function practiceVisible(){
+    var p=document.getElementById('practice');
+    return !!(p && !p.classList.contains('hidden'));
+  }
+  function questionBankMode(){
+    var t=document.getElementById('subTitle');
+    var txt=t ? String(t.textContent||'') : '';
+    return /Question Bank|தொடர்ச்சி/i.test(txt);
+  }
+  function sync(){
+    var b=button();
+    if(!b) return;
+    var active=questionBankMode();
+    if(active && practiceVisible()){
+      b.style.display='block';
+      b.classList.remove('hidden');
+      if(!b.disabled) b.textContent='🚪 வெளியேறு & Review';
+    }else if(!practiceVisible()){
+      b.style.display='none';
+      b.classList.add('hidden');
+    }
+  }
+  document.addEventListener('DOMContentLoaded',function(){
+    sync();
+    setInterval(sync,250);
+  });
+})();
+</script>
+
 </body></html>
