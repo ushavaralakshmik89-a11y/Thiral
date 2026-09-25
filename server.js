@@ -65,6 +65,55 @@ function sendError(res, status, error) {
   return res.status(status).json({ error });
 }
 
+
+/* Group 4 canonical subject/subtopic aliases. The database may contain either
+   the Tamil UI key or its English label for bilingual rows. Never delete or
+   rewrite existing question data: requests simply match both known labels. */
+const SUBJECT_ALIASES = {
+  'பொது அறிவு':'gs','General Knowledge':'gs','general knowledge':'gs',
+  'General Studies':'gs','general studies':'gs',
+  'Aptitude':'apt','aptitude':'apt','தமிழ்':'tamil','Tamil':'tamil'
+};
+const GROUP4_SUBTOPIC_ALIASES = {
+  'பண்டைய இந்தியா':'Ancient India','Ancient India':'பண்டைய இந்தியா',
+  'இடைக்கால இந்தியா':'Medieval India','Medieval India':'இடைக்கால இந்தியா',
+  'நவீன இந்தியா':'Modern India','Modern India':'நவீன இந்தியா',
+  'சுதந்திரப் போராட்டம்':'Indian Freedom Movement','Indian Freedom Movement':'சுதந்திரப் போராட்டம்',
+  'சங்க காலம்':'Sangam Age','Sangam Age':'சங்க காலம்',
+  'சோழர்':'Cholas','Cholas':'சோழர்','பாண்டியர்':'Pandyas','Pandyas':'பாண்டியர்',
+  'பல்லவர்':'Pallavas','Pallavas':'பல்லவர்','நாயக்கர்':'Nayaks','Nayaks':'நாயக்கர்',
+  'அரசியலமைப்பு':'Constitution','Constitution':'அரசியலமைப்பு',
+  'அடிப்படை உரிமைகள்':'Fundamental Rights','Fundamental Rights':'அடிப்படை உரிமைகள்',
+  'பாராளுமன்றம்':'Parliament','Parliament':'பாராளுமன்றம்',
+  'மாநில அரசு':'State Government','State Government':'மாநில அரசு',
+  'உள்ளாட்சி':'Local Government','Local Government':'உள்ளாட்சி',
+  'இந்தியா':'India','India':'இந்தியா','தமிழ்நாடு':'Tamil Nadu','Tamil Nadu':'தமிழ்நாடு',
+  'ஆறுகள்':'Rivers','Rivers':'ஆறுகள்','மலைகள்':'Mountains','Mountains':'மலைகள்',
+  'வளங்கள்':'Resources','Resources':'வளங்கள்','இயற்பியல்':'Physics','Physics':'இயற்பியல்',
+  'வேதியியல்':'Chemistry','Chemistry':'வேதியியல்','உயிரியல்':'Biology','Biology':'உயிரியல்',
+  'சுற்றுச்சூழல்':'Environment','Environment':'சுற்றுச்சூழல்',
+  'அடிப்படை பொருளாதாரம்':'Basic Economics','Basic Economics':'அடிப்படை பொருளாதாரம்',
+  'இந்திய பொருளாதாரம்':'Indian Economy','Indian Economy':'இந்திய பொருளாதாரம்',
+  'தமிழ்நாடு பொருளாதாரம்':'Tamil Nadu Economy','Tamil Nadu Economy':'தமிழ்நாடு பொருளாதாரம்',
+  'எண்கள்':'Numbers','Numbers':'எண்கள்','பின்னங்கள்':'Fractions','Fractions':'பின்னங்கள்',
+  'சதவீதம்':'Percentage','Percentage':'சதவீதம்','விகிதம்':'Ratio','Ratio':'விகிதம்',
+  'சராசரி':'Average','Average':'சராசரி','பரப்பளவு':'Area','Area':'பரப்பளவு',
+  'சுற்றளவு':'Perimeter','Perimeter':'சுற்றளவு','கனஅளவு':'Volume','Volume':'கனஅளவு',
+  'அலகுகள்':'Units','Units':'அலகுகள்','இலாபம் மற்றும் நட்டம்':'Profit and Loss','Profit and Loss':'இலாபம் மற்றும் நட்டம்',
+  'வட்டி':'Interest','Interest':'வட்டி','காலம் மற்றும் வேலை':'Time and Work','Time and Work':'காலம் மற்றும் வேலை',
+  'வேகம் மற்றும் தூரம்':'Speed and Distance','Speed and Distance':'வேகம் மற்றும் தூரம்',
+  'எண் தொடர்':'Number Series','Number Series':'எண் தொடர்','எழுத்துத் தொடர்':'Alphabet Series','Alphabet Series':'எழுத்துத் தொடர்',
+  'ஒப்புமை':'Analogy','Analogy':'ஒப்புமை','வகைப்படுத்தல்':'Classification','Classification':'வகைப்படுத்தல்',
+  'குறியீடு':'Coding','Coding':'குறியீடு'
+};
+function canonicalSubject(raw){ return SUBJECT_ALIASES[String(raw||'').trim()] || String(raw||'').trim(); }
+function subtopicCandidates(raw){
+  const s=String(raw||'').trim();
+  if(!s) return [];
+  const a=[s, GROUP4_SUBTOPIC_ALIASES[s] || ''];
+  return [...new Set(a.filter(Boolean))];
+}
+
 function newSessionId() {
   return crypto.randomBytes(32).toString('hex');
 }
@@ -241,18 +290,7 @@ api.get('/questions', requireAuth, async (req, res) => {
   try {
     const exam = String(req.query.exam || '').trim();
     const rawSubject = String(req.query.subject || '').trim();
-    const subjectAliases = {
-      'பொது அறிவு':'gs',
-      'General Knowledge':'gs',
-      'general knowledge':'gs',
-      'General Studies':'gs',
-      'general studies':'gs',
-      'Aptitude':'apt',
-      'aptitude':'apt',
-      'தமிழ்':'tamil',
-      'Tamil':'tamil'
-    };
-    const subject = subjectAliases[rawSubject] || rawSubject;
+    const subject = canonicalSubject(rawSubject);
     const language = String(req.query.language || 'ta').trim();
     const subtopic = String(req.query.subtopic || '').trim();
     const historyMode = String(req.query.historyMode || '').trim();
@@ -263,7 +301,12 @@ api.get('/questions', requireAuth, async (req, res) => {
     const where = ['exam=$1','subject=$2','language=$3','is_active=true'];
     const params = [exam, subject, language];
     let n = 4;
-    if (subtopic) { where.push(`subtopic=$${n++}`); params.push(subtopic); }
+    const subCandidates = subtopicCandidates(subtopic);
+    if (subCandidates.length === 1) {
+      where.push(`subtopic=$${n++}`); params.push(subCandidates[0]);
+    } else if (subCandidates.length > 1) {
+      where.push(`subtopic = ANY($${n}::text[])`); params.push(subCandidates); n++;
+    }
 
     /* Question Bank continuation: exclude only questions already used
        in this user's Question Bank mode. Normal Practice/Mock are unchanged. */
@@ -304,7 +347,7 @@ api.get('/questions', requireAuth, async (req, res) => {
 api.get('/practice/questions', requireAuth, async (req, res) => {
   try {
     const exam = String(req.query.exam || '').trim();
-    const subject = String(req.query.subject || '').trim();
+    const subject = canonicalSubject(String(req.query.subject || '').trim());
     const language = String(req.query.language || 'ta').trim();
     const subtopic = String(req.query.subtopic || '').trim();
     const limit = Math.min(
@@ -326,9 +369,14 @@ api.get('/practice/questions', requireAuth, async (req, res) => {
       AND q.is_active = true
     `;
 
-    if (subtopic) {
+    const subCandidates = subtopicCandidates(subtopic);
+    if (subCandidates.length === 1) {
       where += ` AND q.subtopic = $${n}`;
-      params.push(subtopic);
+      params.push(subCandidates[0]);
+      n++;
+    } else if (subCandidates.length > 1) {
+      where += ` AND q.subtopic = ANY($${n}::text[])`;
+      params.push(subCandidates);
       n++;
     }
 
