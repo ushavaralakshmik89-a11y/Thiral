@@ -37,7 +37,7 @@ app.use((req, res, next) => {
 });
 
 const PORT = process.env.PORT || 10000;
-const THIRAL_SECURITY_VERSION = 'V157';
+const THIRAL_SECURITY_VERSION = 'V161';
 const isProd = process.env.NODE_ENV === 'production';
 
 if (!process.env.DATABASE_URL) {
@@ -108,13 +108,14 @@ async function sendForgotOtpEmail(to, otp) {
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS || !from) {
     throw new Error('SMTP email service is not configured.');
   }
-  await smtpTransport.sendMail({
+  const result = await smtpTransport.sendMail({
     from: `Thiral Admin <${from}>`,
     to,
     subject: 'Thiral Password Reset OTP',
     text: `Your Thiral password reset OTP is ${otp}. It is valid for 10 minutes. If you did not request this, ignore this email.`,
     html: `<div style="font-family:Arial,sans-serif;line-height:1.6"><h2>Thiral / திறல்</h2><p>Password reset OTP:</p><p style="font-size:30px;font-weight:800;letter-spacing:6px">${otp}</p><p>This OTP is valid for 10 minutes and can be used only once.</p><p>If you did not request a password reset, you can ignore this email.</p></div>`
   });
+  return result;
 }
 
 function sendError(res, status, error) {
@@ -446,16 +447,22 @@ api.post('/auth/register', authLimiter, async (req, res) => {
 
 
 api.post('/auth/forgot/request', forgotOtpLimiter, async (req,res)=>{
+  console.log('[OTP] Forgot-password request received.');
   const generic = 'If the account exists, an OTP has been sent to the registered email.';
   try{
     const email=String(req.body?.email||'').trim().toLowerCase();
+    console.log('[OTP] Request validated:', Boolean(email), 'emailLength=', email.length);
     if(!email || email.length>254) return res.json({ok:true,message:generic});
 
     const userQ=await pool.query(
       `SELECT id,email,is_active FROM users WHERE lower(email)=lower($1) AND role='STUDENT' LIMIT 1`,
       [email]
     );
-    if(!userQ.rowCount || !userQ.rows[0].is_active) return res.json({ok:true,message:generic});
+    if(!userQ.rowCount || !userQ.rows[0].is_active){
+      console.log('[OTP] No active student account matched request.');
+      return res.json({ok:true,message:generic});
+    }
+    console.log('[OTP] Active student account matched. Preparing OTP email.');
 
     const recent=await pool.query(
       `SELECT id FROM password_reset_otps
@@ -478,18 +485,19 @@ api.post('/auth/forgot/request', forgotOtpLimiter, async (req,res)=>{
     );
 
     try{
-      await sendForgotOtpEmail(email,otp);
+      const mailInfo = await sendForgotOtpEmail(email,otp);
+      console.log('[OTP] SMTP send succeeded:', { messageId: mailInfo?.messageId || null, accepted: Array.isArray(mailInfo?.accepted) ? mailInfo.accepted.length : 0, rejected: Array.isArray(mailInfo?.rejected) ? mailInfo.rejected.length : 0 });
     }catch(mailErr){
       await pool.query(
         `UPDATE password_reset_otps SET used_at=now() WHERE user_id=$1 AND otp_hash=$2 AND used_at IS NULL`,
         [userQ.rows[0].id,otpHash(otp)]
       );
-      console.error('Forgot password email error:',mailErr?.message||mailErr);
+      console.error('[OTP] SMTP send FAILED:', { code: mailErr?.code || null, command: mailErr?.command || null, responseCode: mailErr?.responseCode || null, message: mailErr?.message || String(mailErr) });
     }
 
     return res.json({ok:true,message:generic});
   }catch(e){
-    console.error('Forgot password request error:',e);
+    console.error('[OTP] Forgot password request FAILED:', { code:e?.code||null, message:e?.message||String(e) });
     return res.json({ok:true,message:generic});
   }
 });
@@ -1052,7 +1060,8 @@ async function start(){
     await ensureQuestionHistory();
     await ensurePasswordResetTable();
     await ensureAdmin();
-    app.listen(PORT,'0.0.0.0',()=>console.log(`Thiral V160 Secure OTP listening on port ${PORT}`));
+    console.log('[OTP] SMTP configuration present:', { host: process.env.SMTP_HOST || null, port: process.env.SMTP_PORT || null, secure: String(process.env.SMTP_SECURE || 'true'), userPresent: Boolean(process.env.SMTP_USER), passPresent: Boolean(process.env.SMTP_PASS), fromPresent: Boolean(process.env.SMTP_FROM), pepperPresent: Boolean(process.env.OTP_PEPPER) });
+    app.listen(PORT,'0.0.0.0',()=>console.log(`Thiral V161 Secure OTP Diagnostics listening on port ${PORT}`));
   }catch(e){
     console.error('Startup failed:',e);
     process.exit(1);
