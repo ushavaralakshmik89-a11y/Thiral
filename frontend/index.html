@@ -412,8 +412,8 @@ a{
 
 <section id="login" class="card hidden">
 <h2>🔐 Student Login</h2>
-<input id="email" type="email" placeholder="Email ID / மின்னஞ்சல்">
-<input id="pass" type="password" placeholder="Password / கடவுச்சொல்">
+<input id="email" type="email" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Email ID / மின்னஞ்சல்">
+<input id="pass" type="password" autocomplete="new-password" placeholder="Password / கடவுச்சொல்">
 <p id="lm"></p>
 <button onclick="login()">Login</button>
 <button class="secondary" onclick="show('register')">New Registration</button>
@@ -624,9 +624,9 @@ a{
 <section id="adminLogin" class="card hidden">
 <h2>🛠️ Admin Login</h2>
 <label for="adminEmail">Admin ID</label>
-<input id="adminEmail" type="text" autocomplete="username" placeholder="Admin ID">
+<input id="adminEmail" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Admin ID">
 <label for="adminPass">Admin Password</label>
-<input id="adminPass" type="password" autocomplete="current-password" placeholder="Admin Password">
+<input id="adminPass" type="password" autocomplete="new-password" placeholder="Admin Password">
 <p id="adminMsg"></p>
 <button onclick="adminLogin()">Admin Login</button>
 <button class="secondary" onclick="show('home')">← Back</button>
@@ -833,19 +833,51 @@ function labelForSub(s,t,sub){
 
 let currentSubject='',currentTopic='',currentSub='',questions=[],qi=0,total=10,correct=0,wrong=0,unanswered=0,timer=null,locked=false;
 
-function show(id){
-  /* Admin access is based on the server-authenticated user kept in memory.
-     The server remains the real security boundary; this only controls the UI. */
-  if(id==='admin'){
-    const u = window.thiralV138User;
-    if(!u || u.role !== 'ADMIN'){
-      id='adminLogin';
-      const m=document.getElementById('adminMsg');
-      if(m){
-        m.className='bad';
-        m.textContent = 'ACCESS DENIED: Admin authorization required.';
-      }
+function clearLoginFields(which){
+  const ids = which === 'adminLogin'
+    ? ['adminEmail','adminPass','adminMsg']
+    : ['email','pass','lm'];
+
+  ids.forEach(id => {
+    const node = document.getElementById(id);
+    if(!node) return;
+    if('value' in node) node.value = '';
+    if(id === 'adminMsg' || id === 'lm'){
+      node.textContent = '';
+      node.className = '';
     }
+  });
+}
+
+function clearAllLoginFields(){
+  clearLoginFields('login');
+  clearLoginFields('adminLogin');
+}
+
+/* Browser autofill can run after page scripts. Clear once immediately and
+   again on the next event loop turn when a login screen is opened. */
+function clearLoginFieldsDelayed(which){
+  clearLoginFields(which);
+  setTimeout(() => clearLoginFields(which), 0);
+  setTimeout(() => clearLoginFields(which), 150);
+}
+
+function show(id){
+  if(id === 'login' || id === 'adminLogin'){
+    clearLoginFieldsDelayed(id);
+  }
+
+  /* V128: Admin dashboard is never opened without an authenticated ADMIN session. */
+  if(id==='admin'){
+    try{
+      const a=JSON.parse(sessionStorage.getItem('thiral_admin_session_v129')||'null');
+      if(!a || a.role!=='ADMIN' || a.id!=='admin' || !a.expiresAt || Date.now()>a.expiresAt){
+        sessionStorage.removeItem('thiral_admin_session_v129');
+        id='adminLogin';
+        const m=document.getElementById('adminMsg');
+        if(m){m.className='bad';m.textContent='Admin session இல்லை அல்லது காலாவதியாகிவிட்டது. மீண்டும் Login செய்யவும்.';}
+      }
+    }catch(e){ id='adminLogin'; }
   }
   document.querySelectorAll('section').forEach(sec=>{
     sec.classList.add('hidden');
@@ -994,6 +1026,7 @@ function logout(){
   try{sessionStorage.removeItem('tnpsc_student_logged_in');}catch(e){}
   const u=document.getElementById('studentName');
   if(u) u.textContent='';
+  clearAllLoginFields();
   show('home');
 }
 function subject(s){
@@ -3011,14 +3044,13 @@ window.V91_ADV_NUM=V91_ADV_NUM;
     try { await api138('/auth/logout',{method:'POST'}); } catch(e) {}
     window.thiralV138User = null;
     setStudentName(null);
+    clearAllLoginFields();
     show('home');
   };
 
   window.adminLogin = async function(){
     var msg = el('adminMsg');
     try{
-      if(msg){ msg.className=''; msg.textContent='Admin login சரிபார்க்கப்படுகிறது...'; }
-
       var d = await api138('/auth/login',{
         method:'POST',
         body:JSON.stringify({
@@ -3026,36 +3058,24 @@ window.V91_ADV_NUM=V91_ADV_NUM;
           password: el('adminPass').value
         })
       });
-
-      if(!d.user || d.user.role !== 'ADMIN'){
-        throw new Error('ACCESS DENIED: Admin authorization required.');
-      }
-
-      /* Keep the server-authenticated ADMIN user in memory.
-         Do not use sessionStorage/localStorage as an authorization source. */
-      window.thiralV138User = d.user;
-      setStudentName(d.user);
-
-      var ok = await loadAdminV138();
-      if(ok !== false){
-        if(msg){ msg.className='good'; msg.textContent='Admin login successful.'; }
-        show('admin');
-      }
+      if(!d.user || d.user.role !== 'ADMIN') throw new Error('Admin authorization required.');
+      enterV138(d.user);
+      await loadAdminV138();
+      show('admin');
     }catch(e){
-      window.thiralV138User = null;
+      var denied = String(e && e.message || '').indexOf('ACCESS DENIED') === 0;
       if(msg){
         msg.className='bad';
-        msg.textContent = String(e && e.message || e);
+        msg.textContent = denied ? 'ACCESS DENIED' : ('Admin access: ' + (e && e.message || e));
       }
+      if(denied){
+        window.thiralV138Students = [];
+      }
+      return false;
     }
   };
 
-  window.adminLogout = async function(){
-    try { await api138('/auth/logout',{method:'POST'}); } catch(e) {}
-    window.thiralV138User = null;
-    setStudentName(null);
-    show('home');
-  };
+  window.adminLogout = window.logout;
 
   window.openExam = function(id){
     selectedExam = id;
@@ -3590,21 +3610,14 @@ window.V91_ADV_NUM=V91_ADV_NUM;
         body+'</table>';
       if(el('students')) el('students').innerHTML=body;
       window.thiralV138Students=students;
-      return true;
     }catch(e){
-      window.thiralV138Students=[];
-      if(el('adminMsg')){
-        el('adminMsg').className='bad';
-        el('adminMsg').textContent = String(e && e.message || e);
-      }
-      return false;
+      if(el('adminMsg')) el('adminMsg').textContent='Admin data: '+e.message;
     }
   }
 
   window.admin = loadAdminV138;
   window.openAdminStudentView = async function(filter){
-    var loaded = await loadAdminV138();
-    if(loaded === false) return;
+    await loadAdminV138();
     var list=window.thiralV138Students||[];
     var title='மாணவர் விவரங்கள்';
     var now=new Date();
@@ -4225,6 +4238,17 @@ window.startPractice=async function(n){
     exam: 'group4',
     dbSubjects: { tamil:'tamil', gs:'பொது அறிவு', apt:'apt' }
   };
+})();
+</script>
+<script>
+(function(){
+  function wipe(){
+    if(typeof clearAllLoginFields === 'function') clearAllLoginFields();
+  }
+  window.addEventListener('pageshow', wipe);
+  window.addEventListener('visibilitychange', function(){
+    if(document.visibilityState === 'visible') wipe();
+  });
 })();
 </script>
 </body></html>
