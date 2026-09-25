@@ -376,7 +376,7 @@ a{
 <section id="register" class="card hidden">
 <h2>📝 Student Registration / மாணவர் பதிவு</h2><p class="small">தமிழ் அல்லது English-ல் உங்கள் பெயர் உள்ளிட்ட விவரங்களை உள்ளிடலாம். Questions/Study content எந்த மொழியில் இருக்க வேண்டும் என்பது தேர்வைப் பொறுத்தது.</p>
 <input id="rname" placeholder="முழுப் பெயர் / Full Name">
-<input id="rdob" placeholder="DOB (DD/MM/YYYY) / பிறந்த தேதி" maxlength="10" oninput="formatDOB(this)">
+<input id="rdob" type="text" inputmode="numeric" autocomplete="bday" placeholder="DOB (DD/MM/YYYY) / பிறந்த தேதி" maxlength="10" oninput="formatDOB(this)" onpaste="setTimeout(function(){formatDOB(document.getElementById('rdob'));},0)">
 <input id="rphone" placeholder="Phone Number / தொலைபேசி எண்">
 <select id="rgender"><option value="">Select Gender</option><option>ஆண்</option><option>பெண்</option><option>மூன்றாம் பாலினம்</option></select>
 <input id="remail" type="email" placeholder="Email ID / மின்னஞ்சல்">
@@ -4545,16 +4545,11 @@ window.logout=async function(){try{g4StopTimer();if(G4.mockTimer)clearInterval(G
   'use strict';
   window.formatDOB = function(input){
     if(!input) return;
-    var digits = String(input.value || '').replace(/\D/g,'').slice(0,8);
-    var value = '';
-    if(digits.length <= 2){
-      value = digits;
-    }else if(digits.length <= 4){
-      value = digits.slice(0,2) + '/' + digits.slice(2);
-    }else{
-      value = digits.slice(0,2) + '/' + digits.slice(2,4) + '/' + digits.slice(4,8);
-    }
-    input.value = value;
+    var digits = String(input.value || '').replace(/[^0-9]/g,'').slice(0,8);
+    var value = digits;
+    if(digits.length > 2) value = digits.slice(0,2) + '/' + digits.slice(2);
+    if(digits.length > 4) value = digits.slice(0,2) + '/' + digits.slice(2,4) + '/' + digits.slice(4);
+    input.value = value.slice(0,10);
   };
 
   document.addEventListener('DOMContentLoaded', function(){
