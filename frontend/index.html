@@ -834,9 +834,6 @@ function labelForSub(s,t,sub){
 let currentSubject='',currentTopic='',currentSub='',questions=[],qi=0,total=10,correct=0,wrong=0,unanswered=0,timer=null,locked=false;
 
 function show(id){
-  /* Start every fresh login screen with blank credentials. */
-  if(id==='login' || id==='adminLogin') clearLoginForms();
-
   /* Admin access is based on the server-authenticated user kept in memory.
      The server remains the real security boundary; this only controls the UI. */
   if(id==='admin'){
@@ -2936,25 +2933,6 @@ window.V91_ADV_NUM=V91_ADV_NUM;
     if(el('uname')) el('uname').textContent = name;
   }
 
-  /* After logout, never leave the previous user's login credentials visible.
-     This is UI hygiene only; authentication remains server-side. */
-  function clearLoginForms(){
-    ['email','pass','adminEmail','adminPass'].forEach(function(id){
-      var f = el(id);
-      if(f){
-        f.value = '';
-        f.removeAttribute('value');
-      }
-    });
-    ['lm','adminMsg'].forEach(function(id){
-      var m = el(id);
-      if(m){
-        m.textContent = '';
-        m.className = '';
-      }
-    });
-  }
-
   function enterV138(u){
     window.thiralV138User = u;
     setStudentName(u);
@@ -3033,7 +3011,6 @@ window.V91_ADV_NUM=V91_ADV_NUM;
     try { await api138('/auth/logout',{method:'POST'}); } catch(e) {}
     window.thiralV138User = null;
     setStudentName(null);
-    clearLoginForms();
     show('home');
   };
 
@@ -3077,7 +3054,6 @@ window.V91_ADV_NUM=V91_ADV_NUM;
     try { await api138('/auth/logout',{method:'POST'}); } catch(e) {}
     window.thiralV138User = null;
     setStudentName(null);
-    clearLoginForms();
     show('home');
   };
 
