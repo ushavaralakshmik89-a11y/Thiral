@@ -753,36 +753,11 @@ a{
 <p class="small">பதிவு செய்த ஒவ்வொரு மாணவரின் பெயர், Email, தொலைபேசி, பாலினம், பிறந்த தேதி, பதிவு நேரம் மற்றும் கடைசி Login நேரம் இங்கே காட்டப்படும். Password மட்டும் Admin-க்கும் காட்டப்படாது.</p>
 <div id="adminStudentList"></div>
 <hr>
-<h3>📊 Exam Overall Results / தேர்வு ஒட்டுமொத்த முடிவுகள்</h3>
-<p class="small">ஒரு தேர்வில் எழுதிய அனைத்து attempts-ன் ஒட்டுமொத்த முடிவுகள். மாணவர் பெயர் மற்றும் Email மட்டும் அடையாளமாக காட்டப்படும்; Student ID காட்டப்படாது. ஒவ்வொரு attempt-மும் தனி record ஆக இருக்கும்.</p>
-<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
-  <div><label for="adminExamFilter">Exam / தேர்வு</label><select id="adminExamFilter" onchange="populateAdminExamTopics138()"><option value="">அனைத்து தேர்வுகளும்</option></select></div>
-  <div><label for="adminExamTypeFilter">Exam Type / வகை</label><select id="adminExamTypeFilter"><option value="">அனைத்தும்</option><option value="model">Model Exam</option><option value="mock">Mock Test</option><option value="practice">Practice</option><option value="bank">Question Bank</option><option value="10">10 Questions</option><option value="20">20 Questions</option><option value="50">50 Questions</option></select></div>
-  <div><label for="adminExamSubjectFilter">Subject / பாடம்</label><select id="adminExamSubjectFilter" onchange="populateAdminExamTopics138()"><option value="">அனைத்து பாடங்களும்</option><option value="tamil">தமிழ்</option><option value="gs">பொது அறிவு</option><option value="apt">திறனறிவு / Aptitude</option></select></div>
-  <div><label for="adminExamTopicFilter">Topic / தலைப்பு</label><select id="adminExamTopicFilter" onchange="populateAdminExamSubtopics138()"><option value="">அனைத்து தலைப்புகளும்</option></select></div>
-  <div><label for="adminExamSubtopicFilter">Subtopic / உள்தலைப்பு</label><select id="adminExamSubtopicFilter"><option value="">அனைத்து உள்தலைப்புகளும்</option></select></div>
-  <div><label for="adminExamFrom">From Date</label><input id="adminExamFrom" type="date"></div>
-  <div><label for="adminExamTo">To Date</label><input id="adminExamTo" type="date"></div>
-  <div><label for="adminExamMin">Min %</label><input id="adminExamMin" type="number" min="0" max="100" value="0"></div>
-  <div><label for="adminExamMax">Max %</label><input id="adminExamMax" type="number" min="0" max="100" value="100"></div>
-  <div><label for="adminExamPageSize">View / ஒரு பக்கத்தில்</label><select id="adminExamPageSize"><option value="25">25 Results</option><option value="50">50 Results</option><option value="100" selected>100 Results</option><option value="200">200 Results</option></select></div>
+<div class="card" style="margin-top:16px;border:1px solid #dbeafe">
+<h3>📥 Exam Results Excel / தேர்வு முடிவுகள் Excel</h3>
+<p class="small">தேர்வு முடிவுகளை browser-ல் தனியாக காட்ட வேண்டாம். தேவையான முழு Exam Results-ஐ Excel file-ஆக பதிவிறக்கம் செய்யலாம். ஒவ்வொரு தேர்வும் தனித்தனி Excel tab-ல் வரும்.</p>
+<button class="secondary" onclick="exportAdminExamResults()">📥 Excel Export</button>
 </div>
-<div class="grid" style="margin-top:12px">
-  <button onclick="loadAdminExamResults(1)">🔎 Search / View Results</button>
-  <button class="secondary" onclick="clearAdminExamResults()">Clear</button>
-  <button class="secondary" onclick="exportAdminExamResults()">📥 Excel Export</button>
-</div>
-<div class="grid admin-stat-grid" style="margin-top:18px">
-  <div class="card admin-stat-card"><h3>👥 Participants</h3><p id="examOverallParticipants">0</p></div>
-  <div class="card admin-stat-card"><h3>📝 Attempts</h3><p id="examOverallAttempts">0</p></div>
-  <div class="card admin-stat-card"><h3>📊 Average %</h3><p id="examOverallAverage">0%</p></div>
-  <div class="card admin-stat-card"><h3>🏆 Highest %</h3><p id="examOverallHighest">0%</p></div>
-  <div class="card admin-stat-card"><h3>📉 Lowest %</h3><p id="examOverallLowest">0%</p></div>
-  <div class="card admin-stat-card"><h3>❓ Total Questions</h3><p id="examOverallQuestions">0</p></div>
-</div>
-<div id="adminExamResultsMsg" class="small" style="margin-top:10px"></div>
-<div id="adminExamResultsList" style="margin-top:14px;overflow:auto"></div>
-<div id="adminExamResultsPager" class="grid" style="margin-top:12px"></div>
 <hr>
 <h3>📚 Content Management</h3>
 <p>Subjects → Topics → Subtopics → Study Material → Questions ஆகியவற்றை Admin நிர்வகிக்கும் பகுதி.</p>
