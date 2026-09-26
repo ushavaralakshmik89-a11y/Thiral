@@ -36,7 +36,7 @@ app.use((req, res, next) => {
 });
 
 const PORT = process.env.PORT || 10000;
-const THIRAL_SECURITY_VERSION = 'V162';
+const THIRAL_SECURITY_VERSION = 'V166';
 const isProd = process.env.NODE_ENV === 'production';
 
 if (!process.env.DATABASE_URL) {
@@ -213,9 +213,9 @@ async function ensureAdmin() {
 app.get('/health', async (req, res) => {
   try {
     await pool.query('SELECT 1');
-    res.json({ ok: true, service: 'Thiral V162 Secure OTP', database: 'ok', time: new Date().toISOString() });
+    res.json({ ok: true, service: 'Thiral V166 Secure OTP', database: 'ok', time: new Date().toISOString() });
   } catch (e) {
-    res.status(503).json({ ok: false, service: 'Thiral V162 Secure OTP', database: 'error' });
+    res.status(503).json({ ok: false, service: 'Thiral V166 Secure OTP', database: 'error' });
   }
 });
 
@@ -645,14 +645,21 @@ api.post('/auth/forgot-password/reset', authLimiter, async (req,res)=>{
 
     const passwordHash = await argon2.hash(newPassword);
 
-    await pool.query('BEGIN');
+    /*
+      Use one dedicated PostgreSQL client for the password-reset transaction.
+      This preserves all existing data and makes the password update,
+      OTP invalidation, session invalidation and audit event atomic.
+    */
+    const client = await pool.connect();
     try{
-      await pool.query(
+      await client.query('BEGIN');
+
+      await client.query(
         `UPDATE users SET password_hash=$1 WHERE id=$2`,
         [passwordHash,row.user_id]
       );
 
-      await pool.query(
+      await client.query(
         `UPDATE password_reset_otps
          SET used_at=now(),reset_token_hash=NULL
          WHERE id=$1`,
@@ -660,21 +667,23 @@ api.post('/auth/forgot-password/reset', authLimiter, async (req,res)=>{
       );
 
       /* Password reset invalidates all existing sessions for this student. */
-      await pool.query(
+      await client.query(
         `DELETE FROM sessions WHERE user_id=$1`,
         [row.user_id]
       );
 
-      await pool.query(
+      await client.query(
         `INSERT INTO activity_events(user_id,event_type,metadata)
          VALUES($1,'PASSWORD_RESET',$2)`,
         [row.user_id,JSON.stringify({method:'OTP'})]
       );
 
-      await pool.query('COMMIT');
+      await client.query('COMMIT');
     }catch(e){
-      await pool.query('ROLLBACK');
+      try{ await client.query('ROLLBACK'); }catch(_){}
       throw e;
+    }finally{
+      client.release();
     }
 
     return res.json({ok:true,message:'Password reset successfully.'});
