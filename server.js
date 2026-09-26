@@ -1268,69 +1268,90 @@ api.get('/admin/exam-results/export', requireAdmin, async (req,res)=>{
     const typeSql=`CASE WHEN lower(a.exam) LIKE '%model%' THEN 'Model Exam' WHEN a.mode='mock' THEN 'Mock Test' WHEN a.mode='bank' THEN 'Question Bank' WHEN a.total_count=10 THEN '10 Questions' WHEN a.total_count=20 THEN '20 Questions' WHEN a.total_count=50 THEN '50 Questions' ELSE 'Practice' END`;
     const q=await pool.query(`SELECT a.id AS attempt_id,u.name,u.email,a.exam,${typeSql} AS exam_type,to_char(COALESCE(a.submitted_at,a.started_at),'DD-MM-YYYY HH24:MI') AS date,COALESCE(a.total_count,0)::int AS questions,COALESCE(a.correct_count,0)::int AS marks,COALESCE(a.total_count,0)::int AS total_marks,COALESCE(a.score,0)::numeric(10,2) AS percentage,COALESCE((SELECT string_agg(DISTINCT qq.subtopic, ' | ' ORDER BY qq.subtopic) FROM unnest(a.question_ids) AS aqid JOIN questions qq ON qq.id=aqid),'') AS subtopics FROM attempts a JOIN users u ON u.id=a.user_id WHERE ${where.join(' AND ')} ORDER BY COALESCE(a.submitted_at,a.started_at) DESC,a.id DESC`,params);
 
-    /*
-       Excel workbook export: use Excel 2003 SpreadsheetML so that every Exam
-       is a separate worksheet/tab. This keeps Tamil text intact and works
-       with older desktop Excel versions too. No npm package is required.
-    */
-    const esc=v=>String(v??'')
+    const escXml=v=>String(v??'')
       .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
       .replace(/"/g,'&quot;').replace(/'/g,'&apos;');
-    const cell=(v,type='String')=>`<Cell><Data ss:Type="${type}">${esc(v)}</Data></Cell>`;
-    const headers=['Name','Email','Exam','Exam Type','Topic','Subtopics','Date','Questions','Marks','Total Marks','Percentage'];
-    const topicFromRow=r=>[...new Set(String(r.subtopics||'').split(' | ').map(group4TopicForSubtopic).filter(Boolean))].join(' | ');
-    const rows=q.rows.map(r=>({...r,topic:topicFromRow(r)}));
+    const colName=n=>{
+      let s=''; n=Number(n)+1;
+      while(n){ const r=(n-1)%26; s=String.fromCharCode(65+r)+s; n=Math.floor((n-1)/26); }
+      return s;
+    };
+    const inlineCell=(ref,value,style)=>{
+      const text=escXml(value);
+      return `<c r="${ref}" t="inlineStr"${style?` s="${style}"`:''}><is><t xml:space="preserve">${text}</t></is></c>`;
+    };
+    const numCell=(ref,value,style)=>`<c r="${ref}" t="n"${style?` s="${style}"`:''}><v>${Number(value)||0}</v></c>`;
+    const sheetXml=(rows)=>{
+      const headers=['Name','Email','Exam','Exam Type','Topic','Subtopics','Date','Questions','Marks','Total Marks','Percentage'];
+      const out=[];
+      out.push('<row r="1">'+headers.map((h,i)=>inlineCell(`${colName(i)}1`,h,1)).join('')+'</row>');
+      rows.forEach((r,ri)=>{
+        const rowNo=ri+2;
+        const topic=[...new Set(String(r.subtopics||'').split(' | ').map(group4TopicForSubtopic).filter(Boolean))].join(' | ');
+        const vals=[r.name,r.email,r.exam,r.exam_type,topic,r.subtopics,r.date];
+        const cells=[];
+        vals.forEach((v,i)=>cells.push(inlineCell(`${colName(i)}${rowNo}`,v)));
+        cells.push(numCell(`H${rowNo}`,r.questions));
+        cells.push(numCell(`I${rowNo}`,r.marks));
+        cells.push(numCell(`J${rowNo}`,r.total_marks));
+        cells.push(numCell(`K${rowNo}`,r.percentage));
+        out.push(`<row r="${rowNo}">${cells.join('')}</row>`);
+      });
+      return `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"/></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols><col min="1" max="1" width="24"/><col min="2" max="2" width="32"/><col min="3" max="4" width="18"/><col min="5" max="6" width="28"/><col min="7" max="7" width="20"/><col min="8" max="11" width="14"/></cols><sheetData>${out.join('')}</sheetData><autoFilter ref="A1:K${Math.max(1,rows.length+1)}"/></worksheet>`;
+    };
 
     const safeSheetName=(name,used)=>{
-      let n=String(name||'Exam').replace(/[\\\/?*\[\]:]/g,' ').trim()||'Exam';
+      let n=String(name||'Exam').replace(/[\\\/\?\*\[\]:]/g,' ').trim()||'Exam';
       n=n.slice(0,31);
       const base=n; let i=2;
-      while(used.has(n)){ const suffix=` (${i++})`; n=(base.slice(0,31-suffix.length)+suffix); }
-      used.add(n); return n;
+      while(used.has(n)){const suffix=` (${i++})`;n=base.slice(0,31-suffix.length)+suffix;}
+      used.add(n);return n;
     };
 
-    const sheets=[]; const usedNames=new Set();
     const groups=new Map();
-    for(const r of rows){ const key=String(r.exam||'Unknown Exam'); if(!groups.has(key))groups.set(key,[]); groups.get(key).push(r); }
+    for(const r of q.rows){const key=String(r.exam||'Unknown Exam');if(!groups.has(key))groups.set(key,[]);groups.get(key).push(r);}
+    if(!groups.size)groups.set('No Results',[]);
 
-    const summaryRows=[
-      ['Exam','Exam Type','Records','Participants','Average %','Highest %','Lowest %'],
-      ...[...groups.entries()].map(([name,rs])=>{
-        const p=new Set(rs.map(x=>String(x.email||x.name||x.attempt_id))).size;
-        const scores=rs.map(x=>Number(x.percentage)||0);
-        const avg=scores.length?scores.reduce((a,b)=>a+b,0)/scores.length:0;
-        const highest=scores.length?Math.max(...scores):0;
-        const lowest=scores.length?Math.min(...scores):0;
-        return [name,rs[0]?.exam_type||'',rs.length,p,avg.toFixed(2),highest.toFixed(2),lowest.toFixed(2)];
-      })
+    const sheets=[]; const rels=[]; const content=[]; const usedNames=new Set();
+    let idx=1;
+    for(const [examName,rows] of groups.entries()){
+      const sheetName=safeSheetName(examName,usedNames);
+      sheets.push(`<sheet name="${escXml(sheetName)}" sheetId="${idx}" r:id="rId${idx}"/>`);
+      rels.push(`<Relationship Id="rId${idx}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${idx}.xml"/>`);
+      content.push(`<Override PartName="/xl/worksheets/sheet${idx}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`);
+      idx++;
+    }
+
+    const files=[
+      {name:'[Content_Types].xml',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${content.join('')}</Types>`},
+      {name:'_rels/.rels',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`},
+      {name:'xl/workbook.xml',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView/></bookViews><sheets>${sheets.join('')}</sheets></workbook>`},
+      {name:'xl/_rels/workbook.xml.rels',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${rels.join('')}<Relationship Id="rId${idx}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`},
+      {name:'xl/styles.xml',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="10"/><name val="Arial"/></font><font><b/><sz val="10"/><name val="Arial"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0"/></cellXfs></styleSheet>`}
     ];
+    idx=1;
+    for(const [examName,rows] of groups.entries()){
+      files.push({name:`xl/worksheets/sheet${idx}.xml`,data:sheetXml(rows)});idx++;
+    }
 
-    const sheetXml=(name,dataRows)=>{
-      const headerXml=`<Row>${headers.map(h=>cell(h)).join('')}</Row>`;
-      const dataXml=dataRows.map(r=>`<Row>${[
-        r.name,r.email,r.exam,r.exam_type,r.topic,r.subtopics,r.date,r.questions,r.marks,r.total_marks,r.percentage
-      ].map((v,i)=>cell(v,[7,8,9].includes(i)?'Number':'String')).join('')}</Row>`).join('');
-      return `<Worksheet ss:Name="${esc(name)}"><Table>${headerXml}${dataXml}</Table></Worksheet>`;
-    };
-
-    sheets.push(`<Worksheet ss:Name="Summary"><Table>${summaryRows.map((row,ri)=>`<Row>${row.map((v,i)=>cell(v,ri>0&&i>=2?'Number':'String')).join('')}</Row>`).join('')}</Table></Worksheet>`);
-    for(const [examName,rs] of groups.entries()) sheets.push(sheetXml(safeSheetName(examName,usedNames),rs));
-    if(!groups.size) sheets.push(sheetXml(safeSheetName('No Results',usedNames),[]));
-
-    const xml=`<?xml version="1.0" encoding="UTF-8"?>
-<?mso-application progid="Excel.Sheet"?>
-<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet" xmlns:html="http://www.w3.org/TR/REC-html40">
-<Styles><Style ss:ID="Default" ss:Name="Normal"><Alignment ss:Vertical="Center"/><Font ss:FontName="Arial" ss:Size="10"/></Style></Styles>
-${sheets.join('\n')}
-</Workbook>`;
-
-    const filename='thiral_exam_overall_results_'+new Date().toISOString().slice(0,10)+'.xml';
-    res.setHeader('Content-Type','application/vnd.ms-excel; charset=utf-8');
+    const crcTable=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1);t[n]=c>>>0;}return t;})();
+    const crc32=buf=>{let c=0xFFFFFFFF;for(const b of buf)c=crcTable[(c^b)&255]^(c>>>8);return (c^0xFFFFFFFF)>>>0;};
+    const zipParts=[];const central=[];let offset=0;
+    const now=new Date();const dosTime=(now.getHours()<<11)|(now.getMinutes()<<5)|Math.floor(now.getSeconds()/2);const dosDate=((now.getFullYear()-1980)<<9)|((now.getMonth()+1)<<5)|now.getDate();
+    for(const f of files){
+      const nameBuf=Buffer.from(f.name,'utf8'), dataBuf=Buffer.from(f.data,'utf8'), crc=crc32(dataBuf);
+      const local=Buffer.alloc(30+nameBuf.length);local.writeUInt32LE(0x04034b50,0);local.writeUInt16LE(20,4);local.writeUInt16LE(0,6);local.writeUInt16LE(0,8);local.writeUInt16LE(dosTime,10);local.writeUInt16LE(dosDate,12);local.writeUInt32LE(crc,14);local.writeUInt32LE(dataBuf.length,18);local.writeUInt32LE(dataBuf.length,22);local.writeUInt16LE(nameBuf.length,26);local.writeUInt16LE(0,28);nameBuf.copy(local,30);zipParts.push(local,dataBuf);
+      const c=Buffer.alloc(46+nameBuf.length);c.writeUInt32LE(0x02014b50,0);c.writeUInt16LE(20,4);c.writeUInt16LE(20,6);c.writeUInt16LE(0,8);c.writeUInt16LE(0,10);c.writeUInt16LE(dosTime,12);c.writeUInt16LE(dosDate,14);c.writeUInt32LE(crc,16);c.writeUInt32LE(dataBuf.length,20);c.writeUInt32LE(dataBuf.length,24);c.writeUInt16LE(nameBuf.length,28);c.writeUInt16LE(0,30);c.writeUInt16LE(0,32);c.writeUInt16LE(0,34);c.writeUInt16LE(0,36);c.writeUInt32LE(0,38);c.writeUInt32LE(offset,42);nameBuf.copy(c,46);central.push(c);offset+=local.length+dataBuf.length;
+    }
+    const centralBuf=Buffer.concat(central);const end=Buffer.alloc(22);end.writeUInt32LE(0x06054b50,0);end.writeUInt16LE(0,4);end.writeUInt16LE(0,6);end.writeUInt16LE(files.length,8);end.writeUInt16LE(files.length,10);end.writeUInt32LE(centralBuf.length,12);end.writeUInt32LE(offset,16);end.writeUInt16LE(0,20);
+    const xlsx=Buffer.concat([...zipParts,centralBuf,end]);
+    const filename='thiral_exam_results_'+new Date().toISOString().slice(0,10)+'.xlsx';
+    res.setHeader('Content-Type','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition',`attachment; filename="${filename}"`);
-    res.send('\ufeff'+xml);
+    res.setHeader('Content-Length',String(xlsx.length));
+    res.end(xlsx);
   }catch(e){console.error('[ADMIN EXAM EXPORT]',e);sendError(res,500,'Exam export service error.');}
 });
-
 
 api.get('/admin/exam-results/:attemptId', requireAdmin, async (req,res)=>{
   try{
