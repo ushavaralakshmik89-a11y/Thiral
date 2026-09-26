@@ -67,6 +67,53 @@ function sendError(res, status, error) {
 }
 
 
+function clientIp(req){
+  const xf=String(req.headers['x-forwarded-for']||'').split(',')[0].trim();
+  return xf || String(req.ip||'').trim() || 'unknown';
+}
+
+function clientUserAgent(req){
+  return String(req.headers['user-agent']||'').slice(0,500);
+}
+
+async function logSecurityEvent({req,eventType,userId=null,email='',details='',sendAlert=false}){
+  const ip=clientIp(req);
+  const userAgent=clientUserAgent(req);
+  try{
+    await pool.query(
+      `INSERT INTO security_events(event_type,user_id,email,ip,user_agent,details) VALUES($1,$2,$3,$4,$5,$6)`,
+      [eventType,userId,email,ip,userAgent,details]
+    );
+  }catch(e){ console.error('Security event log failed:',e); }
+
+  if(sendAlert){
+    try{ await sendSecurityAlertEmail({eventType,email,ip,userAgent,details}); }
+    catch(e){ console.error('Security alert email failed:',e.message||e); }
+  }
+}
+
+async function sendSecurityAlertEmail({eventType,email,ip,userAgent,details}){
+  const url=String(process.env.THIRAL_SECURITY_ALERT_URL || '').trim();
+  const apiKey=String(process.env.THIRAL_API_KEY || '').trim();
+  const to=String(process.env.THIRAL_SECURITY_ALERT_EMAIL || process.env.ADMIN_ID || '').trim().toLowerCase();
+  if(!url || !apiKey || !to) return false;
+  const subject=`Thiral Security Alert: ${eventType}`;
+  const body=[
+    `Security event: ${eventType}`,
+    `Time: ${new Date().toISOString()}`,
+    `Email: ${email || '-'}`,
+    `IP: ${ip || '-'}`,
+    `Browser: ${userAgent || '-'}`,
+    `Details: ${details || '-'}`
+  ].join('\n');
+  const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},redirect:'follow',body:JSON.stringify({api_key:apiKey,to,subject,body,event_type:eventType})});
+  const text=await response.text();
+  let data={}; try{data=JSON.parse(text);}catch(_){ }
+  if(!response.ok || data.ok!==true) throw new Error(`Security alert bridge failed (${response.status})`);
+  return true;
+}
+
+
 /* Group 4 canonical subject/subtopic aliases. The database may contain either
    the Tamil UI key or its English label for bilingual rows. Never delete or
    rewrite existing question data: requests simply match both known labels. */
@@ -175,8 +222,11 @@ async function requireAuth(req, res, next) {
 }
 
 async function requireAdmin(req, res, next) {
-  await requireAuth(req, res, () => {
-    if (req.user.role !== 'ADMIN') return sendError(res, 403, 'ACCESS DENIED: Admin authorization required.');
+  await requireAuth(req, res, async () => {
+    if (req.user.role !== 'ADMIN') {
+      await logSecurityEvent({req,eventType:'UNAUTHORIZED_ADMIN_ACCESS',userId:req.user.id,email:req.user.email,details:`Attempted ${req.method} ${req.originalUrl}`,sendAlert:true});
+      return sendError(res, 403, 'ACCESS DENIED: Admin authorization required.');
+    }
     next();
   });
 }
@@ -256,14 +306,21 @@ api.post('/auth/login', authLimiter, async (req, res) => {
       `SELECT id,student_id,name,email,password_hash,phone,dob,gender,role,is_active,must_change_password FROM users WHERE lower(email)=lower($1) LIMIT 1`, [email]
     );
     const u = q.rows[0];
-    if (!u || !u.is_active) return sendError(res, 401, 'Invalid ID/email or password.');
+    if (!u || !u.is_active) {
+      await logSecurityEvent({req,eventType:'FAILED_LOGIN',email,details:'Unknown or inactive account',sendAlert:true});
+      return sendError(res, 401, 'Invalid ID/email or password.');
+    }
     const ok = await argon2.verify(u.password_hash, password);
-    if (!ok) return sendError(res, 401, 'Invalid ID/email or password.');
+    if (!ok) {
+      await logSecurityEvent({req,eventType:'FAILED_LOGIN',userId:u.id,email:u.email,details:'Invalid password',sendAlert:true});
+      return sendError(res, 401, 'Invalid ID/email or password.');
+    }
     const sid = newSessionId();
     await pool.query(`DELETE FROM sessions WHERE expires_at <= now()`);
     await pool.query(`INSERT INTO sessions(id,user_id,expires_at) VALUES($1,$2,now()+interval '30 minutes')`, [sid, u.id]);
     await pool.query(`UPDATE users SET last_login_at=now() WHERE id=$1`, [u.id]);
     await pool.query(`INSERT INTO activity_events(user_id,event_type,metadata) VALUES($1,'LOGIN',$2)`, [u.id, JSON.stringify({ role: u.role })]);
+    if(u.role==='ADMIN') await logSecurityEvent({req,eventType:'ADMIN_LOGIN_SUCCESS',userId:u.id,email:u.email,details:'Admin login successful',sendAlert:true});
     setSessionCookie(res, sid);
     delete u.password_hash;
     res.json({ user: u });
@@ -1372,6 +1429,24 @@ api.get('/admin/exam-results/:attemptId', requireAdmin, async (req,res)=>{
 });
 
 
+api.get('/admin/security/events', requireAdmin, async (req,res)=>{
+  try{
+    const limit=Math.min(Math.max(Number(req.query.limit)||100,1),200);
+    const q=await pool.query(`
+      SELECT id,event_type,created_at,email,ip,user_agent,details
+      FROM security_events
+      ORDER BY id DESC
+      LIMIT $1`,[limit]);
+    const s=await pool.query(`
+      SELECT
+        count(*) FILTER (WHERE created_at>=now()-interval '24 hours' AND event_type='FAILED_LOGIN')::int AS failed_logins,
+        count(*) FILTER (WHERE created_at>=now()-interval '24 hours' AND event_type='ADMIN_LOGIN_SUCCESS')::int AS successful_admin_logins,
+        count(*) FILTER (WHERE created_at>=now()-interval '24 hours' AND event_type='UNAUTHORIZED_ADMIN_ACCESS')::int AS unauthorized_admin_access
+      FROM security_events`);
+    res.json({events:q.rows,stats:s.rows[0]||{}});
+  }catch(e){console.error('Security events error:',e);sendError(res,500,'Security monitor error.');}
+});
+
 api.get('/admin/usage-monitor', requireAdmin, async (req,res)=>{
   try{
     const summary = await pool.query(`
@@ -1653,6 +1728,23 @@ app.get('/{*splat}', (req,res)=>{
 /* Create the history table/index without touching existing question data. */
 
 
+async function ensureSecurityEventsTable(){
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS security_events (
+      id BIGSERIAL PRIMARY KEY,
+      event_type VARCHAR(80) NOT NULL,
+      user_id BIGINT NULL,
+      email TEXT NULL,
+      ip TEXT NULL,
+      user_agent TEXT NULL,
+      details TEXT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_security_events_created ON security_events(created_at DESC)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_security_events_type ON security_events(event_type,created_at DESC)`);
+}
+
 async function ensureMustChangePasswordColumn(){
   await pool.query(`
     ALTER TABLE users
@@ -1737,6 +1829,7 @@ async function backfillLastLoginFromAudit(){
 async function start(){
   try{
     await pool.query('SELECT 1');
+    await ensureSecurityEventsTable();
     await ensureMustChangePasswordColumn();
     await ensurePasswordResetTables();
     await ensureQuestionHistory();
