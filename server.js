@@ -1079,7 +1079,7 @@ api.post('/attempts/:id/submit', requirePasswordReady, async (req,res)=>{
     const a=await pool.query(`SELECT * FROM attempts WHERE id=$1 AND user_id=$2 LIMIT 1`,[id,req.user.id]);
     if(!a.rowCount) return sendError(res,404,'Attempt not found.');
     const attempt=a.rows[0];
-    if(attempt.status==='SUBMITTED') return res.json({score:attempt.score,correct:attempt.correct_count,total:attempt.total_count,unanswered:attempt.unanswered_count||0});
+    if(attempt.status==='SUBMITTED') return res.json({score:attempt.score,correct:attempt.correct_count,total:attempt.total_count});
     const answers=req.body?.answers && typeof req.body.answers==='object' ? req.body.answers : {};
     const allIds=Array.isArray(attempt.question_ids) ? attempt.question_ids.map(Number) : [];
     /* For Question Bank, only questions actually reached/answered in this
@@ -1114,7 +1114,7 @@ api.post('/attempts/:id/submit', requirePasswordReady, async (req,res)=>{
       );
     }
 
-    await pool.query(`UPDATE attempts SET status='SUBMITTED',score=$1,correct_count=$2,total_count=$3,unanswered_count=$4,submitted_at=now() WHERE id=$5`,[score,correct,total,unanswered,id]);
+    await pool.query(`UPDATE attempts SET status='SUBMITTED',score=$1,correct_count=$2,total_count=$3,submitted_at=now() WHERE id=$4`,[score,correct,total,id]);
     await pool.query(`INSERT INTO activity_events(user_id,event_type,metadata) VALUES($1,'ATTEMPT_SUBMITTED',$2)`,[req.user.id,JSON.stringify({attempt_id:id,mode:attempt.mode,exam:attempt.exam,score,used_questions:total,unanswered})]);
     res.json({score,correct,total,unanswered,usedQuestionIds:usedIds});
   }catch(e){console.error(e);sendError(res,500,'Grading service error.');}
@@ -1125,6 +1125,90 @@ api.get('/results', requirePasswordReady, async (req,res)=>{
     const q=await pool.query(`SELECT id,exam,subject,mode,language,score,correct_count,total_count,started_at,submitted_at FROM attempts WHERE user_id=$1 AND status='SUBMITTED' ORDER BY started_at DESC LIMIT 100`,[req.user.id]);
     res.json({results:q.rows});
   }catch(e){console.error(e);sendError(res,500,'Results service error.');}
+});
+
+/* Admin: exam-wise overall results. Student identity is deliberately omitted from the response. */
+api.get('/admin/exam-results', requireAdmin, async (req,res)=>{
+  try{
+    const exam = String(req.query.exam || '').trim();
+    const type = String(req.query.type || '').trim().toLowerCase();
+    const from = String(req.query.from || '').trim();
+    const to = String(req.query.to || '').trim();
+    const minPct = req.query.min_pct === undefined || req.query.min_pct === '' ? 0 : Number(req.query.min_pct);
+    const maxPct = req.query.max_pct === undefined || req.query.max_pct === '' ? 100 : Number(req.query.max_pct);
+    const page = Math.max(parseInt(req.query.page || '1',10) || 1,1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit || '100',10) || 100,1),200);
+    if(!Number.isFinite(minPct) || !Number.isFinite(maxPct) || minPct<0 || maxPct>100 || minPct>maxPct){
+      return sendError(res,400,'Invalid percentage range.');
+    }
+
+    const where=[`a.status='SUBMITTED'`];
+    const params=[];
+    const add=(sql,val)=>{params.push(val);where.push(sql.replace('?', '$'+params.length));};
+    if(exam) add(`a.exam=?` ,exam);
+    if(from) add(`a.submitted_at::date >= ?::date`,from);
+    if(to) add(`a.submitted_at::date <= ?::date`,to);
+    where.push(`COALESCE(a.score,0) >= $${params.length+1}`); params.push(minPct);
+    where.push(`COALESCE(a.score,0) <= $${params.length+1}`); params.push(maxPct);
+
+    const typeSql=`CASE
+      WHEN lower(a.exam) LIKE '%model%' THEN 'Model Exam'
+      WHEN a.mode='mock' THEN 'Mock Test'
+      WHEN a.mode='bank' THEN 'Question Bank'
+      WHEN a.total_count=10 THEN '10 Questions'
+      WHEN a.total_count=20 THEN '20 Questions'
+      WHEN a.total_count=50 THEN '50 Questions'
+      ELSE 'Practice'
+    END`;
+    if(type && ['model','mock','practice','bank','10','20','50'].includes(type)){
+      const typeExpr=type==='model' ? `lower(a.exam) LIKE '%model%'` : type==='mock' ? `a.mode='mock'` : type==='bank' ? `a.mode='bank'` : type==='10' ? `a.total_count=10` : type==='20' ? `a.total_count=20` : type==='50' ? `a.total_count=50` : `(a.mode='practice' AND lower(a.exam) NOT LIKE '%model%' AND a.total_count NOT IN (10,20,50))`;
+      where.push(typeExpr);
+    }
+
+    const whereSql=where.join(' AND ');
+    const base=`FROM attempts a WHERE ${whereSql}`;
+    const countQ=await pool.query(`SELECT count(*)::int AS total, count(DISTINCT a.user_id)::int AS participants, COALESCE(sum(a.total_count),0)::bigint AS total_questions, COALESCE(avg(a.score),0)::numeric(10,2) AS average_pct, COALESCE(max(a.score),0)::numeric(10,2) AS highest_pct, COALESCE(min(a.score),0)::numeric(10,2) AS lowest_pct ${base}`,params);
+    const offset=(page-1)*limit;
+    const pageParams=params.slice();
+    pageParams.push(limit,offset);
+    const rowsQ=await pool.query(`SELECT a.exam,${typeSql} AS exam_type,to_char(COALESCE(a.submitted_at,a.started_at),'DD-MM-YYYY HH24:MI') AS date,COALESCE(a.total_count,0)::int AS questions,COALESCE(a.correct_count,0)::int AS marks,COALESCE(a.total_count,0)::int AS total_marks,COALESCE(a.score,0)::numeric(10,2) AS percentage ${base} ORDER BY COALESCE(a.submitted_at,a.started_at) DESC,a.id DESC LIMIT $${pageParams.length-1} OFFSET $${pageParams.length}`,pageParams);
+
+    const rows=rowsQ.rows;
+    const c=countQ.rows[0]||{};
+    const examsQ=await pool.query(`SELECT DISTINCT a.exam FROM attempts a WHERE a.status='SUBMITTED' ORDER BY a.exam`);
+    res.json({ok:true,rows,total:Number(c.total||0),limit,page,exams:examsQ.rows.map(x=>x.exam).filter(Boolean),summary:{participants:Number(c.participants||0),attempts:Number(c.total||0),total_questions:Number(c.total_questions||0),average_pct:Number(c.average_pct||0),highest_pct:Number(c.highest_pct||0),lowest_pct:Number(c.lowest_pct||0)}});
+  }catch(e){console.error('[ADMIN EXAM RESULTS]',e);sendError(res,500,'Exam results service error.');}
+});
+
+api.get('/admin/exam-results/export', requireAdmin, async (req,res)=>{
+  try{
+    const exam=String(req.query.exam||'').trim();
+    const type=String(req.query.type||'').trim().toLowerCase();
+    const from=String(req.query.from||'').trim();
+    const to=String(req.query.to||'').trim();
+    const minPct=req.query.min_pct===''||req.query.min_pct===undefined?0:Number(req.query.min_pct);
+    const maxPct=req.query.max_pct===''||req.query.max_pct===undefined?100:Number(req.query.max_pct);
+    if(!Number.isFinite(minPct)||!Number.isFinite(maxPct)||minPct<0||maxPct>100||minPct>maxPct)return sendError(res,400,'Invalid percentage range.');
+    const where=[`a.status='SUBMITTED'`],params=[];
+    const add=(sql,val)=>{params.push(val);where.push(sql.replace('?', '$'+params.length));};
+    if(exam)add(`a.exam=?`,exam);
+    if(from)add(`a.submitted_at::date >= ?::date`,from);
+    if(to)add(`a.submitted_at::date <= ?::date`,to);
+    where.push(`COALESCE(a.score,0) >= $${params.length+1}`);params.push(minPct);
+    where.push(`COALESCE(a.score,0) <= $${params.length+1}`);params.push(maxPct);
+    if(type && ['model','mock','practice','bank','10','20','50'].includes(type)){
+      where.push(type==='model'?`lower(a.exam) LIKE '%model%'`:type==='mock'?`a.mode='mock'`:type==='bank'?`a.mode='bank'`:type==='10'?`a.total_count=10`:type==='20'?`a.total_count=20`:type==='50'?`a.total_count=50`:`(a.mode='practice' AND lower(a.exam) NOT LIKE '%model%' AND a.total_count NOT IN (10,20,50))`);
+    }
+    const typeSql=`CASE WHEN lower(a.exam) LIKE '%model%' THEN 'Model Exam' WHEN a.mode='mock' THEN 'Mock Test' WHEN a.mode='bank' THEN 'Question Bank' WHEN a.total_count=10 THEN '10 Questions' WHEN a.total_count=20 THEN '20 Questions' WHEN a.total_count=50 THEN '50 Questions' ELSE 'Practice' END`;
+    const q=await pool.query(`SELECT a.exam,${typeSql} AS exam_type,to_char(COALESCE(a.submitted_at,a.started_at),'DD-MM-YYYY HH24:MI') AS date,COALESCE(a.total_count,0)::int AS questions,COALESCE(a.correct_count,0)::int AS marks,COALESCE(a.total_count,0)::int AS total_marks,COALESCE(a.score,0)::numeric(10,2) AS percentage FROM attempts a WHERE ${where.join(' AND ')} ORDER BY COALESCE(a.submitted_at,a.started_at) DESC,a.id DESC`,params);
+    const csvCell=v=>{const x=String(v??'');return /[",\n\r]/.test(x)?'"'+x.replace(/"/g,'""')+'"':x;};
+    const header=['Exam','Exam Type','Date','Questions','Marks','Total Marks','Percentage'];
+    const lines=[header.join(',')].concat(q.rows.map(r=>[r.exam,r.exam_type,r.date,r.questions,r.marks,r.total_marks,r.percentage].map(csvCell).join(',')));
+    const filename='thiral_exam_overall_results_'+new Date().toISOString().slice(0,10)+'.csv';
+    res.setHeader('Content-Type','text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition',`attachment; filename="${filename}"`);
+    res.send('\ufeff'+lines.join('\r\n'));
+  }catch(e){console.error('[ADMIN EXAM EXPORT]',e);sendError(res,500,'Exam export service error.');}
 });
 
 api.get('/admin/usage-monitor', requireAdmin, async (req,res)=>{
@@ -1369,254 +1453,6 @@ api.patch('/admin/students/:studentId/status', requireAdmin, async (req,res)=>{
   }
 });
 
-
-/* =========================================================
-   ADMIN RESULT HISTORY / ANALYTICS
-   Uses the existing attempts table. No existing attempt/result
-   rows are deleted or rewritten. Each submitted attempt remains
-   a separate historical record.
-   ========================================================= */
-
-async function ensureAdminResultHistoryIndexes(){
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_attempts_user_submitted_at ON attempts(user_id, submitted_at DESC)`);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_attempts_exam_mode_submitted_at ON attempts(exam, mode, submitted_at DESC)`);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_attempts_submitted_at ON attempts(submitted_at DESC)`);
-}
-
-function adminResultFilters(req){
-  const p = [];
-  const where = [`a.status='SUBMITTED'`, `u.role='STUDENT'`];
-
-  const student = String(req.query.student_id || '').trim();
-  const exam = String(req.query.exam || '').trim();
-  const mode = String(req.query.mode || '').trim();
-  const from = String(req.query.from || '').trim();
-  const to = String(req.query.to || '').trim();
-  const minScoreRaw = String(req.query.min_score || '').trim();
-  const maxScoreRaw = String(req.query.max_score || '').trim();
-
-  if(student){
-    p.push(student);
-    where.push(`u.student_id ILIKE '%' || $${p.length} || '%'`);
-  }
-  if(exam){
-    p.push(exam);
-    where.push(`a.exam = $${p.length}`);
-  }
-  if(mode){
-    p.push(mode);
-    where.push(`a.mode = $${p.length}`);
-  }
-  if(from && /^\d{4}-\d{2}-\d{2}$/.test(from)){
-    p.push(from);
-    where.push(`COALESCE(a.submitted_at,a.started_at) >= $${p.length}::date`);
-  }
-  if(to && /^\d{4}-\d{2}-\d{2}$/.test(to)){
-    p.push(to);
-    where.push(`COALESCE(a.submitted_at,a.started_at) < ($${p.length}::date + interval '1 day')`);
-  }
-
-  const minScore = Number(minScoreRaw);
-  const maxScore = Number(maxScoreRaw);
-  if(Number.isFinite(minScore)){
-    p.push(minScore);
-    where.push(`COALESCE(a.score,0) >= $${p.length}`);
-  }
-  if(Number.isFinite(maxScore)){
-    p.push(maxScore);
-    where.push(`COALESCE(a.score,0) <= $${p.length}`);
-  }
-
-  return {where:where.join(' AND '), params:p};
-}
-
-function adminResultModeLabel(mode, total){
-  const m=String(mode||'').toLowerCase();
-  if(m==='mock') return 'Mock Test';
-  if(m==='practice'){
-    const n=Number(total||0);
-    return n ? `Practice – ${n} Questions` : 'Practice';
-  }
-  if(m==='bank') return 'Question Bank';
-  return mode || '-';
-}
-
-function adminResultSelect(){
-  return `
-    SELECT
-      a.id AS attempt_id,
-      u.id AS user_id,
-      u.student_id,
-      u.name,
-      u.email,
-      a.exam,
-      a.subject,
-      a.mode,
-      a.language,
-      a.score,
-      a.correct_count,
-      a.total_count,
-      COALESCE(a.unanswered_count,0) AS unanswered_count,
-      GREATEST(COALESCE(a.total_count,0)-COALESCE(a.correct_count,0)-COALESCE(a.unanswered_count,0),0) AS wrong_count,
-      a.started_at,
-      a.submitted_at
-    FROM attempts a
-    JOIN users u ON u.id=a.user_id
-  `;
-}
-
-api.get('/admin/results', requireAdmin, async (req,res)=>{
-  try{
-    const {where,params}=adminResultFilters(req);
-    const page=Math.max(1,Math.min(100000,Number(req.query.page)||1));
-    const limit=Math.max(1,Math.min(500,Number(req.query.limit)||100));
-    const offset=(page-1)*limit;
-
-    const countQ=await pool.query(
-      `SELECT count(*)::bigint AS total
-         FROM attempts a JOIN users u ON u.id=a.user_id
-        WHERE ${where}`, params
-    );
-
-    const listParams=params.slice();
-    listParams.push(limit,offset);
-
-    const q=await pool.query(
-      `${adminResultSelect()}
-        WHERE ${where}
-        ORDER BY COALESCE(a.submitted_at,a.started_at) DESC, a.id DESC
-        LIMIT $${listParams.length-1} OFFSET $${listParams.length}`, listParams
-    );
-
-    const rows=q.rows.map(r=>({
-      ...r,
-      mode_label:adminResultModeLabel(r.mode,r.total_count),
-      percentage:r.score==null ? null : Number(r.score),
-      total_marks:Number(r.total_count||0),
-      marks_obtained:Number(r.correct_count||0),
-      wrong_count:Number(r.wrong_count||0),
-      unanswered_count:Number(r.unanswered_count||0)
-    }));
-
-    res.json({
-      results:rows,
-      page,
-      limit,
-      total:Number(countQ.rows[0]?.total||0),
-      pages:Math.ceil(Number(countQ.rows[0]?.total||0)/limit)
-    });
-  }catch(e){
-    console.error('[ADMIN RESULTS] error:',e);
-    sendError(res,500,'Admin result history service error.');
-  }
-});
-
-api.get('/admin/results/student/:studentId', requireAdmin, async (req,res)=>{
-  try{
-    const studentId=String(req.params.studentId||'').trim();
-    if(!studentId) return sendError(res,400,'Student ID is required.');
-
-    const studentQ=await pool.query(
-      `SELECT id,student_id,name,email,phone,gender,dob,created_at,last_login_at,is_active
-         FROM users WHERE student_id=$1 AND role='STUDENT' LIMIT 1`,[studentId]
-    );
-    if(!studentQ.rowCount) return sendError(res,404,'Student not found.');
-
-    const q=await pool.query(
-      `${adminResultSelect()}
-        WHERE u.student_id=$1 AND a.status='SUBMITTED'
-        ORDER BY COALESCE(a.submitted_at,a.started_at) DESC,a.id DESC`,[studentId]
-    );
-
-    const rows=q.rows.map(r=>({
-      ...r,
-      mode_label:adminResultModeLabel(r.mode,r.total_count),
-      percentage:r.score==null ? null : Number(r.score),
-      total_marks:Number(r.total_count||0),
-      marks_obtained:Number(r.correct_count||0),
-      wrong_count:Number(r.wrong_count||0),
-      unanswered_count:Number(r.unanswered_count||0)
-    }));
-
-    const totalExams=rows.length;
-    const totalQuestions=rows.reduce((n,r)=>n+Number(r.total_count||0),0);
-    const totalMarks=rows.reduce((n,r)=>n+Number(r.total_count||0),0);
-    const marksObtained=rows.reduce((n,r)=>n+Number(r.correct_count||0),0);
-    const percentages=rows.map(r=>Number(r.score)).filter(Number.isFinite);
-    const avgPercentage=percentages.length
-      ? Number((percentages.reduce((a,b)=>a+b,0)/percentages.length).toFixed(2)) : 0;
-    const bestScore=percentages.length ? Math.max(...percentages) : 0;
-
-    res.json({
-      student:studentQ.rows[0],
-      summary:{
-        total_exams:totalExams,
-        total_questions:totalQuestions,
-        total_marks:totalMarks,
-        marks_obtained:marksObtained,
-        average_percentage:avgPercentage,
-        best_score:bestScore,
-        last_exam:rows[0]||null
-      },
-      results:rows
-    });
-  }catch(e){
-    console.error('[ADMIN STUDENT RESULTS] error:',e);
-    sendError(res,500,'Student result history service error.');
-  }
-});
-
-api.get('/admin/results/export', requireAdmin, async (req,res)=>{
-  try{
-    const {where,params}=adminResultFilters(req);
-    const q=await pool.query(
-      `${adminResultSelect()}
-        WHERE ${where}
-        ORDER BY COALESCE(a.submitted_at,a.started_at) DESC,a.id DESC`,params
-    );
-
-    function esc(v){
-      return String(v==null?'':v)
-        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    }
-    function dt(v){
-      return v ? new Date(v).toLocaleString('en-IN') : '';
-    }
-
-    const header=[
-      'Attempt ID','Student ID','Name','Email','Exam','Subject','Test Type',
-      'Language','Questions','Marks Obtained','Total Marks','Wrong','Unanswered',
-      'Percentage','Started At','Submitted At'
-    ];
-
-    const rows=q.rows.map(r=>[
-      r.attempt_id,r.student_id,r.name,r.email,r.exam,r.subject,
-      adminResultModeLabel(r.mode,r.total_count),r.language,
-      Number(r.total_count||0),Number(r.correct_count||0),
-      Number(r.total_count||0),Number(r.wrong_count||0),Number(r.unanswered_count||0),
-      r.score==null?'':Number(r.score),dt(r.started_at),dt(r.submitted_at)
-    ]);
-
-    const table=[
-      '<html><head><meta charset="UTF-8"></head><body><table border="1"><thead><tr>',
-      header.map(x=>`<th>${esc(x)}</th>`).join(''),
-      '</tr></thead><tbody>',
-      rows.map(row=>'<tr>'+row.map(esc).map(x=>`<td>${x}</td>`).join('')+'</tr>').join(''),
-      '</tbody></table></body></html>'
-    ].join('');
-
-    const stamp=new Date().toISOString().replace(/[:.]/g,'-');
-    res.setHeader('Content-Type','application/vnd.ms-excel; charset=utf-8');
-    res.setHeader('Content-Disposition',`attachment; filename="thiral-results-${stamp}.xls"`);
-    return res.send(table);
-  }catch(e){
-    console.error('[ADMIN RESULT EXPORT] error:',e);
-    sendError(res,500,'Excel export service error.');
-  }
-});
-
-
 api.get('/group4/question-status', requirePasswordReady, async (req,res)=>{
   try{
     const rows=await pool.query(`
@@ -1695,14 +1531,6 @@ async function ensurePasswordResetTables() {
   `);
 }
 
-async function ensureAttemptAnalyticsColumn(){
-  await pool.query(`
-    ALTER TABLE attempts
-    ADD COLUMN IF NOT EXISTS unanswered_count INTEGER NOT NULL DEFAULT 0
-  `);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_attempts_user_status_submitted ON attempts(user_id,status,submitted_at DESC)`);
-}
-
 async function ensureQuestionHistory() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS question_history (
@@ -1751,8 +1579,6 @@ async function start(){
     await ensureMustChangePasswordColumn();
     await ensurePasswordResetTables();
     await ensureQuestionHistory();
-    await ensureAttemptAnalyticsColumn();
-    await ensureAdminResultHistoryIndexes();
     await backfillLastLoginFromAudit();
     await ensureAdmin();
     app.listen(PORT,'0.0.0.0',()=>console.log(`Thiral V171 Secure Temporary Password + Gender Summary + Detailed Usage Monitor listening on port ${PORT}`));
