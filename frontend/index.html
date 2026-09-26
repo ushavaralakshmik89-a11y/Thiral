@@ -755,8 +755,23 @@ a{
 <hr>
 <div class="card" style="margin-top:16px;border:1px solid #dbeafe">
 <h3>📥 Exam Results Excel / தேர்வு முடிவுகள் Excel</h3>
-<p class="small">தேர்வு முடிவுகளை browser-ல் தனியாக காட்ட வேண்டாம். தேவையான முழு Exam Results-ஐ Excel file-ஆக பதிவிறக்கம் செய்யலாம். ஒவ்வொரு தேர்வும் தனித்தனி Excel tab-ல் வரும்.</p>
-<button class="secondary" onclick="exportAdminExamResults()">📥 Excel Export</button>
+<p class="small">தேவையான தேர்வை / வகையை / பாடத்தைத் தேர்ந்தெடுத்து Excel Export செய்யலாம். Browser-ல் result table காட்டப்படாது. தேர்வு வாரியாக தனித்தனி Excel tab-களில் முழு result records வரும்.</p>
+<div class="grid" style="margin-top:12px">
+<div><label>Exam / தேர்வு</label><select id="adminExamFilter" style="width:100%"><option value="">அனைத்து தேர்வுகளும்</option></select></div>
+<div><label>Exam Type / வகை</label><select id="adminExamTypeFilter" style="width:100%" onchange="loadAdminExamResults(1)"><option value="">அனைத்தும்</option><option value="model">Model Exam</option><option value="mock">Mock Test</option><option value="10">10 Questions</option><option value="20">20 Questions</option><option value="50">50 Questions</option><option value="practice">Practice</option><option value="bank">Question Bank</option></select></div>
+<div><label>Subject / பாடம்</label><select id="adminExamSubjectFilter" style="width:100%"><option value="">அனைத்து பாடங்களும்</option></select></div>
+<div><label>Topic / தலைப்பு</label><select id="adminExamTopicFilter" style="width:100%"><option value="">அனைத்து தலைப்புகளும்</option></select></div>
+<div><label>Subtopic / உள்தலைப்பு</label><select id="adminExamSubtopicFilter" style="width:100%"><option value="">அனைத்து உள்தலைப்புகளும்</option></select></div>
+<div><label>From Date</label><input id="adminExamFrom" type="date" style="width:100%"></div>
+<div><label>To Date</label><input id="adminExamTo" type="date" style="width:100%"></div>
+<div><label>Min %</label><input id="adminExamMin" type="number" min="0" max="100" value="0" style="width:100%"></div>
+<div><label>Max %</label><input id="adminExamMax" type="number" min="0" max="100" value="100" style="width:100%"></div>
+</div>
+<div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
+<button onclick="exportAdminExamResults()">📥 Excel Export</button>
+<button class="secondary" onclick="clearAdminExamResults()">Clear / அழி</button>
+</div>
+<p id="adminExamResultsMsg" class="small" style="margin-top:10px"></p>
 </div>
 <hr>
 <h3>📚 Content Management</h3>
@@ -3699,6 +3714,9 @@ window.V91_ADV_NUM=V91_ADV_NUM;
         body+'</table>';
       if(el('students')) el('students').innerHTML=body;
       window.thiralV138Students=students;
+      populateAdminExamSubjects138();
+      bindAdminExamFilterEvents138();
+      populateAdminExamTopics138();
       await loadAdminExamResults(1);
     }catch(e){
       if(el('adminMsg')) el('adminMsg').textContent='Admin data: '+e.message;
@@ -3715,6 +3733,15 @@ window.V91_ADV_NUM=V91_ADV_NUM;
   function examUsesGroup4Topics138(exam){
     return String(exam||'').toLowerCase()==='group4' || /group\s*4/i.test(String(exam||''));
   }
+  window.populateAdminExamSubjects138=function(){
+    var sel=el('adminExamSubjectFilter');
+    if(!sel)return;
+    var map=group4AllTopicMap138(), current=sel.value||'', keys=[];
+    Object.keys(map).forEach(function(k){ if(k && keys.indexOf(k)<0) keys.push(k); });
+    sel.innerHTML='<option value="">அனைத்து பாடங்களும்</option>'+keys.map(function(x){return '<option value="'+escapeHtml138(x)+'">'+escapeHtml138(x)+'</option>';}).join('');
+    if(current && keys.indexOf(current)>=0) sel.value=current;
+  };
+
   window.populateAdminExamTopics138=function(){
     var exam=el('adminExamFilter')?.value||'';
     var topicSel=el('adminExamTopicFilter');
@@ -3762,6 +3789,19 @@ window.V91_ADV_NUM=V91_ADV_NUM;
       });
     });
     return out.join(' | ');
+  }
+
+  function bindAdminExamFilterEvents138(){
+    var ids=['adminExamFilter','adminExamSubjectFilter','adminExamTopicFilter','adminExamSubtopicFilter','adminExamFrom','adminExamTo','adminExamMin','adminExamMax'];
+    ids.forEach(function(id){
+      var node=el(id);
+      if(!node || node.dataset.examBound==='1')return;
+      node.dataset.examBound='1';
+      node.addEventListener('change',function(){
+        if(id==='adminExamSubjectFilter'){ populateAdminExamTopics138(); }
+        if(id==='adminExamTopicFilter'){ populateAdminExamSubtopics138(); }
+      });
+    });
   }
 
   function adminExamQueryParams138(){
