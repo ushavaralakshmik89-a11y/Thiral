@@ -734,6 +734,10 @@ a{
 <p id="onlineMonitorMsg" class="small">Online tracking அமைக்கப்படவில்லை.</p>
 <button class="secondary" onclick="refreshOnlineMonitor()">🔄 Usage Refresh</button>
 <div id="onlineStudentList" style="margin-top:14px"></div>
+<div id="usageLast24Detail" style="margin-top:18px"></div>
+<div id="usagePracticeDetail" style="margin-top:18px"></div>
+<div id="usageMockDetail" style="margin-top:18px"></div>
+
 </div>
 <hr>
 <h3>💡 Student Suggestions / Feedback</h3>
@@ -3813,6 +3817,20 @@ window.V91_ADV_NUM=V91_ADV_NUM;
   };
 
   window.refreshOnlineMonitor=async function(){
+    function esc(s){
+      return String(s == null ? '' : s).replace(/[&<>'"]/g,function(c){
+        return {'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c];
+      });
+    }
+    function dt(v){
+      return v ? new Date(v).toLocaleString('en-IN') : '-';
+    }
+    function table(title, headers, rows, emptyText){
+      if(!rows.length) return '<div class="card" style="margin-top:10px"><h4>'+title+'</h4><p class="small">'+emptyText+'</p></div>';
+      var head='<tr>'+headers.map(function(h){return '<th>'+h+'</th>';}).join('')+'</tr>';
+      return '<div class="card" style="margin-top:10px;overflow:auto"><h4>'+title+'</h4><table>'+head+rows.join('')+'</table></div>';
+    }
+
     try{
       var d=await api138('/admin/usage-monitor');
       if(el('onlineActiveNow')) el('onlineActiveNow').textContent=String(d.active_now ?? 0);
@@ -3820,13 +3838,49 @@ window.V91_ADV_NUM=V91_ADV_NUM;
       if(el('onlineActive24h')) el('onlineActive24h').textContent=String(d.active_24h ?? 0);
       if(el('onlinePracticeCount')) el('onlinePracticeCount').textContent=String(d.practice_sessions_24h ?? 0);
       if(el('onlineMockCount')) el('onlineMockCount').textContent=String(d.mock_tests_24h ?? 0);
-      var rows=(d.online_students||[]).map(function(x){
-        return '<tr><td>'+escapeHtml138(x.student_id||'')+'</td><td>'+escapeHtml138(x.name||'')+'</td><td>'+escapeHtml138(x.last_login_at?new Date(x.last_login_at).toLocaleString():'-')+'</td><td>'+escapeHtml138(x.session_expires_at?new Date(x.session_expires_at).toLocaleString():'-')+'</td></tr>';
+
+      var onlineRows=(d.online_students||[]).map(function(x){
+        return '<tr><td>'+esc(x.student_id)+'</td><td>'+esc(x.name)+'</td><td>'+esc(x.email)+'</td><td>'+esc(dt(x.last_login_at))+'</td><td>'+esc(dt(x.session_expires_at))+'</td></tr>';
       }).join('');
-      if(el('onlineStudentList')) el('onlineStudentList').innerHTML=rows
-        ? '<p class="small">தற்போது valid session உள்ள மாணவர்கள்:</p><table><tr><th>Student ID</th><th>Name</th><th>Last Login</th><th>Session Valid Until</th></tr>'+rows+'</table>'
-        : '<p class="small">தற்போது valid session உள்ள Student இல்லை.</p>';
-      if(el('onlineMonitorMsg')) el('onlineMonitorMsg').textContent='Usage data updated. Active Now = தற்போது valid login session உள்ள unique students.';
+      if(el('onlineStudentList')) el('onlineStudentList').innerHTML=table(
+        '🟢 தற்போது Online-ல் இருப்பவர்கள் ('+(d.online_students||[]).length+')',
+        ['Student ID','Name','Email','Last Login','Session Valid Until'],
+        onlineRows ? [onlineRows] : [],
+        'தற்போது valid session உள்ள Student இல்லை.'
+      );
+
+      var last24Rows=(d.last24_students||[]).map(function(x){
+        return '<tr><td>'+esc(x.student_id)+'</td><td>'+esc(x.name)+'</td><td>'+esc(x.email)+'</td><td>'+esc(dt(x.last_login_at))+'</td><td>'+esc(String(x.activity_count||0))+'</td><td>'+esc(dt(x.last_activity_at))+'</td></tr>';
+      });
+      if(el('usageLast24Detail')) el('usageLast24Detail').innerHTML=table(
+        '🕐 கடந்த 24 மணி நேரத்தில் பயன்படுத்திய மாணவர்கள் ('+(d.last24_students||[]).length+')',
+        ['Student ID','Name','Email','Last Login','Activity / Attempts','Last Activity'],
+        last24Rows,
+        'கடந்த 24 மணி நேரத்தில் பதிவு செய்யப்பட்ட Student activity இல்லை.'
+      );
+
+      var practiceRows=(d.practice_students||[]).map(function(x){
+        return '<tr><td>'+esc(x.student_id)+'</td><td>'+esc(x.name)+'</td><td>'+esc(x.email)+'</td><td><b>'+esc(String(x.session_count||0))+'</b></td><td>'+esc(String(x.completed_count||0))+'</td><td>'+esc(dt(x.last_started_at))+'</td></tr>';
+      });
+      if(el('usagePracticeDetail')) el('usagePracticeDetail').innerHTML=table(
+        '📝 Practice பயன்படுத்திய மாணவர்கள் ('+(d.practice_students||[]).length+')',
+        ['Student ID','Name','Email','Practice Sessions','Completed','Last Started'],
+        practiceRows,
+        'கடந்த 24 மணி நேரத்தில் Practice Session இல்லை.'
+      );
+
+      var mockRows=(d.mock_students||[]).map(function(x){
+        return '<tr><td>'+esc(x.student_id)+'</td><td>'+esc(x.name)+'</td><td>'+esc(x.email)+'</td><td><b>'+esc(String(x.test_count||0))+'</b></td><td>'+esc(String(x.completed_count||0))+'</td><td>'+esc(dt(x.last_started_at))+'</td></tr>';
+      });
+      if(el('usageMockDetail')) el('usageMockDetail').innerHTML=table(
+        '🎯 Mock Test பயன்படுத்திய மாணவர்கள் ('+(d.mock_students||[]).length+')',
+        ['Student ID','Name','Email','Mock Tests','Completed','Last Started'],
+        mockRows,
+        'கடந்த 24 மணி நேரத்தில் Mock Test இல்லை.'
+      );
+
+      if(el('onlineMonitorMsg')) el('onlineMonitorMsg').textContent=
+        'Usage data updated. Online count = தற்போது valid login session உள்ள unique students. Practice / Mock விவரங்கள் கடந்த 24 மணி நேரத்தை அடிப்படையாகக் கொண்டவை.';
     }catch(e){
       if(el('onlineMonitorMsg')) el('onlineMonitorMsg').textContent='Usage Monitor: '+(e.message||'Data கிடைக்கவில்லை.');
     }
@@ -3845,6 +3899,12 @@ window.V91_ADV_NUM=V91_ADV_NUM;
   window.addEventListener('load', function(){
     setTimeout(bootV138, 50);
   });
+  setInterval(function(){
+    var sec=document.getElementById('adminDashboard');
+    if(sec && !sec.classList.contains('hidden') && sec.style.display!=='none'){
+      refreshOnlineMonitor();
+    }
+  },60000);
 
 })();
 </script>
