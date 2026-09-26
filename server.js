@@ -1171,7 +1171,7 @@ api.get('/admin/exam-results', requireAdmin, async (req,res)=>{
     const offset=(page-1)*limit;
     const pageParams=params.slice();
     pageParams.push(limit,offset);
-    const rowsQ=await pool.query(`SELECT a.exam,${typeSql} AS exam_type,to_char(COALESCE(a.submitted_at,a.started_at),'DD-MM-YYYY HH24:MI') AS date,COALESCE(a.total_count,0)::int AS questions,COALESCE(a.correct_count,0)::int AS marks,COALESCE(a.total_count,0)::int AS total_marks,COALESCE(a.score,0)::numeric(10,2) AS percentage ${base} ORDER BY COALESCE(a.submitted_at,a.started_at) DESC,a.id DESC LIMIT $${pageParams.length-1} OFFSET $${pageParams.length}`,pageParams);
+    const rowsQ=await pool.query(`SELECT u.name,u.email,a.exam,${typeSql} AS exam_type,to_char(COALESCE(a.submitted_at,a.started_at),'DD-MM-YYYY HH24:MI') AS date,COALESCE(a.total_count,0)::int AS questions,COALESCE(a.correct_count,0)::int AS marks,COALESCE(a.total_count,0)::int AS total_marks,COALESCE(a.score,0)::numeric(10,2) AS percentage FROM attempts a JOIN users u ON u.id=a.user_id WHERE ${whereSql} ORDER BY COALESCE(a.submitted_at,a.started_at) DESC,a.id DESC LIMIT $${pageParams.length-1} OFFSET $${pageParams.length}`,pageParams);
 
     const rows=rowsQ.rows;
     const c=countQ.rows[0]||{};
@@ -1200,10 +1200,10 @@ api.get('/admin/exam-results/export', requireAdmin, async (req,res)=>{
       where.push(type==='model'?`lower(a.exam) LIKE '%model%'`:type==='mock'?`a.mode='mock'`:type==='bank'?`a.mode='bank'`:type==='10'?`a.total_count=10`:type==='20'?`a.total_count=20`:type==='50'?`a.total_count=50`:`(a.mode='practice' AND lower(a.exam) NOT LIKE '%model%' AND a.total_count NOT IN (10,20,50))`);
     }
     const typeSql=`CASE WHEN lower(a.exam) LIKE '%model%' THEN 'Model Exam' WHEN a.mode='mock' THEN 'Mock Test' WHEN a.mode='bank' THEN 'Question Bank' WHEN a.total_count=10 THEN '10 Questions' WHEN a.total_count=20 THEN '20 Questions' WHEN a.total_count=50 THEN '50 Questions' ELSE 'Practice' END`;
-    const q=await pool.query(`SELECT a.exam,${typeSql} AS exam_type,to_char(COALESCE(a.submitted_at,a.started_at),'DD-MM-YYYY HH24:MI') AS date,COALESCE(a.total_count,0)::int AS questions,COALESCE(a.correct_count,0)::int AS marks,COALESCE(a.total_count,0)::int AS total_marks,COALESCE(a.score,0)::numeric(10,2) AS percentage FROM attempts a WHERE ${where.join(' AND ')} ORDER BY COALESCE(a.submitted_at,a.started_at) DESC,a.id DESC`,params);
+    const q=await pool.query(`SELECT u.name,u.email,a.exam,${typeSql} AS exam_type,to_char(COALESCE(a.submitted_at,a.started_at),'DD-MM-YYYY HH24:MI') AS date,COALESCE(a.total_count,0)::int AS questions,COALESCE(a.correct_count,0)::int AS marks,COALESCE(a.total_count,0)::int AS total_marks,COALESCE(a.score,0)::numeric(10,2) AS percentage FROM attempts a JOIN users u ON u.id=a.user_id WHERE ${where.join(' AND ')} ORDER BY COALESCE(a.submitted_at,a.started_at) DESC,a.id DESC`,params);
     const csvCell=v=>{const x=String(v??'');return /[",\n\r]/.test(x)?'"'+x.replace(/"/g,'""')+'"':x;};
-    const header=['Exam','Exam Type','Date','Questions','Marks','Total Marks','Percentage'];
-    const lines=[header.join(',')].concat(q.rows.map(r=>[r.exam,r.exam_type,r.date,r.questions,r.marks,r.total_marks,r.percentage].map(csvCell).join(',')));
+    const header=['Name','Email','Exam','Exam Type','Date','Questions','Marks','Total Marks','Percentage'];
+    const lines=[header.join(',')].concat(q.rows.map(r=>[r.name,r.email,r.exam,r.exam_type,r.date,r.questions,r.marks,r.total_marks,r.percentage].map(csvCell).join(',')));
     const filename='thiral_exam_overall_results_'+new Date().toISOString().slice(0,10)+'.csv';
     res.setHeader('Content-Type','text/csv; charset=utf-8');
     res.setHeader('Content-Disposition',`attachment; filename="${filename}"`);
