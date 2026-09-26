@@ -36,7 +36,7 @@ app.use((req, res, next) => {
 });
 
 const PORT = process.env.PORT || 10000;
-const THIRAL_SECURITY_VERSION = 'V170';
+const THIRAL_SECURITY_VERSION = 'V171';
 const isProd = process.env.NODE_ENV === 'production';
 
 if (!process.env.DATABASE_URL) {
@@ -1471,14 +1471,33 @@ async function ensureQuestionHistory() {
    PostgreSQL advisory transaction lock. Existing users, questions,
    attempts, results and admin data are not deleted or rewritten.
 */
+
+/* Backfill Last Login for older accounts from the server-side LOGIN audit trail.
+   This does not touch passwords, registrations, results or attempts. */
+async function backfillLastLoginFromAudit(){
+  await pool.query(`
+    UPDATE users u
+       SET last_login_at = x.last_login
+      FROM (
+        SELECT user_id, MAX(created_at) AS last_login
+          FROM activity_events
+         WHERE event_type='LOGIN'
+         GROUP BY user_id
+      ) x
+     WHERE u.id=x.user_id
+       AND (u.last_login_at IS NULL OR u.last_login_at < x.last_login)
+  `);
+}
+
 async function start(){
   try{
     await pool.query('SELECT 1');
     await ensureMustChangePasswordColumn();
     await ensurePasswordResetTables();
     await ensureQuestionHistory();
+    await backfillLastLoginFromAudit();
     await ensureAdmin();
-    app.listen(PORT,'0.0.0.0',()=>console.log(`Thiral V170 Secure Temporary Password + Gender Summary + Detailed Usage Monitor listening on port ${PORT}`));
+    app.listen(PORT,'0.0.0.0',()=>console.log(`Thiral V171 Secure Temporary Password + Gender Summary + Detailed Usage Monitor listening on port ${PORT}`));
   }catch(e){
     console.error('Startup failed:',e);
     process.exit(1);
