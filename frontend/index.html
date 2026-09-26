@@ -756,15 +756,19 @@ a{
 <h3>📊 Exam Overall Results / தேர்வு ஒட்டுமொத்த முடிவுகள்</h3>
 <p class="small">ஒரு தேர்வில் எழுதிய அனைத்து attempts-ன் ஒட்டுமொத்த முடிவுகள். மாணவர் பெயர் மற்றும் Email மட்டும் அடையாளமாக காட்டப்படும்; Student ID காட்டப்படாது. ஒவ்வொரு attempt-மும் தனி record ஆக இருக்கும்.</p>
 <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
-  <div><label for="adminExamFilter">Exam / தேர்வு</label><select id="adminExamFilter"><option value="">அனைத்து தேர்வுகளும்</option></select></div>
+  <div><label for="adminExamFilter">Exam / தேர்வு</label><select id="adminExamFilter" onchange="populateAdminExamTopics138()"><option value="">அனைத்து தேர்வுகளும்</option></select></div>
   <div><label for="adminExamTypeFilter">Exam Type / வகை</label><select id="adminExamTypeFilter"><option value="">அனைத்தும்</option><option value="model">Model Exam</option><option value="mock">Mock Test</option><option value="practice">Practice</option><option value="bank">Question Bank</option><option value="10">10 Questions</option><option value="20">20 Questions</option><option value="50">50 Questions</option></select></div>
+  <div><label for="adminExamSubjectFilter">Subject / பாடம்</label><select id="adminExamSubjectFilter" onchange="populateAdminExamTopics138()"><option value="">அனைத்து பாடங்களும்</option><option value="tamil">தமிழ்</option><option value="gs">பொது அறிவு</option><option value="apt">திறனறிவு / Aptitude</option></select></div>
+  <div><label for="adminExamTopicFilter">Topic / தலைப்பு</label><select id="adminExamTopicFilter" onchange="populateAdminExamSubtopics138()"><option value="">அனைத்து தலைப்புகளும்</option></select></div>
+  <div><label for="adminExamSubtopicFilter">Subtopic / உள்தலைப்பு</label><select id="adminExamSubtopicFilter"><option value="">அனைத்து உள்தலைப்புகளும்</option></select></div>
   <div><label for="adminExamFrom">From Date</label><input id="adminExamFrom" type="date"></div>
   <div><label for="adminExamTo">To Date</label><input id="adminExamTo" type="date"></div>
   <div><label for="adminExamMin">Min %</label><input id="adminExamMin" type="number" min="0" max="100" value="0"></div>
   <div><label for="adminExamMax">Max %</label><input id="adminExamMax" type="number" min="0" max="100" value="100"></div>
+  <div><label for="adminExamPageSize">View / ஒரு பக்கத்தில்</label><select id="adminExamPageSize"><option value="25">25 Results</option><option value="50">50 Results</option><option value="100" selected>100 Results</option><option value="200">200 Results</option></select></div>
 </div>
 <div class="grid" style="margin-top:12px">
-  <button onclick="loadAdminExamResults(1)">🔎 Search Results</button>
+  <button onclick="loadAdminExamResults(1)">🔎 Search / View Results</button>
   <button class="secondary" onclick="clearAdminExamResults()">Clear</button>
   <button class="secondary" onclick="exportAdminExamResults()">📥 Excel Export</button>
 </div>
@@ -3727,16 +3731,84 @@ window.V91_ADV_NUM=V91_ADV_NUM;
   }
 
   window.admin = loadAdminV138;
+  function group4TopicMap138(){
+    try{ return (typeof data==='object' && data.gs && data.gs.topics) ? data.gs.topics : {}; }catch(e){ return {}; }
+  }
+  function group4AllTopicMap138(){
+    try{ return (typeof data==='object') ? data : {}; }catch(e){ return {}; }
+  }
+  function examUsesGroup4Topics138(exam){
+    return String(exam||'').toLowerCase()==='group4' || /group\s*4/i.test(String(exam||''));
+  }
+  window.populateAdminExamTopics138=function(){
+    var exam=el('adminExamFilter')?.value||'';
+    var topicSel=el('adminExamTopicFilter');
+    var subSel=el('adminExamSubtopicFilter');
+    if(!topicSel||!subSel)return;
+    var map=(!exam || examUsesGroup4Topics138(exam))?group4AllTopicMap138():{};
+    var selectedSubject=el('adminExamSubjectFilter')?.value||'';
+    var oldTopic=topicSel.value||'';
+    var oldSub=subSel.value||'';
+    topicSel.innerHTML='<option value="">அனைத்து தலைப்புகளும்</option>';
+    Object.keys(map).forEach(function(subjectKey){
+      if(selectedSubject && subjectKey!==selectedSubject)return;
+      var info=map[subjectKey];
+      if(!info||!info.topics)return;
+      Object.keys(info.topics).forEach(function(topicKey){
+        if(topicSel.querySelector('option[value="'+escapeHtml138(topicKey)+'"]'))return;
+        var o=document.createElement('option');o.value=topicKey;o.textContent=topicKey;topicSel.appendChild(o);
+      });
+    });
+    if(oldTopic && Array.from(topicSel.options).some(function(o){return o.value===oldTopic;})) topicSel.value=oldTopic;
+    subSel.innerHTML='<option value="">அனைத்து உள்தலைப்புகளும்</option>';
+    if(topicSel.value) populateAdminExamSubtopics138();
+    if(oldSub && Array.from(subSel.options).some(function(o){return o.value===oldSub;})) subSel.value=oldSub;
+  };
+  window.populateAdminExamSubtopics138=function(){
+    var topic=el('adminExamTopicFilter')?.value||'';
+    var subSel=el('adminExamSubtopicFilter');
+    if(!subSel)return;
+    var map=group4AllTopicMap138(), found=[], selectedSubject=el('adminExamSubjectFilter')?.value||'';
+    Object.keys(map).forEach(function(subjectKey){
+      if(selectedSubject && subjectKey!==selectedSubject)return;
+      var list=map[subjectKey]?.topics?.[topic]||[];
+      list.forEach(function(x){if(found.indexOf(x)<0)found.push(x);});
+    });
+    subSel.innerHTML='<option value="">அனைத்து உள்தலைப்புகளும்</option>'+found.map(function(x){return '<option value="'+escapeHtml138(x)+'">'+escapeHtml138(x)+'</option>';}).join('');
+  };
+  function topicForSubtopics138(raw){
+    var vals=String(raw||'').split(' | ').map(function(x){return x.trim();}).filter(Boolean), out=[];
+    var map=group4AllTopicMap138();
+    Object.keys(map).forEach(function(subjectKey){
+      var topics=map[subjectKey]?.topics||{};
+      Object.keys(topics).forEach(function(topicKey){
+        var subs=topics[topicKey]||[];
+        if(vals.some(function(v){return subs.indexOf(v)>=0;}) && out.indexOf(topicKey)<0)out.push(topicKey);
+      });
+    });
+    return out.join(' | ');
+  }
+
   function adminExamQueryParams138(){
     var p=new URLSearchParams();
     var exam=el('adminExamFilter')?.value||'';
     var type=el('adminExamTypeFilter')?.value||'';
+    var subject=el('adminExamSubjectFilter')?.value||'';
+    var topic=el('adminExamTopicFilter')?.value||'';
+    var subtopic=el('adminExamSubtopicFilter')?.value||'';
     var from=el('adminExamFrom')?.value||'';
     var to=el('adminExamTo')?.value||'';
     var min=el('adminExamMin')?.value||'';
     var max=el('adminExamMax')?.value||'';
     if(exam)p.set('exam',exam);
     if(type)p.set('type',type);
+    if(subject)p.set('subject',subject);
+    if(topic){
+      var map=group4AllTopicMap138(), subs=[];
+      Object.keys(map).forEach(function(subjectKey){(map[subjectKey]?.topics?.[topic]||[]).forEach(function(x){if(subs.indexOf(x)<0)subs.push(x);});});
+      if(subs.length)p.set('subtopics',subs.join('|'));
+    }
+    if(subtopic)p.set('subtopic',subtopic);
     if(from)p.set('from',from);
     if(to)p.set('to',to);
     if(min!=='')p.set('min_pct',min);
@@ -3751,7 +3823,7 @@ window.V91_ADV_NUM=V91_ADV_NUM;
     if(msg)msg.textContent='Loading...';
     try{
       var p=adminExamQueryParams138();
-      p.set('page',String(page)); p.set('limit','100');
+      p.set('page',String(page)); p.set('limit',String(el('adminExamPageSize')?.value||100));
       var d=await api138('/admin/exam-results?'+p.toString());
       var opts=(d.exams||[]).map(function(x){return '<option value="'+escapeHtml138(x)+'">'+escapeHtml138(x)+'</option>';}).join('');
       var sel=el('adminExamFilter');
@@ -3760,6 +3832,7 @@ window.V91_ADV_NUM=V91_ADV_NUM;
         sel.innerHTML='<option value="">அனைத்து தேர்வுகளும்</option>'+opts;
         if(current && (d.exams||[]).indexOf(current)>=0)sel.value=current;
       }
+      populateAdminExamTopics138();
       var sm=d.summary||{};
       if(el('examOverallParticipants'))el('examOverallParticipants').textContent=String(sm.participants??0);
       if(el('examOverallAttempts'))el('examOverallAttempts').textContent=String(sm.attempts??0);
@@ -3768,9 +3841,10 @@ window.V91_ADV_NUM=V91_ADV_NUM;
       if(el('examOverallLowest'))el('examOverallLowest').textContent=(sm.lowest_pct??0)+'%';
       if(el('examOverallQuestions'))el('examOverallQuestions').textContent=String(sm.total_questions??0);
       var rows=(d.rows||[]).map(function(r){
-        return '<tr><td>'+escapeHtml138(r.name||'')+'</td><td>'+escapeHtml138(r.email||'')+'</td><td>'+escapeHtml138(r.exam||'')+'</td><td>'+escapeHtml138(r.exam_type||'')+'</td><td>'+escapeHtml138(r.date||'-')+'</td><td>'+String(r.questions??0)+'</td><td>'+String(r.marks??0)+'</td><td>'+String(r.total_marks??0)+'</td><td>'+String(r.percentage??0)+'%</td></tr>';
+        var topicLabel=topicForSubtopics138(r.subtopics||'');
+        return '<tr><td>'+escapeHtml138(r.name||'')+'</td><td>'+escapeHtml138(r.email||'')+'</td><td>'+escapeHtml138(r.exam||'')+'</td><td>'+escapeHtml138(r.exam_type||'')+'</td><td>'+escapeHtml138(topicLabel)+'</td><td>'+escapeHtml138(r.subtopics||'')+'</td><td>'+escapeHtml138(r.date||'-')+'</td><td>'+String(r.questions??0)+'</td><td>'+String(r.marks??0)+'</td><td>'+String(r.total_marks??0)+'</td><td>'+String(r.percentage??0)+'%</td></tr>';
       }).join('');
-      if(list)list.innerHTML=rows?'<table><tr><th>Name</th><th>Email</th><th>Exam</th><th>Exam Type</th><th>Date</th><th>Questions</th><th>Marks</th><th>Total Marks</th><th>%</th></tr>'+rows+'</table>':'<p>No submitted results found.</p>';
+      if(list)list.innerHTML=rows?'<table><tr><th>Name</th><th>Email</th><th>Exam</th><th>Exam Type</th><th>Topic / தலைப்பு</th><th>Subtopic / உள்தலைப்பு</th><th>Date</th><th>Questions</th><th>Marks</th><th>Total Marks</th><th>%</th></tr>'+rows+'</table>':'<p>இந்த filter-க்கு Result இல்லை.</p>';
       var pager=el('adminExamResultsPager');
       var total=Number(d.total||0), limit=Number(d.limit||100), pages=Math.max(1,Math.ceil(total/limit));
       if(pager)pager.innerHTML=(page>1?'<button class="secondary" onclick="loadAdminExamResults('+(page-1)+')">◀ Previous</button>':'')+(page<pages?'<button class="secondary" onclick="loadAdminExamResults('+(page+1)+')">Next ▶</button>':'')+'<span class="small">Page '+page+' / '+pages+' · '+total+' records</span>';
@@ -3782,10 +3856,12 @@ window.V91_ADV_NUM=V91_ADV_NUM;
   };
 
   window.clearAdminExamResults = function(){
-    ['adminExamFilter','adminExamTypeFilter'].forEach(function(id){if(el(id))el(id).value='';});
+    ['adminExamFilter','adminExamTypeFilter','adminExamSubjectFilter','adminExamTopicFilter','adminExamSubtopicFilter'].forEach(function(id){if(el(id))el(id).value='';});
     ['adminExamFrom','adminExamTo'].forEach(function(id){if(el(id))el(id).value='';});
     if(el('adminExamMin'))el('adminExamMin').value='0';
     if(el('adminExamMax'))el('adminExamMax').value='100';
+    populateAdminExamTopics138();
+    if(el('adminExamPageSize'))el('adminExamPageSize').value='100';
     loadAdminExamResults(1);
   };
 
