@@ -419,34 +419,17 @@ a{
 <p id="lm"></p>
 <button onclick="login()">Login</button>
 <button class="secondary" onclick="show('register')">New Registration</button>
-<button class="secondary" onclick="show('forgotPassword')">Forgot Password?</button>
 </section>
 
-<section id="forgotPassword" class="card hidden">
-<h2>🔑 Forgot Password / கடவுச்சொல் மறந்துவிட்டதா?</h2>
-<p class="small">முதலில் பதிவு செய்யப்பட்ட Email ID-ஐ உள்ளிடுங்கள். OTP சரிபார்த்த பிறகே புதிய Password அமைக்க முடியும்.</p>
-
-<div id="fpStep1">
-<input id="fpemail" type="email" placeholder="Registered Email ID / பதிவு செய்த மின்னஞ்சல்">
-<p id="fpmsg"></p>
-<button onclick="sendForgotOTP()">📧 OTP அனுப்பவும்</button>
-</div>
-
-<div id="fpStep2" class="hidden">
-<input id="fpotp" inputmode="numeric" maxlength="6" placeholder="6 இலக்க OTP / Enter OTP">
-<p id="fpOtpMsg"></p>
-<button onclick="verifyForgotOTP()">✓ OTP சரிபார்க்கவும்</button>
-<button class="secondary" onclick="resendForgotOTP()">↻ OTP மீண்டும் அனுப்பவும்</button>
-</div>
-
-<div id="fpStep3" class="hidden">
-<input id="fppass" type="password" placeholder="New Password / புதிய கடவுச்சொல்">
-<input id="fpcpass" type="password" placeholder="Confirm New Password / புதிய கடவுச்சொல் உறுதி">
-<p id="fpPassMsg"></p>
-<button onclick="resetPasswordAfterOTP()">🔐 புதிய Password அமைக்கவும்</button>
-</div>
-
-<button class="secondary" onclick="show('login')">← Back to Login</button>
+<section id="forcePasswordChange" class="card hidden">
+<h2>🔐 புதிய Password அமைக்கவும் / Set New Password</h2>
+<p class="small">Admin வழங்கிய Temporary Password மூலம் முதல் Login செய்துள்ளீர்கள். தொடர்வதற்கு உங்கள் சொந்த புதிய Password-ஐ அமைக்க வேண்டும்.</p>
+<input id="currentTempPassword" type="password" placeholder="Temporary Password / தற்போதைய Password">
+<input id="newForcePassword" type="password" placeholder="New Password / புதிய Password">
+<input id="confirmForcePassword" type="password" placeholder="Confirm New Password / புதிய Password உறுதி">
+<p id="forcePasswordMsg"></p>
+<button onclick="changeForcedPassword()">🔐 புதிய Password சேமிக்கவும்</button>
+<button class="secondary" onclick="logout()">Logout</button>
 </section>
 
 <section id="dash" class="card hidden">
@@ -3064,9 +3047,47 @@ window.V91_ADV_NUM=V91_ADV_NUM;
         })
       });
       if(msg) msg.textContent = '';
+      if(d.user && d.user.role === 'STUDENT' && d.user.must_change_password === true){
+        window.thiralV138User = d.user;
+        setStudentName(d.user);
+        var tempField = el('currentTempPassword');
+        if(tempField) tempField.value = el('pass').value;
+        if(el('forcePasswordMsg')) el('forcePasswordMsg').textContent = '';
+        show('forcePasswordChange');
+        return;
+      }
       enterV138(d.user);
     }catch(e){
       if(msg){ msg.className='bad'; msg.textContent='Login failed: ' + e.message; }
+    }
+  };
+
+  window.changeForcedPassword = async function(){
+    var msg = el('forcePasswordMsg');
+    try{
+      var current = el('currentTempPassword').value;
+      var next = el('newForcePassword').value;
+      var confirmNext = el('confirmForcePassword').value;
+      if(!current || !next || !confirmNext) throw new Error('அனைத்து Password fields-ஐ நிரப்புங்கள்.');
+      if(next.length < 8) throw new Error('New Password குறைந்தது 8 characters இருக்க வேண்டும்.');
+      if(next !== confirmNext) throw new Error('New Password மற்றும் Confirm Password ஒன்றாக இருக்க வேண்டும்.');
+      if(next === current) throw new Error('New Password, Temporary Password-இலிருந்து வேறுபட்டதாக இருக்க வேண்டும்.');
+      var d = await api138('/auth/change-password',{
+        method:'POST',
+        body:JSON.stringify({current_password:current,new_password:next,confirm_password:confirmNext})
+      });
+      if(msg){ msg.className='good'; msg.textContent=d.message || 'Password மாற்றப்பட்டது. மீண்டும் Login செய்யவும்.'; }
+      el('currentTempPassword').value='';
+      el('newForcePassword').value='';
+      el('confirmForcePassword').value='';
+      await new Promise(function(resolve){setTimeout(resolve,700);});
+      await api138('/auth/logout',{method:'POST'});
+      window.thiralV138User=null;
+      setStudentName(null);
+      clearAllLoginFields();
+      show('login');
+    }catch(e){
+      if(msg){ msg.className='bad'; msg.textContent=e.message || 'Password மாற்ற முடியவில்லை.'; }
     }
   };
 
@@ -3675,7 +3696,9 @@ window.V91_ADV_NUM=V91_ADV_NUM;
           '<td>'+escapeHtml138(formatAdminDOB138(x.dob))+'</td>'+
           '<td>'+escapeHtml138(x.last_login_at?new Date(x.last_login_at).toLocaleString():'-')+'</td>'+
           '<td>'+escapeHtml138(statusText)+'</td>'+
-          '<td><button class="'+actionClass+'" onclick="toggleStudentStatus(\''+escapeHtml138(x.student_id||'')+'\','+(active?'true':'false')+')">'+actionText+'</button></td></tr>';
+          '<td><button class="'+actionClass+'" onclick="toggleStudentStatus(\''+escapeHtml138(x.student_id||'')+'\','+(active?'true':'false')+')">'+actionText+'</button>'+
+          (active ? '<button class="secondary" style="margin-left:6px" onclick="setStudentTemporaryPassword(\''+escapeHtml138(x.student_id||'')+'\')">🔑 Set Temporary Password</button>' : '')+
+          '</td></tr>';
       }).join('');
       if(el('adminStudentList')) el('adminStudentList').innerHTML=
         '<p class="small">Deactivate செய்தால் அந்த Student ID-ன் புதிய Login உடனடியாக தடுக்கப்படும்; பழைய Results/Attempts அழிக்கப்படாது.</p>'+
@@ -3715,6 +3738,33 @@ window.V91_ADV_NUM=V91_ADV_NUM;
       '</td><td>'+escapeHtml138(x.last_login_at?new Date(x.last_login_at).toLocaleString():'-')+
       '</td></tr>';}).join('')+'</table>';
     if(el('adminStudentDetailModal')){el('adminStudentDetailModal').classList.remove('hidden');el('adminStudentDetailModal').style.display='flex';}
+  };
+
+  window.setStudentTemporaryPassword = async function(studentId){
+    var temp = window.prompt('Temporary Password / தற்காலிக Password\n\nகுறைந்தது 8 characters உள்ள Password ஒன்றை உள்ளிடுங்கள்.');
+    if(temp === null) return;
+    temp = String(temp);
+    if(temp.length < 8){
+      alert('Temporary Password குறைந்தது 8 characters இருக்க வேண்டும்.');
+      return;
+    }
+    var confirmTemp = window.prompt('Temporary Password-ஐ மீண்டும் உள்ளிடுங்கள்.');
+    if(confirmTemp === null) return;
+    if(temp !== String(confirmTemp)){
+      alert('Password மற்றும் Confirm Password ஒன்றாக இல்லை.');
+      return;
+    }
+    if(!confirm('இந்த Student-க்கு Temporary Password அமைத்து, அடுத்த Login-ல் புதிய Password கட்டாயமாக அமைக்கவா?')) return;
+    try{
+      await api138('/admin/students/'+encodeURIComponent(studentId)+'/password',{
+        method:'PATCH',
+        body:JSON.stringify({temporary_password:temp})
+      });
+      alert('Temporary Password அமைக்கப்பட்டது. மாணவர் அடுத்த Login-ல் புதிய Password அமைக்க வேண்டும்.');
+      await loadAdminV138();
+    }catch(e){
+      alert(e.message || 'Temporary Password அமைக்க முடியவில்லை.');
+    }
   };
 
   window.toggleStudentStatus = async function(studentId, currentlyActive){
@@ -4431,286 +4481,6 @@ window.startPractice=async function(n){
   window.__THIRAL_GROUP4_ONLY_FINAL__=true;
 })();
 </script>
-
-<script id="thiral-otp-frontend-v164">
-/* =========================================================
-   THIRAL OTP FRONTEND CONTROLLER V164
-   Connects the existing Forgot Password UI to:
-   /api/auth/forgot-password/request
-   /api/auth/forgot-password/verify
-   /api/auth/forgot-password/reset
-
-   Existing student/admin/question functionality is preserved.
-   ========================================================= */
-(function(){
-  'use strict';
-
-  var fpResetToken = '';
-
-  function fpEl(id){
-    return document.getElementById(id);
-  }
-
-  function fpMessage(id, text, cls){
-    var el = fpEl(id);
-    if(!el) return;
-    el.textContent = String(text || '');
-    el.className = cls || '';
-  }
-
-  function fpSetBusy(button, busy, busyText){
-    if(!button) return;
-    if(busy){
-      if(!button.dataset.originalText){
-        button.dataset.originalText = button.textContent;
-      }
-      button.disabled = true;
-      button.textContent = busyText || 'Please wait...';
-    }else{
-      button.disabled = false;
-      if(button.dataset.originalText){
-        button.textContent = button.dataset.originalText;
-        delete button.dataset.originalText;
-      }
-    }
-  }
-
-  async function fpApi(path, body){
-    var response = await fetch('/api' + path, {
-      method:'POST',
-      credentials:'include',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify(body || {})
-    });
-
-    var data = {};
-    try{
-      data = await response.json();
-    }catch(_){}
-
-    if(!response.ok){
-      throw new Error(
-        String(data.error || data.message || ('HTTP ' + response.status))
-      );
-    }
-
-    return data;
-  }
-
-  function fpEmail(){
-    return String((fpEl('fpemail') && fpEl('fpemail').value) || '')
-      .trim()
-      .toLowerCase();
-  }
-
-  function fpOtp(){
-    return String((fpEl('fpotp') && fpEl('fpotp').value) || '')
-      .trim();
-  }
-
-  function fpShowStep(step){
-    var s1 = fpEl('fpStep1');
-    var s2 = fpEl('fpStep2');
-    var s3 = fpEl('fpStep3');
-
-    if(s1) s1.classList.toggle('hidden', step !== 1);
-    if(s2) s2.classList.toggle('hidden', step !== 2);
-    if(s3) s3.classList.toggle('hidden', step !== 3);
-  }
-
-  window.sendForgotOTP = async function(){
-    var email = fpEmail();
-    var button = null;
-
-    try{
-      button = document.querySelector('#fpStep1 button');
-      fpMessage('fpmsg', '', '');
-
-      if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
-        fpMessage('fpmsg', 'சரியான Email ID-ஐ உள்ளிடவும்.', 'bad');
-        return;
-      }
-
-      fpSetBusy(button, true, 'OTP அனுப்பப்படுகிறது...');
-
-      await fpApi('/auth/forgot-password/request', {
-        email: email
-      });
-
-      fpResetToken = '';
-      fpMessage(
-        'fpmsg',
-        'OTP அனுப்பப்பட்டது. உங்கள் Email Inbox-ஐ சரிபார்க்கவும்.',
-        'good'
-      );
-      fpMessage('fpOtpMsg', '', '');
-      fpShowStep(2);
-
-      if(fpEl('fpotp')){
-        fpEl('fpotp').value = '';
-        fpEl('fpotp').focus();
-      }
-    }catch(e){
-      fpMessage(
-        'fpmsg',
-        e && e.message ? e.message : 'OTP அனுப்ப முடியவில்லை.',
-        'bad'
-      );
-    }finally{
-      fpSetBusy(button, false);
-    }
-  };
-
-  window.resendForgotOTP = async function(){
-    /* Resend uses the same server-side rate-limited request endpoint. */
-    await window.sendForgotOTP();
-  };
-
-  window.verifyForgotOTP = async function(){
-    var email = fpEmail();
-    var otp = fpOtp();
-    var button = null;
-
-    try{
-      button = document.querySelector('#fpStep2 button');
-      fpMessage('fpOtpMsg', '', '');
-
-      if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
-        fpMessage('fpOtpMsg', 'Email ID சரிபார்க்கவும்.', 'bad');
-        return;
-      }
-
-      if(!/^\d{6}$/.test(otp)){
-        fpMessage('fpOtpMsg', '6 இலக்க OTP-ஐ உள்ளிடவும்.', 'bad');
-        return;
-      }
-
-      fpSetBusy(button, true, 'சரிபார்க்கப்படுகிறது...');
-
-      var data = await fpApi('/auth/forgot-password/verify', {
-        email: email,
-        otp: otp
-      });
-
-      if(!data || !data.reset_token){
-        throw new Error('OTP சரிபார்க்கப்பட்டது, ஆனால் reset token கிடைக்கவில்லை.');
-      }
-
-      fpResetToken = String(data.reset_token);
-      fpMessage(
-        'fpOtpMsg',
-        'OTP சரிபார்க்கப்பட்டது. புதிய Password அமைக்கவும்.',
-        'good'
-      );
-      fpMessage('fpPassMsg', '', '');
-      fpShowStep(3);
-
-      if(fpEl('fppass')) fpEl('fppass').focus();
-    }catch(e){
-      fpMessage(
-        'fpOtpMsg',
-        e && e.message ? e.message : 'OTP சரிபார்க்க முடியவில்லை.',
-        'bad'
-      );
-    }finally{
-      fpSetBusy(button, false);
-    }
-  };
-
-  window.resetPasswordAfterOTP = async function(){
-    var email = fpEmail();
-    var password = String((fpEl('fppass') && fpEl('fppass').value) || '');
-    var confirmPassword = String((fpEl('fpcpass') && fpEl('fpcpass').value) || '');
-    var button = null;
-
-    try{
-      button = document.querySelector('#fpStep3 button');
-
-      fpMessage('fpPassMsg', '', '');
-
-      if(!fpResetToken){
-        fpMessage(
-          'fpPassMsg',
-          'முதலில் OTP-ஐ சரிபார்க்கவும்.',
-          'bad'
-        );
-        fpShowStep(2);
-        return;
-      }
-
-      if(password.length < 8){
-        fpMessage(
-          'fpPassMsg',
-          'Password குறைந்தது 8 characters இருக்க வேண்டும்.',
-          'bad'
-        );
-        return;
-      }
-
-      if(password !== confirmPassword){
-        fpMessage(
-          'fpPassMsg',
-          'இரண்டு Password-களும் ஒன்றாக இருக்க வேண்டும்.',
-          'bad'
-        );
-        return;
-      }
-
-      fpSetBusy(button, true, 'Password மாற்றப்படுகிறது...');
-
-      await fpApi('/auth/forgot-password/reset', {
-        email: email,
-        reset_token: fpResetToken,
-        password: password
-      });
-
-      fpResetToken = '';
-      if(fpEl('fppass')) fpEl('fppass').value = '';
-      if(fpEl('fpcpass')) fpEl('fpcpass').value = '';
-
-      fpMessage(
-        'fpPassMsg',
-        'Password வெற்றிகரமாக மாற்றப்பட்டது. இப்போது Login செய்யலாம்.',
-        'good'
-      );
-
-      fpShowStep(1);
-
-      if(fpEl('fpemail')) fpEl('fpemail').value = email;
-
-      setTimeout(function(){
-        if(typeof show === 'function'){
-          show('login');
-        }
-      }, 1200);
-
-    }catch(e){
-      fpMessage(
-        'fpPassMsg',
-        e && e.message ? e.message : 'Password மாற்ற முடியவில்லை.',
-        'bad'
-      );
-    }finally{
-      fpSetBusy(button, false);
-    }
-  };
-
-  /* When Forgot Password is opened again, start cleanly at step 1. */
-  var originalShow = window.show;
-  if(typeof originalShow === 'function'){
-    window.show = function(id){
-      if(id === 'forgotPassword'){
-        fpResetToken = '';
-        fpShowStep(1);
-        fpMessage('fpmsg', '', '');
-        fpMessage('fpOtpMsg', '', '');
-        fpMessage('fpPassMsg', '', '');
-      }
-      return originalShow.apply(this, arguments);
-    };
-  }
-
-})();
+<script id="thiral-forgot-password-otp-v158">
 </script>
-
 </body></html>
