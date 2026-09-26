@@ -1127,13 +1127,39 @@ api.get('/results', requirePasswordReady, async (req,res)=>{
   }catch(e){console.error(e);sendError(res,500,'Results service error.');}
 });
 
+/* Group 4 UI topic map used only for Admin result filtering/export. Existing question rows keep their original subtopic values. */
+const GROUP4_RESULT_TOPICS = {
+  'தமிழ்': ['எழுத்து வகைகள்','சொல் வகைகள்','வேற்றுமை','வினைச்சொல்','புணர்ச்சி','ஒருபொருட்பன்மொழி','எதிர்ச்சொல்','இணைச்சொல்','மரபுத்தொடர்','கலைச்சொல்','சங்க இலக்கியம்','பதினெண்கீழ்க்கணக்கு','காப்பியங்கள்','பக்தி இலக்கியம்','நவீன இலக்கியம்','அறத்துப்பால்','பொருட்பால்','இன்பத்துப்பால்','குறள் பொருள்','குறள் சார்ந்த கருத்துகள்'],
+  'இந்திய வரலாறு': ['பண்டைய இந்தியா','இடைக்கால இந்தியா','நவீன இந்தியா','சுதந்திரப் போராட்டம்'],
+  'தமிழ்நாடு வரலாறு': ['சங்க காலம்','சோழர்','பாண்டியர்','பல்லவர்','நாயக்கர்'],
+  'இந்திய அரசியல்': ['அரசியலமைப்பு','அடிப்படை உரிமைகள்','பாராளுமன்றம்','மாநில அரசு','உள்ளாட்சி'],
+  'புவியியல்': ['இந்தியா','தமிழ்நாடு','ஆறுகள்','மலைகள்','வளங்கள்'],
+  'அறிவியல்': ['இயற்பியல்','வேதியியல்','உயிரியல்','சுற்றுச்சூழல்'],
+  'பொருளாதாரம்': ['அடிப்படை பொருளாதாரம்','இந்திய பொருளாதாரம்','தமிழ்நாடு பொருளாதாரம்'],
+  'அடிப்படை கணிதம்': ['எண்கள்','பின்னங்கள்','சதவீதம்','விகிதம்','சராசரி'],
+  'அளவியல்': ['பரப்பளவு','சுற்றளவு','கனஅளவு','அலகுகள்'],
+  'வணிகக் கணிதம்': ['இலாபம் மற்றும் நட்டம்','வட்டி','காலம் மற்றும் வேலை','வேகம் மற்றும் தூரம்'],
+  'தர்க்கத் திறன்': ['எண் தொடர்','எழுத்துத் தொடர்','ஒப்புமை','வகைப்படுத்தல்','குறியீடு']
+};
+function group4TopicForSubtopic(v){
+  const s=String(v||'').trim();
+  const tamil = GROUP4_SUBTOPIC_ALIASES[s] || s;
+  for(const [topic,subs] of Object.entries(GROUP4_RESULT_TOPICS)){ if(subs.includes(s) || subs.includes(tamil)) return topic; }
+  return '';
+}
+
 /* Admin: exam-wise overall results. Student identity is deliberately omitted from the response. */
 api.get('/admin/exam-results', requireAdmin, async (req,res)=>{
   try{
     const exam = String(req.query.exam || '').trim();
     const type = String(req.query.type || '').trim().toLowerCase();
+    const subjectFilter = String(req.query.subject || '').trim();
     const from = String(req.query.from || '').trim();
     const to = String(req.query.to || '').trim();
+    const requestedSubtopic = String(req.query.subtopic || '').trim();
+    const requestedSubtopics = String(req.query.subtopics || '').split('|').map(x=>x.trim()).filter(Boolean);
+    const requestedSubtopicCandidates = [...new Set([...requestedSubtopics, ...requestedSubtopics.map(x=>GROUP4_SUBTOPIC_ALIASES[x]||'')].filter(Boolean))];
+    const requestedSubtopicCandidatesSingle = requestedSubtopic ? [...new Set([requestedSubtopic, GROUP4_SUBTOPIC_ALIASES[requestedSubtopic]||''].filter(Boolean))] : [];
     const minPct = req.query.min_pct === undefined || req.query.min_pct === '' ? 0 : Number(req.query.min_pct);
     const maxPct = req.query.max_pct === undefined || req.query.max_pct === '' ? 100 : Number(req.query.max_pct);
     const page = Math.max(parseInt(req.query.page || '1',10) || 1,1);
@@ -1146,8 +1172,20 @@ api.get('/admin/exam-results', requireAdmin, async (req,res)=>{
     const params=[];
     const add=(sql,val)=>{params.push(val);where.push(sql.replace('?', '$'+params.length));};
     if(exam) add(`a.exam=?` ,exam);
+    if(subjectFilter){
+      const subjectList = subjectCandidates(subjectFilter);
+      where.push(`a.subject = ANY($${params.length+1}::text[])`);
+      params.push(subjectList);
+    }
     if(from) add(`a.submitted_at::date >= ?::date`,from);
     if(to) add(`a.submitted_at::date <= ?::date`,to);
+    if(requestedSubtopic){
+      where.push(`EXISTS (SELECT 1 FROM unnest(a.question_ids) AS aqid JOIN questions qq ON qq.id=aqid WHERE qq.subtopic = ANY($${params.length+1}::text[]))`);
+      params.push(requestedSubtopicCandidatesSingle);
+    } else if(requestedSubtopics.length){
+      where.push(`EXISTS (SELECT 1 FROM unnest(a.question_ids) AS aqid JOIN questions qq ON qq.id=aqid WHERE qq.subtopic = ANY($${params.length+1}::text[]))`);
+      params.push(requestedSubtopicCandidates);
+    }
     where.push(`COALESCE(a.score,0) >= $${params.length+1}`); params.push(minPct);
     where.push(`COALESCE(a.score,0) <= $${params.length+1}`); params.push(maxPct);
 
@@ -1171,7 +1209,7 @@ api.get('/admin/exam-results', requireAdmin, async (req,res)=>{
     const offset=(page-1)*limit;
     const pageParams=params.slice();
     pageParams.push(limit,offset);
-    const rowsQ=await pool.query(`SELECT u.name,u.email,a.exam,${typeSql} AS exam_type,to_char(COALESCE(a.submitted_at,a.started_at),'DD-MM-YYYY HH24:MI') AS date,COALESCE(a.total_count,0)::int AS questions,COALESCE(a.correct_count,0)::int AS marks,COALESCE(a.total_count,0)::int AS total_marks,COALESCE(a.score,0)::numeric(10,2) AS percentage FROM attempts a JOIN users u ON u.id=a.user_id WHERE ${whereSql} ORDER BY COALESCE(a.submitted_at,a.started_at) DESC,a.id DESC LIMIT $${pageParams.length-1} OFFSET $${pageParams.length}`,pageParams);
+    const rowsQ=await pool.query(`SELECT u.name,u.email,a.exam,${typeSql} AS exam_type,to_char(COALESCE(a.submitted_at,a.started_at),'DD-MM-YYYY HH24:MI') AS date,COALESCE(a.total_count,0)::int AS questions,COALESCE(a.correct_count,0)::int AS marks,COALESCE(a.total_count,0)::int AS total_marks,COALESCE(a.score,0)::numeric(10,2) AS percentage,COALESCE((SELECT string_agg(DISTINCT qq.subtopic, ' | ' ORDER BY qq.subtopic) FROM unnest(a.question_ids) AS aqid JOIN questions qq ON qq.id=aqid),'') AS subtopics FROM attempts a JOIN users u ON u.id=a.user_id WHERE ${whereSql} ORDER BY COALESCE(a.submitted_at,a.started_at) DESC,a.id DESC LIMIT $${pageParams.length-1} OFFSET $${pageParams.length}`,pageParams);
 
     const rows=rowsQ.rows;
     const c=countQ.rows[0]||{};
@@ -1184,26 +1222,46 @@ api.get('/admin/exam-results/export', requireAdmin, async (req,res)=>{
   try{
     const exam=String(req.query.exam||'').trim();
     const type=String(req.query.type||'').trim().toLowerCase();
+    const subjectFilter=String(req.query.subject||'').trim();
     const from=String(req.query.from||'').trim();
     const to=String(req.query.to||'').trim();
+    const requestedSubtopic=String(req.query.subtopic||'').trim();
+    const requestedSubtopics=String(req.query.subtopics||'').split('|').map(x=>x.trim()).filter(Boolean);
+    const requestedSubtopicCandidates=[...new Set([...requestedSubtopics,...requestedSubtopics.map(x=>GROUP4_SUBTOPIC_ALIASES[x]||'')].filter(Boolean))];
+    const requestedSubtopicCandidatesSingle=requestedSubtopic?[...new Set([requestedSubtopic,GROUP4_SUBTOPIC_ALIASES[requestedSubtopic]||''].filter(Boolean))]:[];
     const minPct=req.query.min_pct===''||req.query.min_pct===undefined?0:Number(req.query.min_pct);
     const maxPct=req.query.max_pct===''||req.query.max_pct===undefined?100:Number(req.query.max_pct);
     if(!Number.isFinite(minPct)||!Number.isFinite(maxPct)||minPct<0||maxPct>100||minPct>maxPct)return sendError(res,400,'Invalid percentage range.');
     const where=[`a.status='SUBMITTED'`],params=[];
     const add=(sql,val)=>{params.push(val);where.push(sql.replace('?', '$'+params.length));};
     if(exam)add(`a.exam=?`,exam);
+    if(subjectFilter){
+      const subjectList=subjectCandidates(subjectFilter);
+      where.push(`a.subject = ANY($${params.length+1}::text[])`);
+      params.push(subjectList);
+    }
     if(from)add(`a.submitted_at::date >= ?::date`,from);
     if(to)add(`a.submitted_at::date <= ?::date`,to);
+    if(requestedSubtopic){
+      where.push(`EXISTS (SELECT 1 FROM unnest(a.question_ids) AS aqid JOIN questions qq ON qq.id=aqid WHERE qq.subtopic = ANY($${params.length+1}::text[]))`);
+      params.push(requestedSubtopicCandidatesSingle);
+    } else if(requestedSubtopics.length){
+      where.push(`EXISTS (SELECT 1 FROM unnest(a.question_ids) AS aqid JOIN questions qq ON qq.id=aqid WHERE qq.subtopic = ANY($${params.length+1}::text[]))`);
+      params.push(requestedSubtopicCandidates);
+    }
     where.push(`COALESCE(a.score,0) >= $${params.length+1}`);params.push(minPct);
     where.push(`COALESCE(a.score,0) <= $${params.length+1}`);params.push(maxPct);
     if(type && ['model','mock','practice','bank','10','20','50'].includes(type)){
       where.push(type==='model'?`lower(a.exam) LIKE '%model%'`:type==='mock'?`a.mode='mock'`:type==='bank'?`a.mode='bank'`:type==='10'?`a.total_count=10`:type==='20'?`a.total_count=20`:type==='50'?`a.total_count=50`:`(a.mode='practice' AND lower(a.exam) NOT LIKE '%model%' AND a.total_count NOT IN (10,20,50))`);
     }
     const typeSql=`CASE WHEN lower(a.exam) LIKE '%model%' THEN 'Model Exam' WHEN a.mode='mock' THEN 'Mock Test' WHEN a.mode='bank' THEN 'Question Bank' WHEN a.total_count=10 THEN '10 Questions' WHEN a.total_count=20 THEN '20 Questions' WHEN a.total_count=50 THEN '50 Questions' ELSE 'Practice' END`;
-    const q=await pool.query(`SELECT u.name,u.email,a.exam,${typeSql} AS exam_type,to_char(COALESCE(a.submitted_at,a.started_at),'DD-MM-YYYY HH24:MI') AS date,COALESCE(a.total_count,0)::int AS questions,COALESCE(a.correct_count,0)::int AS marks,COALESCE(a.total_count,0)::int AS total_marks,COALESCE(a.score,0)::numeric(10,2) AS percentage FROM attempts a JOIN users u ON u.id=a.user_id WHERE ${where.join(' AND ')} ORDER BY COALESCE(a.submitted_at,a.started_at) DESC,a.id DESC`,params);
+    const q=await pool.query(`SELECT u.name,u.email,a.exam,${typeSql} AS exam_type,to_char(COALESCE(a.submitted_at,a.started_at),'DD-MM-YYYY HH24:MI') AS date,COALESCE(a.total_count,0)::int AS questions,COALESCE(a.correct_count,0)::int AS marks,COALESCE(a.total_count,0)::int AS total_marks,COALESCE(a.score,0)::numeric(10,2) AS percentage,COALESCE((SELECT string_agg(DISTINCT qq.subtopic, ' | ' ORDER BY qq.subtopic) FROM unnest(a.question_ids) AS aqid JOIN questions qq ON qq.id=aqid),'') AS subtopics FROM attempts a JOIN users u ON u.id=a.user_id WHERE ${where.join(' AND ')} ORDER BY COALESCE(a.submitted_at,a.started_at) DESC,a.id DESC`,params);
     const csvCell=v=>{const x=String(v??'');return /[",\n\r]/.test(x)?'"'+x.replace(/"/g,'""')+'"':x;};
-    const header=['Name','Email','Exam','Exam Type','Date','Questions','Marks','Total Marks','Percentage'];
-    const lines=[header.join(',')].concat(q.rows.map(r=>[r.name,r.email,r.exam,r.exam_type,r.date,r.questions,r.marks,r.total_marks,r.percentage].map(csvCell).join(',')));
+    const header=['Name','Email','Exam','Exam Type','Topic','Subtopics','Date','Questions','Marks','Total Marks','Percentage'];
+    const lines=[header.join(',')].concat(q.rows.map(r=>{
+      const topics=String(r.subtopics||'').split(' | ').map(group4TopicForSubtopic).filter(Boolean);
+      return [r.name,r.email,r.exam,r.exam_type,[...new Set(topics)].join(' | '),r.subtopics,r.date,r.questions,r.marks,r.total_marks,r.percentage].map(csvCell).join(',');
+    }));
     const filename='thiral_exam_overall_results_'+new Date().toISOString().slice(0,10)+'.csv';
     res.setHeader('Content-Type','text/csv; charset=utf-8');
     res.setHeader('Content-Disposition',`attachment; filename="${filename}"`);
