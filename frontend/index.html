@@ -419,17 +419,44 @@ a{
 <p id="lm"></p>
 <button onclick="login()">Login</button>
 <button class="secondary" onclick="show('register')">New Registration</button>
+<button class="secondary" onclick="show('forgotPassword')">Forgot Password?</button>
 </section>
 
-<section id="forcePasswordChange" class="card hidden">
+<section id="changePasswordRequired" class="card hidden">
 <h2>🔐 புதிய Password அமைக்கவும் / Set New Password</h2>
-<p class="small">Admin வழங்கிய Temporary Password மூலம் முதல் Login செய்துள்ளீர்கள். தொடர்வதற்கு உங்கள் சொந்த புதிய Password-ஐ அமைக்க வேண்டும்.</p>
-<input id="currentTempPassword" type="password" placeholder="Temporary Password / தற்போதைய Password">
-<input id="newForcePassword" type="password" placeholder="New Password / புதிய Password">
-<input id="confirmForcePassword" type="password" placeholder="Confirm New Password / புதிய Password உறுதி">
-<p id="forcePasswordMsg"></p>
-<button onclick="changeForcedPassword()">🔐 புதிய Password சேமிக்கவும்</button>
+<p class="small">Admin temporary password மூலம் Login செய்துள்ளீர்கள். பாதுகாப்புக்காக முதலில் உங்கள் சொந்த புதிய Password அமைக்க வேண்டும்.</p>
+<input id="newPassword" type="password" autocomplete="new-password" placeholder="New Password / புதிய கடவுச்சொல்">
+<input id="confirmNewPassword" type="password" autocomplete="new-password" placeholder="Confirm New Password / புதிய கடவுச்சொல் உறுதி">
+<p id="changePasswordMsg"></p>
+<button onclick="changeRequiredPassword()">🔐 Password மாற்றவும்</button>
 <button class="secondary" onclick="logout()">Logout</button>
+</section>
+
+<section id="forgotPassword class="card hidden">
+<h2>🔑 Forgot Password / கடவுச்சொல் மறந்துவிட்டதா?</h2>
+<p class="small">முதலில் பதிவு செய்யப்பட்ட Email ID-ஐ உள்ளிடுங்கள். OTP சரிபார்த்த பிறகே புதிய Password அமைக்க முடியும்.</p>
+
+<div id="fpStep1">
+<input id="fpemail" type="email" placeholder="Registered Email ID / பதிவு செய்த மின்னஞ்சல்">
+<p id="fpmsg"></p>
+<button onclick="sendForgotOTP()">📧 OTP அனுப்பவும்</button>
+</div>
+
+<div id="fpStep2" class="hidden">
+<input id="fpotp" inputmode="numeric" maxlength="6" placeholder="6 இலக்க OTP / Enter OTP">
+<p id="fpOtpMsg"></p>
+<button onclick="verifyForgotOTP()">✓ OTP சரிபார்க்கவும்</button>
+<button class="secondary" onclick="resendForgotOTP()">↻ OTP மீண்டும் அனுப்பவும்</button>
+</div>
+
+<div id="fpStep3" class="hidden">
+<input id="fppass" type="password" placeholder="New Password / புதிய கடவுச்சொல்">
+<input id="fpcpass" type="password" placeholder="Confirm New Password / புதிய கடவுச்சொல் உறுதி">
+<p id="fpPassMsg"></p>
+<button onclick="resetPasswordAfterOTP()">🔐 புதிய Password அமைக்கவும்</button>
+</div>
+
+<button class="secondary" onclick="show('login')">← Back to Login</button>
 </section>
 
 <section id="dash" class="card hidden">
@@ -653,11 +680,11 @@ a{
   </div>
 
   <div style="max-width:980px;margin:0 auto 24px;display:flex;align-items:stretch;justify-content:center;gap:18px;flex-wrap:wrap;">
-    <a href="mailto:thiraladmin@gmail.com" style="flex:1 1 380px;min-width:280px;display:flex;align-items:center;gap:18px;text-align:left;padding:22px 26px;border-radius:18px;text-decoration:none;background:linear-gradient(135deg,#eef7ff,#e3f1ff);border:1px solid rgba(37,99,235,.18);box-shadow:0 8px 24px rgba(37,99,235,.10);box-sizing:border-box;">
+    <a href="mailto:thiral.admin@gmail.com" style="flex:1 1 380px;min-width:280px;display:flex;align-items:center;gap:18px;text-align:left;padding:22px 26px;border-radius:18px;text-decoration:none;background:linear-gradient(135deg,#eef7ff,#e3f1ff);border:1px solid rgba(37,99,235,.18);box-shadow:0 8px 24px rgba(37,99,235,.10);box-sizing:border-box;">
       <span style="width:62px;height:62px;flex:0 0 62px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:31px;background:#1677e8;color:#fff;box-shadow:0 5px 14px rgba(37,99,235,.25);">✉</span>
       <span style="min-width:0;">
         <span style="display:block;font-size:20px;font-weight:800;color:#123f70;margin-bottom:5px;">Email</span>
-        <span style="display:block;font-size:clamp(19px,2.3vw,27px);font-weight:900;color:#1265d6;word-break:break-word;line-height:1.25;">thiraladmin@gmail.com</span>
+        <span style="display:block;font-size:clamp(19px,2.3vw,27px);font-weight:900;color:#1265d6;word-break:break-word;line-height:1.25;">thiral.admin@gmail.com</span>
       </span>
     </a>
 
@@ -724,20 +751,16 @@ a{
 </div>
 <div class="card" style="margin-top:16px;border:1px solid #dbeafe">
 <h3>📡 Beta Usage Monitor</h3>
-<p class="small">Beta Test-ல் தற்போது எத்தனை மாணவர்கள் உள்ளே இருக்கிறார்கள், கடந்த 24 மணி நேர பயன்பாடு மற்றும் Practice/Mock பயன்பாட்டை central activity data மூலம் பார்க்கும் பகுதி. மாணவர்களின் Password ஒருபோதும் அனுப்பப்படாது.</p>
+<p class="small">10 மாணவர்கள் Beta Test பயன்படுத்துகிறார்களா என்பதை central activity data மூலம் பார்க்கும் பகுதி. மாணவர்களின் Password ஒருபோதும் அனுப்பப்படாது.</p>
 <div class="grid admin-stat-grid">
-<div class="card admin-stat-card" role="button" tabindex="0" onclick="toggleUsageDetail('onlineStudentList')" onkeydown="if(event.key==='Enter'||event.key===' ')toggleUsageDetail('onlineStudentList')" style="cursor:pointer"><h3>🟢 Currently Online</h3><p id="onlineActiveNow">-</p><span class="small">விவரங்களை காண்க ▾</span></div>
-<div class="card admin-stat-card" role="button" tabindex="0" onclick="toggleUsageDetail('usageLast24Detail')" onkeydown="if(event.key==='Enter'||event.key===' ')toggleUsageDetail('usageLast24Detail')" style="cursor:pointer"><h3>🕐 Last 24 Hours</h3><p id="onlineActive24h">-</p><span class="small">விவரங்களை காண்க ▾</span></div>
-<div class="card admin-stat-card" role="button" tabindex="0" onclick="toggleUsageDetail('usagePracticeDetail')" onkeydown="if(event.key==='Enter'||event.key===' ')toggleUsageDetail('usagePracticeDetail')" style="cursor:pointer"><h3>📝 Practice Sessions</h3><p id="onlinePracticeCount">-</p><span class="small">யார் யார் என்பதை காண்க ▾</span></div>
-<div class="card admin-stat-card" role="button" tabindex="0" onclick="toggleUsageDetail('usageMockDetail')" onkeydown="if(event.key==='Enter'||event.key===' ')toggleUsageDetail('usageMockDetail')" style="cursor:pointer"><h3>🎯 Mock Tests</h3><p id="onlineMockCount">-</p><span class="small">யார் யார் என்பதை காண்க ▾</span></div>
+<div class="card admin-stat-card" role="button" tabindex="0" onclick="showUsageDetail('today')"><h3>🟢 Active Today</h3><p id="onlineActiveToday">-</p><span class="small">கிளிக் செய்து விவரம்</span></div>
+<div class="card admin-stat-card" role="button" tabindex="0" onclick="showUsageDetail('last24')"><h3>🕐 Last 24 Hours</h3><p id="onlineActive24h">-</p><span class="small">கிளிக் செய்து விவரம்</span></div>
+<div class="card admin-stat-card" role="button" tabindex="0" onclick="showUsageDetail('practice')"><h3>📝 Practice Sessions</h3><p id="onlinePracticeCount">-</p><span class="small">கிளிக் செய்து மாணவர் விவரம்</span></div>
+<div class="card admin-stat-card" role="button" tabindex="0" onclick="showUsageDetail('mock')"><h3>🎯 Mock Tests</h3><p id="onlineMockCount">-</p><span class="small">கிளிக் செய்து மாணவர் விவரம்</span></div>
 </div>
-<p id="onlineMonitorMsg" class="small">மேலுள்ள எண்ணிக்கையை அழுத்தினால் அந்த எண்ணிக்கைக்கான முழு விவரங்கள் திறக்கும்.</p>
+<p id="onlineMonitorMsg" class="small">Online tracking அமைக்கப்படவில்லை.</p>
 <button class="secondary" onclick="refreshOnlineMonitor()">🔄 Usage Refresh</button>
-<div id="onlineStudentList" class="hidden" style="margin-top:14px"></div>
-<div id="usageLast24Detail" class="hidden" style="margin-top:18px"></div>
-<div id="usagePracticeDetail" class="hidden" style="margin-top:18px"></div>
-<div id="usageMockDetail" class="hidden" style="margin-top:18px"></div>
-
+<div id="onlineStudentList" style="margin-top:14px"></div><div id="usageDetail" class="card hidden" style="margin-top:14px"></div>
 </div>
 <hr>
 <h3>💡 Student Suggestions / Feedback</h3>
@@ -758,7 +781,7 @@ a{
 <h3>📝 Question Bank</h3>
 <p>Difficulty, Question Type, Topic/Subtopic, Correct Answer, Explanation, Practice/Mock பயன்பாடு ஆகியவற்றை நிர்வகிக்கலாம்.</p>
 <h3>🔒 Student Privacy</h3>
-<p>Student data-ஐ Admin மட்டும் பார்க்க முடியும். Production version-ல் server-side authentication, password hashing மற்றும் role-based access control கட்டாயம்.</p>
+<p>Student data-ஐ Admin மட்டும் பார்க்க முடியும். இந்த Production version-ல் authentication, password hashing, session, Results, Practice/Mock activity மற்றும் Admin data server/database-ல் பாதுகாப்பாக நிர்வகிக்கப்படுகின்றன.</p>
 <button class="secondary" onclick="show('home')">Home</button>
 </section>
 
@@ -969,23 +992,15 @@ function initContentLanguage(){
   const el=document.getElementById('selectedLanguageLabel');
   if(el) el.textContent=contentLanguage==='en'?'English':'தமிழ்';
 }
-document.addEventListener('DOMContentLoaded',function(){
-  initContentLanguage();
-  try{
-    ['tnpsc_student_users','tnpsc_nanban_user','tnpsc_student_count','tnpsc_last_result','tnpsc_result_history',
-     'thiral_active_student_email','g4login'].forEach(function(k){localStorage.removeItem(k);sessionStorage.removeItem(k);});
-    Object.keys(localStorage).filter(function(k){return /^thiral_practice_used_/.test(k)||/^tnpsc_used_questions_/.test(k);})
-      .forEach(function(k){localStorage.removeItem(k);});
-  }catch(e){}
-});
+document.addEventListener('DOMContentLoaded',initContentLanguage);
 
 /* V137 ONLINE BETA TELEMETRY
    Configure the Google Apps Script Web App URL after deployment.
    The endpoint receives activity/profile data but NEVER receives passwords. */
 window.THIRAL_V137_CONFIG={
-  version:'V137',
-  mode:'cloud-required',
-  apiBase:'https://YOUR-THIRAL-BACKEND.example/api',
+  version:'V172-FINAL',
+  mode:'server-only',
+  apiBase:'https://thiral-v138-backend.onrender.com/api',
   clientSecrets:false,
   heartbeatMs:5*60*1000,
   questionSource:'server-only',
@@ -998,9 +1013,9 @@ function thiralTelemetryReady(){
  return /^https:\/\//.test(c.apiBase||'') && !/YOUR-THIRAL-BACKEND/i.test(c.apiBase||'');
 }
 function thiralTelemetryPayload(extra){
- const u=getActiveStudent()||window.thiralV138User||null;
+ const u=getActiveStudent()||null;
  return Object.assign({
-   app:'Thiral',version:'V137',
+   app:'Thiral',version:'V172-FINAL',
    studentId:u&&u.id||'',name:u&&u.name||'',email:u&&u.email||'',
    exam:typeof selectedExam!=='undefined'?selectedExam||'':'',
    timestamp:new Date().toISOString()
@@ -1010,7 +1025,7 @@ async function thiralSendActivity(eventName,extra){
  if(!thiralTelemetryReady())return;
  try{
    const c=window.THIRAL_V137_CONFIG;
-   await fetch(c.apiBase.replace(/\/$/,'')+'/events',{
+   await fetch(c.apiBase.replace(/\/$/,'')+'/activity',{
      method:'POST',
      credentials:'include',
      headers:{'Content-Type':'application/json'},
@@ -1032,21 +1047,8 @@ document.addEventListener('visibilitychange',()=>{
  if(document.visibilityState==='visible'&&getActiveStudent())thiralSendActivity('foreground');
 });
 
-/* Central-data rule: student identity, credentials and account records are never stored
-   in browser localStorage. The backend session is the source of truth. */
 function getStudentUsers(){ return []; }
 function saveStudentUsers(list){ return; }
-function getActiveStudent(){ return (window.thiralV138User && window.thiralV138User.role==='STUDENT') ? window.thiralV138User : null; }
-function setActiveStudent(email){ return; }
-function clearActiveStudent(){ return; }
-
-function login(){
-  /* Real login is defined by the V138 secure server bridge below. */
-  if(typeof window.thiralV138Login==='function') return window.thiralV138Login();
-  const msg=document.getElementById('lm');
-  if(msg){msg.className='bad';msg.textContent='Secure server login is not ready.';}
-}
-
 
 function logout(){
   thiralSendActivity('logout');
@@ -1298,7 +1300,6 @@ function finish(){
  const actualTotal=questions.length; const score=Math.round((correct/Math.max(1,actualTotal))*100);
  const ex=(EXAMS[selectedExam]||EXAMS.group4).title;
  const res={student:getStudentName(),exam:ex,type:'Practice',total:actualTotal,correct,wrong,unanswered,score:score+'%',date:new Date().toLocaleString('en-IN')};
- localStorage.setItem('tnpsc_last_result',JSON.stringify(res));
  saveResultToHistory(res);
  thiralSendActivity('practice_complete',{count:actualTotal,correct,wrong,unanswered,score:score+'%',subject:currentSubject});
  resultText.innerHTML=`<p><b>மாணவர் பெயர்:</b> ${res.student}</p><p><b>தேர்வு:</b> ${res.exam}</p><p><b>வகை:</b> Practice</p><p>மொத்த கேள்விகள்: <b>${actualTotal}</b></p><p>சரி: <b>${correct}</b> | தவறு: <b>${wrong}</b> | விடையளிக்காதது: <b>${unanswered}</b></p><p>Score: <b>${score}%</b></p><p class="small">${res.date}</p>`;
@@ -1432,7 +1433,7 @@ function showResultHistory(){
   show('resultHistory');
 }
 function getStudentName(){
- const u=window.thiralV138User || null;
+ const u=JSON.parse(localStorage.getItem('tnpsc_nanban_user')||'null');
  return (u&&u.name)?u.name:'மாணவர்';
 }
 function toggleReview(){
@@ -1450,7 +1451,6 @@ function submitMock(auto=false){
  const total=mockQuestions.length,percent=Math.round(correct/total*100);
  const exTitle=(EXAMS[selectedExam]||EXAMS.group4).title;
  const result={student:getStudentName(),exam:exTitle,type:'Mock Test',total,correct,wrong,unanswered,score:correct+' / '+total,date:new Date().toLocaleString('en-IN')};
- localStorage.setItem('tnpsc_last_result',JSON.stringify(result));
  saveResultToHistory(result);
  thiralSendActivity('mock_complete',{count:total,correct,wrong,unanswered,score:percent+'%',exam:selectedExam});
  document.getElementById('studentResultSummary').innerHTML=
@@ -1470,7 +1470,7 @@ function submitMock(auto=false){
  setTimeout(()=>window.scrollTo(0,0),50);
 }
 
-/* Central-data mode: no student registry is migrated or restored from browser storage. */
+/* Legacy browser student registry disabled: authentication is server-only. */
 </script>
 
 <script>
@@ -1609,8 +1609,7 @@ function submitMock(auto=false){
     clearInterval(timer); show('result');
     const actualTotal=questions.length; const score=Math.round((correct/Math.max(1,actualTotal))*100); const l=L();
     const ex=(EXAMS[selectedExam]||EXAMS.group4).title;
-    const res={student:getStudentName(),exam:ex,type:'Practice',total:actualTotal,correct,wrong,unanswered,score:score+'%',language:contentLanguage,date:new Date().toLocaleString('en-IN')};
-    localStorage.setItem('tnpsc_last_result',JSON.stringify(res)); saveResultToHistory(res);
+    const res={student:getStudentName(),exam:ex,type:'Practice',total:actualTotal,correct,wrong,unanswered,score:score+'%',language:contentLanguage,date:new Date().toLocaleString('en-IN')}; saveResultToHistory(res);
     thiralSendActivity('practice_complete',{count:actualTotal,correct,wrong,unanswered,score:score+'%',subject:currentSubject});
     resultText.innerHTML=`<p><b>${l.student}:</b> ${escHtml(res.student)}</p><p><b>${l.exam}:</b> ${escHtml(res.exam)}</p><p><b>${l.type}:</b> ${l.practice}</p><p>${l.total}: <b>${actualTotal}</b></p><p>${l.correct}: <b>${correct}</b> | ${l.incorrect}: <b>${wrong}</b> | ${l.unanswered}: <b>${unanswered}</b></p><p>${l.score}: <b>${score}%</b></p><p class="small">${escHtml(res.date)}</p>`;
     buildPracticeReview();
@@ -1624,8 +1623,7 @@ function submitMock(auto=false){
     let c=0,w=0,u=0; mockQuestions.forEach((q,i)=>{if(mockAnswers[i]===-1)u++;else if(mockAnswers[i]===q.a)c++;else w++;});
     const total=mockQuestions.length,percent=Math.round(c/total*100),l=L();
     const exTitle=(EXAMS[selectedExam]||EXAMS.group4).title;
-    const result={student:getStudentName(),exam:exTitle,type:'Mock Test',total,correct:c,wrong:w,unanswered:u,score:c+' / '+total,language:contentLanguage,date:new Date().toLocaleString('en-IN')};
-    localStorage.setItem('tnpsc_last_result',JSON.stringify(result)); saveResultToHistory(result);
+    const result={student:getStudentName(),exam:exTitle,type:'Mock Test',total,correct:c,wrong:w,unanswered:u,score:c+' / '+total,language:contentLanguage,date:new Date().toLocaleString('en-IN')}; saveResultToHistory(result);
     thiralSendActivity('mock_complete',{count:total,correct:c,wrong:w,unanswered:u,score:percent+'%',exam:selectedExam,auto:!!auto});
     document.getElementById('studentResultSummary').innerHTML=`<div class="card" style="box-shadow:none;background:#f7f9fc"><p><b>${l.student}:</b> ${escHtml(result.student)}</p><p><b>${l.exam}:</b> ${escHtml(exTitle)} – ${l.mock}</p><p><b>${l.total}:</b> ${total}</p><p><b>${l.correct}:</b> ${c}</p><p><b>${l.incorrect}:</b> ${w}</p><p><b>${l.unanswered}:</b> ${u}</p><h3>${l.score}: ${c} / ${total} (${percent}%)</h3></div>`;
     const review=mockQuestions.map((q,i)=>{
@@ -2948,7 +2946,7 @@ window.V91_ADV_NUM=V91_ADV_NUM;
 (function(){
   'use strict';
 
-  window.THIRAL_API = '';
+  window.THIRAL_API = 'https://thiral-v138-backend.onrender.com';
   var V138_API = window.THIRAL_API;
 
   window.thiralV138 = {
@@ -2981,20 +2979,6 @@ window.V91_ADV_NUM=V91_ADV_NUM;
   }
   window.thiralV138Api = api138;
 
-  var usageHeartbeatTimer=null;
-  async function sendUsageHeartbeat(){
-    try{
-      if(!window.thiralV138User) return;
-      await api138('/auth/heartbeat',{method:'POST',body:'{}'});
-    }catch(e){}
-  }
-  function startUsageHeartbeat(){
-    if(usageHeartbeatTimer) clearInterval(usageHeartbeatTimer);
-    sendUsageHeartbeat();
-    usageHeartbeatTimer=setInterval(sendUsageHeartbeat,60000);
-  }
-  window.__startThiralUsageHeartbeat=startUsageHeartbeat;
-
   function setStudentName(u){
     var name = (u && (u.name || u.email)) || '';
     if(el('studentName')) el('studentName').textContent = name;
@@ -3003,19 +2987,29 @@ window.V91_ADV_NUM=V91_ADV_NUM;
 
   function enterV138(u){
     window.thiralV138User = u;
-    if(window.__startThiralUsageHeartbeat) window.__startThiralUsageHeartbeat();
     setStudentName(u);
+    if(u && u.role==='STUDENT' && u.must_change_password){
+      show('changePasswordRequired');
+      return;
+    }
     if(typeof selectedExam !== 'undefined'){
-      /* Exam preference is UI-only and contains no student identity. */
       localStorage.setItem('tnpsc_selected_exam', selectedExam || 'group4');
     }
     if(typeof renderExamHome === 'function'){
       try { renderExamHome(); } catch(e) {}
     }
-    show('dash');
+    show(u && u.role==='ADMIN' ? 'admin' : 'dash');
+  }
+
+  function clearLegacySensitiveBrowserData(){
+    try{
+      ['tnpsc_student_users','tnpsc_nanban_user','tnpsc_last_result','tnpsc_result_history','tnpsc_student_count'].forEach(function(k){localStorage.removeItem(k);});
+      Object.keys(localStorage).filter(function(k){return k.indexOf('thiral_practice_used_')===0;}).forEach(function(k){localStorage.removeItem(k);});
+    }catch(e){}
   }
 
   async function bootV138(){
+    clearLegacySensitiveBrowserData();
     /*
       Initial page load must always show the public Main/Home screen.
       If a valid backend session exists, keep the user session in memory,
@@ -3026,7 +3020,6 @@ window.V91_ADV_NUM=V91_ADV_NUM;
       var d = await api138('/auth/me');
       window.thiralV138User = d.user || null;
       setStudentName(d.user || null);
-      if(window.thiralV138User && window.__startThiralUsageHeartbeat) window.__startThiralUsageHeartbeat();
     }catch(e){
       window.thiralV138User = null;
       setStudentName(null);
@@ -3045,48 +3038,9 @@ window.V91_ADV_NUM=V91_ADV_NUM;
         })
       });
       if(msg) msg.textContent = '';
-      if(d.user && d.user.role === 'STUDENT' && d.user.must_change_password === true){
-        window.thiralV138User = d.user;
-        setStudentName(d.user);
-        if(window.__startThiralUsageHeartbeat) window.__startThiralUsageHeartbeat();
-        var tempField = el('currentTempPassword');
-        if(tempField) tempField.value = el('pass').value;
-        if(el('forcePasswordMsg')) el('forcePasswordMsg').textContent = '';
-        show('forcePasswordChange');
-        return;
-      }
       enterV138(d.user);
     }catch(e){
       if(msg){ msg.className='bad'; msg.textContent='Login failed: ' + e.message; }
-    }
-  };
-
-  window.changeForcedPassword = async function(){
-    var msg = el('forcePasswordMsg');
-    try{
-      var current = el('currentTempPassword').value;
-      var next = el('newForcePassword').value;
-      var confirmNext = el('confirmForcePassword').value;
-      if(!current || !next || !confirmNext) throw new Error('அனைத்து Password fields-ஐ நிரப்புங்கள்.');
-      if(next.length < 8) throw new Error('New Password குறைந்தது 8 characters இருக்க வேண்டும்.');
-      if(next !== confirmNext) throw new Error('New Password மற்றும் Confirm Password ஒன்றாக இருக்க வேண்டும்.');
-      if(next === current) throw new Error('New Password, Temporary Password-இலிருந்து வேறுபட்டதாக இருக்க வேண்டும்.');
-      var d = await api138('/auth/change-password',{
-        method:'POST',
-        body:JSON.stringify({current_password:current,new_password:next,confirm_password:confirmNext})
-      });
-      if(msg){ msg.className='good'; msg.textContent=d.message || 'Password மாற்றப்பட்டது. மீண்டும் Login செய்யவும்.'; }
-      el('currentTempPassword').value='';
-      el('newForcePassword').value='';
-      el('confirmForcePassword').value='';
-      await new Promise(function(resolve){setTimeout(resolve,700);});
-      await api138('/auth/logout',{method:'POST'});
-      window.thiralV138User=null;
-      setStudentName(null);
-      clearAllLoginFields();
-      show('login');
-    }catch(e){
-      if(msg){ msg.className='bad'; msg.textContent=e.message || 'Password மாற்ற முடியவில்லை.'; }
     }
   };
 
@@ -3117,6 +3071,23 @@ window.V91_ADV_NUM=V91_ADV_NUM;
     }
   };
 
+  window.changeRequiredPassword = async function(){
+    var msg=el('changePasswordMsg');
+    try{
+      var p=el('newPassword').value;
+      var c=el('confirmNewPassword').value;
+      if(p.length<8 || p.length>128) throw new Error('Password 8 முதல் 128 characters வரை இருக்க வேண்டும்.');
+      if(p!==c) throw new Error('Password மற்றும் Confirm Password ஒன்றாக இருக்க வேண்டும்.');
+      var d=await api138('/auth/change-password',{method:'POST',body:JSON.stringify({password:p,confirmPassword:c})});
+      if(d.ok){
+        el('newPassword').value=''; el('confirmNewPassword').value='';
+        if(msg){msg.className='';msg.textContent='Password மாற்றப்பட்டது. பாதுகாப்பாக Login செய்யப்பட்டுள்ளீர்கள்.';}
+        window.thiralV138User=Object.assign({},window.thiralV138User,{must_change_password:false});
+        setTimeout(function(){show('dash');},400);
+      }
+    }catch(e){ if(msg){msg.className='bad';msg.textContent=e.message;} }
+  };
+
   window.logout = async function(){
     try { await api138('/auth/logout',{method:'POST'}); } catch(e) {}
     window.thiralV138User = null;
@@ -3138,6 +3109,7 @@ window.V91_ADV_NUM=V91_ADV_NUM;
       if(!d.user || d.user.role !== 'ADMIN') throw new Error('Admin authorization required.');
       enterV138(d.user);
       await loadAdminV138();
+      await refreshOnlineMonitor();
       show('admin');
     }catch(e){
       var denied = String(e && e.message || '').indexOf('ACCESS DENIED') === 0;
@@ -3658,7 +3630,6 @@ window.V91_ADV_NUM=V91_ADV_NUM;
   async function loadAdminV138(){
     try{
       var s=await api138('/admin/summary');
-      var usage=await api138('/admin/usage-monitor');
       var d=await api138('/admin/students');
       var students=d.students||[];
 
@@ -3670,11 +3641,6 @@ window.V91_ADV_NUM=V91_ADV_NUM;
       if(el('statThird')) el('statThird').textContent=s.students?.third ?? 0;
       if(el('statLogin')) el('statLogin').textContent=s.students?.lastLogin ?? '-';
       if(el('statSuggestions')) el('statSuggestions').textContent='-';
-      if(el('onlineActiveNow')) el('onlineActiveNow').textContent=String(usage.active_now ?? 0);
-      if(el('onlineActiveToday')) el('onlineActiveToday').textContent=String(usage.active_today ?? 0);
-      if(el('onlineActive24h')) el('onlineActive24h').textContent=String(usage.active_24h ?? 0);
-      if(el('onlinePracticeCount')) el('onlinePracticeCount').textContent=String(usage.practice_sessions_24h ?? 0);
-      if(el('onlineMockCount')) el('onlineMockCount').textContent=String(usage.mock_tests_24h ?? 0);
 
       var body=students.map(function(x){
         var active = x.is_active !== false;
@@ -3689,9 +3655,7 @@ window.V91_ADV_NUM=V91_ADV_NUM;
           '<td>'+escapeHtml138(formatAdminDOB138(x.dob))+'</td>'+
           '<td>'+escapeHtml138(x.last_login_at?new Date(x.last_login_at).toLocaleString():'-')+'</td>'+
           '<td>'+escapeHtml138(statusText)+'</td>'+
-          '<td><button class="'+actionClass+'" onclick="toggleStudentStatus(\''+escapeHtml138(x.student_id||'')+'\','+(active?'true':'false')+')">'+actionText+'</button>'+
-          (active ? '<button class="secondary" style="margin-left:6px" onclick="setStudentTemporaryPassword(\''+escapeHtml138(x.student_id||'')+'\')">🔑 Set Temporary Password</button>' : '')+
-          '</td></tr>';
+          '<td><button class="'+actionClass+'" onclick="toggleStudentStatus(\''+escapeHtml138(x.student_id||'')+'\','+(active?'true':'false')+')">'+actionText+'</button> <button class="secondary" onclick="setTemporaryPassword(\''+escapeHtml138(x.student_id||'')+'\')">🔑 Temporary Password</button></td></tr>';
       }).join('');
       if(el('adminStudentList')) el('adminStudentList').innerHTML=
         '<p class="small">Deactivate செய்தால் அந்த Student ID-ன் புதிய Login உடனடியாக தடுக்கப்படும்; பழைய Results/Attempts அழிக்கப்படாது.</p>'+
@@ -3733,33 +3697,6 @@ window.V91_ADV_NUM=V91_ADV_NUM;
     if(el('adminStudentDetailModal')){el('adminStudentDetailModal').classList.remove('hidden');el('adminStudentDetailModal').style.display='flex';}
   };
 
-  window.setStudentTemporaryPassword = async function(studentId){
-    var temp = window.prompt('Temporary Password / தற்காலிக Password\n\nகுறைந்தது 8 characters உள்ள Password ஒன்றை உள்ளிடுங்கள்.');
-    if(temp === null) return;
-    temp = String(temp);
-    if(temp.length < 8){
-      alert('Temporary Password குறைந்தது 8 characters இருக்க வேண்டும்.');
-      return;
-    }
-    var confirmTemp = window.prompt('Temporary Password-ஐ மீண்டும் உள்ளிடுங்கள்.');
-    if(confirmTemp === null) return;
-    if(temp !== String(confirmTemp)){
-      alert('Password மற்றும் Confirm Password ஒன்றாக இல்லை.');
-      return;
-    }
-    if(!confirm('இந்த Student-க்கு Temporary Password அமைத்து, அடுத்த Login-ல் புதிய Password கட்டாயமாக அமைக்கவா?')) return;
-    try{
-      await api138('/admin/students/'+encodeURIComponent(studentId)+'/password',{
-        method:'PATCH',
-        body:JSON.stringify({temporary_password:temp})
-      });
-      alert('Temporary Password அமைக்கப்பட்டது. மாணவர் அடுத்த Login-ல் புதிய Password அமைக்க வேண்டும்.');
-      await loadAdminV138();
-    }catch(e){
-      alert(e.message || 'Temporary Password அமைக்க முடியவில்லை.');
-    }
-  };
-
   window.toggleStudentStatus = async function(studentId, currentlyActive){
     var action = currentlyActive ? 'Deactivate / முடக்க' : 'Reactivate / மீண்டும் செயல்படுத்த';
     var message = currentlyActive
@@ -3778,84 +3715,46 @@ window.V91_ADV_NUM=V91_ADV_NUM;
     }
   };
 
+  window.setTemporaryPassword=async function(studentId){
+    if(!confirm('இந்த Student ID-க்கு புதிய Temporary Password உருவாக்கவா? பழைய active sessions உடனடியாக முடக்கப்படும்.')) return;
+    try{
+      var d=await api138('/admin/students/'+encodeURIComponent(studentId)+'/temporary-password',{method:'POST',body:'{}'});
+      alert('Temporary Password\n\nStudent ID: '+d.student_id+'\nPassword: '+d.temporary_password+'\n\nஇந்த Password-ஐ மாணவரிடம் பாதுகாப்பாக மட்டும் பகிருங்கள். Login செய்தவுடன் புதிய Password அமைக்க வேண்டும்.');
+    }catch(e){alert(e.message||'Temporary Password உருவாக்க முடியவில்லை.');}
+  };
+
   window.closeAdminStudentView=function(){
     if(el('adminStudentDetailModal')){el('adminStudentDetailModal').classList.add('hidden');el('adminStudentDetailModal').style.display='none';}
   };
 
-  window.toggleUsageDetail=function(id){
-    var node=document.getElementById(id);
-    if(!node) return;
-    node.classList.toggle('hidden');
+  var usageMonitorData={summary:null,online_students:[],last24_students:[],practice_students:[],mock_students:[]};
+  function usageDate(v){return v?new Date(v).toLocaleString('en-IN'):'-';}
+  function usageEsc(v){return escapeHtml138(v==null?'':v);}
+  window.showUsageDetail=function(kind){
+    var box=el('usageDetail'); if(!box) return;
+    var title='Usage Details',rows=[];
+    if(kind==='today'){ title='🟢 Active Today'; rows=(usageMonitorData.last24_students||[]).filter(function(x){return x.last_login_at&&new Date(x.last_login_at)>=new Date(new Date().setHours(0,0,0,0));}).map(function(x){return '<tr><td>'+usageEsc(x.student_id)+'</td><td>'+usageEsc(x.name)+'</td><td>'+usageEsc(x.email)+'</td><td>'+usageDate(x.last_login_at)+'</td><td>'+usageDate(x.last_activity_at)+'</td></tr>';}); }
+    if(kind==='last24'){ title='🕐 Last 24 Hours'; rows=(usageMonitorData.last24_students||[]).map(function(x){return '<tr><td>'+usageEsc(x.student_id)+'</td><td>'+usageEsc(x.name)+'</td><td>'+usageEsc(x.email)+'</td><td>'+usageDate(x.last_login_at)+'</td><td>'+usageEsc(x.activity_count)+'</td><td>'+usageDate(x.last_activity_at)+'</td></tr>';}); }
+    if(kind==='practice'){ title='📝 Practice Sessions - Last 24 Hours'; rows=(usageMonitorData.practice_students||[]).map(function(x){return '<tr><td>'+usageEsc(x.student_id)+'</td><td>'+usageEsc(x.name)+'</td><td>'+usageEsc(x.email)+'</td><td>'+usageEsc(x.session_count)+'</td><td>'+usageEsc(x.completed_count)+'</td><td>'+usageDate(x.first_started_at)+'</td><td>'+usageDate(x.last_started_at)+'</td></tr>';}); }
+    if(kind==='mock'){ title='🎯 Mock Tests - Last 24 Hours'; rows=(usageMonitorData.mock_students||[]).map(function(x){return '<tr><td>'+usageEsc(x.student_id)+'</td><td>'+usageEsc(x.name)+'</td><td>'+usageEsc(x.email)+'</td><td>'+usageEsc(x.test_count)+'</td><td>'+usageEsc(x.completed_count)+'</td><td>'+usageDate(x.first_started_at)+'</td><td>'+usageDate(x.last_started_at)+'</td></tr>';}); }
+    var heads=kind==='last24'?'<th>Student ID</th><th>Name</th><th>Email</th><th>Last Login</th><th>Activities</th><th>Last Activity</th>':kind==='practice'?'<th>Student ID</th><th>Name</th><th>Email</th><th>Sessions</th><th>Completed</th><th>First</th><th>Last</th>':kind==='mock'?'<th>Student ID</th><th>Name</th><th>Email</th><th>Tests</th><th>Completed</th><th>First</th><th>Last</th>':'<th>Student ID</th><th>Name</th><th>Email</th><th>Last Login</th><th>Last Activity</th>';
+    box.classList.remove('hidden'); box.style.display='block'; box.innerHTML='<div class="top"><h3>'+title+'</h3><button class="secondary" onclick="document.getElementById(\'usageDetail\').classList.add(\'hidden\')">✕</button></div>'+ (rows.length?'<div style="overflow:auto"><table><tr>'+heads+'</tr>'+rows.join('')+'</table></div>':'<p class="small">இந்த காலப்பகுதியில் activity இல்லை.</p>');
   };
-
   window.refreshOnlineMonitor=async function(){
-    function esc(s){
-      return String(s == null ? '' : s).replace(/[&<>'"]/g,function(c){
-        return {'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c];
-      });
-    }
-    function dt(v){
-      return v ? new Date(v).toLocaleString('en-IN') : '-';
-    }
-    function table(title, headers, rows, emptyText){
-      if(!rows.length) return '<div class="card" style="margin-top:10px"><h4>'+title+'</h4><p class="small">'+emptyText+'</p></div>';
-      var head='<tr>'+headers.map(function(h){return '<th>'+h+'</th>';}).join('')+'</tr>';
-      return '<div class="card" style="margin-top:10px;overflow:auto"><h4>'+title+'</h4><table>'+head+rows.join('')+'</table></div>';
-    }
-
     try{
       var d=await api138('/admin/usage-monitor');
-      if(el('onlineActiveNow')) el('onlineActiveNow').textContent=String(d.active_now ?? 0);
-      if(el('onlineActiveToday')) el('onlineActiveToday').textContent=String(d.active_today ?? 0);
-      if(el('onlineActive24h')) el('onlineActive24h').textContent=String(d.active_24h ?? 0);
-      if(el('onlinePracticeCount')) el('onlinePracticeCount').textContent=String(d.practice_sessions_24h ?? 0);
-      if(el('onlineMockCount')) el('onlineMockCount').textContent=String(d.mock_tests_24h ?? 0);
-
-      var onlineRows=(d.online_students||[]).map(function(x){
-        return '<tr><td>'+esc(x.student_id)+'</td><td>'+esc(x.name)+'</td><td>'+esc(x.email)+'</td><td>'+esc(dt(x.last_login_at))+'</td><td>'+esc(dt(x.session_expires_at))+'</td></tr>';
-      }).join('');
-      if(el('onlineStudentList')) el('onlineStudentList').innerHTML=table(
-        '🟢 தற்போது Online-ல் இருப்பவர்கள் ('+(d.online_students||[]).length+')',
-        ['Student ID','Name','Email','Last Login','Session Valid Until'],
-        onlineRows ? [onlineRows] : [],
-        'தற்போது valid session உள்ள Student இல்லை.'
-      );
-
-      var last24Rows=(d.last24_students||[]).map(function(x){
-        return '<tr><td>'+esc(x.student_id)+'</td><td>'+esc(x.name)+'</td><td>'+esc(x.email)+'</td><td>'+esc(dt(x.last_login_at))+'</td><td>'+esc(String(x.activity_count||0))+'</td><td>'+esc(dt(x.last_activity_at))+'</td></tr>';
-      });
-      if(el('usageLast24Detail')) el('usageLast24Detail').innerHTML=table(
-        '🕐 கடந்த 24 மணி நேரத்தில் பயன்படுத்திய மாணவர்கள் ('+(d.last24_students||[]).length+')',
-        ['Student ID','Name','Email','Last Login','Activity / Attempts','Last Activity'],
-        last24Rows,
-        'கடந்த 24 மணி நேரத்தில் பதிவு செய்யப்பட்ட Student activity இல்லை.'
-      );
-
-      var practiceRows=(d.practice_students||[]).map(function(x){
-        return '<tr><td>'+esc(x.student_id)+'</td><td>'+esc(x.name)+'</td><td>'+esc(x.email)+'</td><td><b>'+esc(String(x.session_count||0))+'</b></td><td>'+esc(String(x.completed_count||0))+'</td><td>'+esc(dt(x.last_started_at))+'</td></tr>';
-      });
-      if(el('usagePracticeDetail')) el('usagePracticeDetail').innerHTML=table(
-        '📝 Practice பயன்படுத்திய மாணவர்கள் ('+(d.practice_students||[]).length+')',
-        ['Student ID','Name','Email','Practice Sessions','Completed','Last Started'],
-        practiceRows,
-        'கடந்த 24 மணி நேரத்தில் Practice Session இல்லை.'
-      );
-
-      var mockRows=(d.mock_students||[]).map(function(x){
-        return '<tr><td>'+esc(x.student_id)+'</td><td>'+esc(x.name)+'</td><td>'+esc(x.email)+'</td><td><b>'+esc(String(x.test_count||0))+'</b></td><td>'+esc(String(x.completed_count||0))+'</td><td>'+esc(dt(x.last_started_at))+'</td></tr>';
-      });
-      if(el('usageMockDetail')) el('usageMockDetail').innerHTML=table(
-        '🎯 Mock Test பயன்படுத்திய மாணவர்கள் ('+(d.mock_students||[]).length+')',
-        ['Student ID','Name','Email','Mock Tests','Completed','Last Started'],
-        mockRows,
-        'கடந்த 24 மணி நேரத்தில் Mock Test இல்லை.'
-      );
-
-      if(el('onlineMonitorMsg')) el('onlineMonitorMsg').textContent=
-        'Usage data updated. Server database is the source of truth. Online count = தற்போது valid login session உள்ள unique students. Practice / Mock விவரங்கள் கடந்த 24 மணி நேரத்தை அடிப்படையாகக் கொண்டவை.';
-    }catch(e){
-      if(el('onlineMonitorMsg')) el('onlineMonitorMsg').textContent='Usage Monitor: '+(e.message||'Data கிடைக்கவில்லை.');
-    }
+      usageMonitorData=d||usageMonitorData;
+      var s=d.summary||{};
+      if(el('onlineActiveToday')) el('onlineActiveToday').textContent=s.active_today??0;
+      if(el('onlineActive24h')) el('onlineActive24h').textContent=s.active_24h??0;
+      if(el('onlinePracticeCount')) el('onlinePracticeCount').textContent=s.practice_sessions_24h??0;
+      if(el('onlineMockCount')) el('onlineMockCount').textContent=s.mock_tests_24h??0;
+      if(el('onlineMonitorMsg')) el('onlineMonitorMsg').textContent='Central server activity data. Passwords are never sent to the browser.';
+      if(el('onlineStudentList')){
+        var rows=(d.online_students||[]).map(function(x){return '<tr><td>'+usageEsc(x.student_id)+'</td><td>'+usageEsc(x.name)+'</td><td>'+usageEsc(x.email)+'</td><td>'+usageDate(x.last_login_at)+'</td><td>'+usageDate(x.expires_at)+'</td></tr>';}).join('');
+        el('onlineStudentList').innerHTML='<h4>🟢 Currently Online ('+(d.online_students||[]).length+')</h4>'+(rows?'<div style="overflow:auto"><table><tr><th>Student ID</th><th>Name</th><th>Email</th><th>Last Login</th><th>Session Expires</th></tr>'+rows+'</table></div>':'<p class="small">Currently online student இல்லை.</p>');
+      }
+    }catch(e){if(el('onlineMonitorMsg'))el('onlineMonitorMsg').textContent='Usage monitor: '+e.message;}
   };
 
   window.submitSuggestion=function(){
@@ -3871,12 +3770,6 @@ window.V91_ADV_NUM=V91_ADV_NUM;
   window.addEventListener('load', function(){
     setTimeout(bootV138, 50);
   });
-  setInterval(function(){
-    var sec=document.getElementById('adminDashboard');
-    if(sec && !sec.classList.contains('hidden') && sec.style.display!=='none'){
-      refreshOnlineMonitor();
-    }
-  },60000);
 
 })();
 </script>
@@ -3946,8 +3839,7 @@ async function submit(){if(P.submitted||!P.attemptId)return;P.submitted=true;sto
  const d=await api()('/attempts/'+P.attemptId+'/submit',{method:'POST',body:JSON.stringify({answers:P.answers})});
  const total=Number(d.total||P.questions.length),correct=Number(d.correct||0),unanswered=Object.values(P.answers).filter(v=>Number(v)===-1).length,wrong=Math.max(0,total-correct-unanswered),score=d.score!=null?Number(d.score):Math.round(correct*100/Math.max(1,total));
  const student=(window.thiralV138User&&window.thiralV138User.name)||'',exam=(typeof selectedExam!=='undefined'&&selectedExam)||'group4';
- if($('resultText'))$('resultText').innerHTML='<p><b>மாணவர் பெயர்:</b> '+esc(student)+'</p><p><b>தேர்வு:</b> '+esc(exam)+'</p><p><b>வகை:</b> Practice</p><p><b>மொத்த கேள்விகள்:</b> '+total+'</p><p><b>சரி:</b> '+correct+'</p><p><b>தவறு:</b> '+wrong+'</p><p><b>விடையளிக்காதது:</b> '+unanswered+'</p><p><b>மதிப்பெண்:</b> '+score+'%</p>';
- localStorage.setItem('tnpsc_last_result',JSON.stringify({student,exam,type:'Practice',total,correct,wrong,unanswered,score:score+'%',date:new Date().toLocaleString('en-IN')}));buildReview();if(typeof show==='function')show('result');if($('practiceReview')){$('practiceReview').classList.remove('hidden','screen-review');$('practiceReview').style.display='block';}window.scrollTo({top:0,behavior:'instant'});
+ if($('resultText'))$('resultText').innerHTML='<p><b>மாணவர் பெயர்:</b> '+esc(student)+'</p><p><b>தேர்வு:</b> '+esc(exam)+'</p><p><b>வகை:</b> Practice</p><p><b>மொத்த கேள்விகள்:</b> '+total+'</p><p><b>சரி:</b> '+correct+'</p><p><b>தவறு:</b> '+wrong+'</p><p><b>விடையளிக்காதது:</b> '+unanswered+'</p><p><b>மதிப்பெண்:</b> '+score+'%</p>';buildReview();if(typeof show==='function')show('result');if($('practiceReview')){$('practiceReview').classList.remove('hidden','screen-review');$('practiceReview').style.display='block';}window.scrollTo({top:0,behavior:'instant'});
  }catch(e){P.submitted=false;if($('feedback'))$('feedback').innerHTML='<b>Result சேமிக்க முடியவில்லை.</b><br>'+esc(e.message);}}
 function buildReview(){const box=$('practiceReview');if(!box)return;box.innerHTML='<h2>📝 Total Review</h2>'+P.questions.map((q,i)=>{const d=P.checks[String(q.id)]||{},o=opts(q),a=P.answers[String(q.id)],ci=Number(d.correct_option),your=Number(a)===-1?'விடையளிக்கவில்லை':(o[Number(a)]||''),right=o[ci]||'',status=Number(a)===-1?'⏱️ விடையளிக்கவில்லை':d.correct===true?'✓ சரி':'✗ தவறு',cls=Number(a)===-1?'warn':d.correct===true?'good':'bad';return '<div class="card" style="box-shadow:none;border:1px solid #e5e7eb;margin:12px 0;padding:15px"><div style="font-weight:800">'+(i+1)+'. '+esc(qtext(q))+'</div><p><b>உங்கள் விடை:</b> '+esc(your)+'</p><p><b>சரியான பதில்:</b> '+esc(right)+'</p><p class="'+cls+'" style="font-size:18px;font-weight:800">'+status+'</p>'+(d.explanation?'<p><b>விளக்கம்:</b> '+esc(d.explanation)+'</p>':'')+'</div>';}).join('');}
 window.buildPracticeReview=buildReview;window.togglePracticeReview=function(){const b=$('practiceReview');if(!b)return;const h=b.classList.contains('hidden')||b.classList.contains('screen-review')||b.style.display==='none';if(h){buildReview();b.classList.remove('hidden','screen-review');b.style.display='block';b.scrollIntoView({behavior:'smooth',block:'start'});}else{b.classList.add('hidden','screen-review');b.style.display='none';}};
@@ -4551,7 +4443,5 @@ window.startPractice=async function(n){
 
   window.__THIRAL_GROUP4_ONLY_FINAL__=true;
 })();
-</script>
-<script id="thiral-forgot-password-otp-v158">
 </script>
 </body></html>
