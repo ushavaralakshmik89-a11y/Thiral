@@ -724,9 +724,9 @@ a{
 </div>
 <div class="card" style="margin-top:16px;border:1px solid #dbeafe">
 <h3>📡 Beta Usage Monitor</h3>
-<p class="small">10 மாணவர்கள் Beta Test பயன்படுத்துகிறார்களா என்பதை central activity data மூலம் பார்க்கும் பகுதி. மாணவர்களின் Password ஒருபோதும் அனுப்பப்படாது.</p>
+<p class="small">Beta Test-ல் தற்போது எத்தனை மாணவர்கள் உள்ளே இருக்கிறார்கள், கடந்த 24 மணி நேர பயன்பாடு மற்றும் Practice/Mock பயன்பாட்டை central activity data மூலம் பார்க்கும் பகுதி. மாணவர்களின் Password ஒருபோதும் அனுப்பப்படாது.</p>
 <div class="grid admin-stat-grid">
-<div class="card admin-stat-card"><h3>🟢 Active Today</h3><p id="onlineActiveToday">-</p></div>
+<div class="card admin-stat-card"><h3>🟢 Currently Online</h3><p id="onlineActiveNow">-</p></div>
 <div class="card admin-stat-card"><h3>🕐 Last 24 Hours</h3><p id="onlineActive24h">-</p></div>
 <div class="card admin-stat-card"><h3>📝 Practice Sessions</h3><p id="onlinePracticeCount">-</p></div>
 <div class="card admin-stat-card"><h3>🎯 Mock Tests</h3><p id="onlineMockCount">-</p></div>
@@ -3000,6 +3000,20 @@ window.V91_ADV_NUM=V91_ADV_NUM;
   }
   window.thiralV138Api = api138;
 
+  var usageHeartbeatTimer=null;
+  async function sendUsageHeartbeat(){
+    try{
+      if(!window.thiralV138User) return;
+      await api138('/auth/heartbeat',{method:'POST',body:'{}'});
+    }catch(e){}
+  }
+  function startUsageHeartbeat(){
+    if(usageHeartbeatTimer) clearInterval(usageHeartbeatTimer);
+    sendUsageHeartbeat();
+    usageHeartbeatTimer=setInterval(sendUsageHeartbeat,60000);
+  }
+  window.__startThiralUsageHeartbeat=startUsageHeartbeat;
+
   function setStudentName(u){
     var name = (u && (u.name || u.email)) || '';
     if(el('studentName')) el('studentName').textContent = name;
@@ -3008,6 +3022,7 @@ window.V91_ADV_NUM=V91_ADV_NUM;
 
   function enterV138(u){
     window.thiralV138User = u;
+    if(window.__startThiralUsageHeartbeat) window.__startThiralUsageHeartbeat();
     setStudentName(u);
     if(typeof selectedExam !== 'undefined'){
       localStorage.setItem('tnpsc_selected_exam', selectedExam || 'group4');
@@ -3029,6 +3044,7 @@ window.V91_ADV_NUM=V91_ADV_NUM;
       var d = await api138('/auth/me');
       window.thiralV138User = d.user || null;
       setStudentName(d.user || null);
+      if(window.thiralV138User && window.__startThiralUsageHeartbeat) window.__startThiralUsageHeartbeat();
     }catch(e){
       window.thiralV138User = null;
       setStudentName(null);
@@ -3050,6 +3066,7 @@ window.V91_ADV_NUM=V91_ADV_NUM;
       if(d.user && d.user.role === 'STUDENT' && d.user.must_change_password === true){
         window.thiralV138User = d.user;
         setStudentName(d.user);
+        if(window.__startThiralUsageHeartbeat) window.__startThiralUsageHeartbeat();
         var tempField = el('currentTempPassword');
         if(tempField) tempField.value = el('pass').value;
         if(el('forcePasswordMsg')) el('forcePasswordMsg').textContent = '';
@@ -3671,6 +3688,7 @@ window.V91_ADV_NUM=V91_ADV_NUM;
   async function loadAdminV138(){
     try{
       var s=await api138('/admin/summary');
+      var usage=await api138('/admin/usage-monitor');
       var d=await api138('/admin/students');
       var students=d.students||[];
 
@@ -3682,6 +3700,11 @@ window.V91_ADV_NUM=V91_ADV_NUM;
       if(el('statThird')) el('statThird').textContent=s.students?.third ?? 0;
       if(el('statLogin')) el('statLogin').textContent=s.students?.lastLogin ?? '-';
       if(el('statSuggestions')) el('statSuggestions').textContent='-';
+      if(el('onlineActiveNow')) el('onlineActiveNow').textContent=String(usage.active_now ?? 0);
+      if(el('onlineActiveToday')) el('onlineActiveToday').textContent=String(usage.active_today ?? 0);
+      if(el('onlineActive24h')) el('onlineActive24h').textContent=String(usage.active_24h ?? 0);
+      if(el('onlinePracticeCount')) el('onlinePracticeCount').textContent=String(usage.practice_sessions_24h ?? 0);
+      if(el('onlineMockCount')) el('onlineMockCount').textContent=String(usage.mock_tests_24h ?? 0);
 
       var body=students.map(function(x){
         var active = x.is_active !== false;
@@ -3789,8 +3812,24 @@ window.V91_ADV_NUM=V91_ADV_NUM;
     if(el('adminStudentDetailModal')){el('adminStudentDetailModal').classList.add('hidden');el('adminStudentDetailModal').style.display='none';}
   };
 
-  window.refreshOnlineMonitor=function(){
-    if(el('onlineMonitorMsg')) el('onlineMonitorMsg').textContent='V138 backend telemetry summary is not exposed by the current API. Passwords are never sent to the browser.';
+  window.refreshOnlineMonitor=async function(){
+    try{
+      var d=await api138('/admin/usage-monitor');
+      if(el('onlineActiveNow')) el('onlineActiveNow').textContent=String(d.active_now ?? 0);
+      if(el('onlineActiveToday')) el('onlineActiveToday').textContent=String(d.active_today ?? 0);
+      if(el('onlineActive24h')) el('onlineActive24h').textContent=String(d.active_24h ?? 0);
+      if(el('onlinePracticeCount')) el('onlinePracticeCount').textContent=String(d.practice_sessions_24h ?? 0);
+      if(el('onlineMockCount')) el('onlineMockCount').textContent=String(d.mock_tests_24h ?? 0);
+      var rows=(d.online_students||[]).map(function(x){
+        return '<tr><td>'+escapeHtml138(x.student_id||'')+'</td><td>'+escapeHtml138(x.name||'')+'</td><td>'+escapeHtml138(x.last_login_at?new Date(x.last_login_at).toLocaleString():'-')+'</td><td>'+escapeHtml138(x.session_expires_at?new Date(x.session_expires_at).toLocaleString():'-')+'</td></tr>';
+      }).join('');
+      if(el('onlineStudentList')) el('onlineStudentList').innerHTML=rows
+        ? '<p class="small">தற்போது valid session உள்ள மாணவர்கள்:</p><table><tr><th>Student ID</th><th>Name</th><th>Last Login</th><th>Session Valid Until</th></tr>'+rows+'</table>'
+        : '<p class="small">தற்போது valid session உள்ள Student இல்லை.</p>';
+      if(el('onlineMonitorMsg')) el('onlineMonitorMsg').textContent='Usage data updated. Active Now = தற்போது valid login session உள்ள unique students.';
+    }catch(e){
+      if(el('onlineMonitorMsg')) el('onlineMonitorMsg').textContent='Usage Monitor: '+(e.message||'Data கிடைக்கவில்லை.');
+    }
   };
 
   window.submitSuggestion=function(){
