@@ -1241,6 +1241,7 @@ api.get('/admin/exam-results/export', requireAdmin, async (req,res)=>{
     const minPct=req.query.min_pct===''||req.query.min_pct===undefined?0:Number(req.query.min_pct);
     const maxPct=req.query.max_pct===''||req.query.max_pct===undefined?100:Number(req.query.max_pct);
     if(!Number.isFinite(minPct)||!Number.isFinite(maxPct)||minPct<0||maxPct>100||minPct>maxPct)return sendError(res,400,'Invalid percentage range.');
+
     const where=[`a.status='SUBMITTED'`],params=[];
     const add=(sql,val)=>{params.push(val);where.push(sql.replace('?', '$'+params.length));};
     if(exam)add(`a.exam=?`,exam);
@@ -1263,18 +1264,70 @@ api.get('/admin/exam-results/export', requireAdmin, async (req,res)=>{
     if(type && ['model','mock','practice','bank','10','20','50'].includes(type)){
       where.push(type==='model'?`lower(a.exam) LIKE '%model%'`:type==='mock'?`a.mode='mock'`:type==='bank'?`a.mode='bank'`:type==='10'?`a.total_count=10`:type==='20'?`a.total_count=20`:type==='50'?`a.total_count=50`:`(a.mode='practice' AND lower(a.exam) NOT LIKE '%model%' AND a.total_count NOT IN (10,20,50))`);
     }
+
     const typeSql=`CASE WHEN lower(a.exam) LIKE '%model%' THEN 'Model Exam' WHEN a.mode='mock' THEN 'Mock Test' WHEN a.mode='bank' THEN 'Question Bank' WHEN a.total_count=10 THEN '10 Questions' WHEN a.total_count=20 THEN '20 Questions' WHEN a.total_count=50 THEN '50 Questions' ELSE 'Practice' END`;
     const q=await pool.query(`SELECT a.id AS attempt_id,u.name,u.email,a.exam,${typeSql} AS exam_type,to_char(COALESCE(a.submitted_at,a.started_at),'DD-MM-YYYY HH24:MI') AS date,COALESCE(a.total_count,0)::int AS questions,COALESCE(a.correct_count,0)::int AS marks,COALESCE(a.total_count,0)::int AS total_marks,COALESCE(a.score,0)::numeric(10,2) AS percentage,COALESCE((SELECT string_agg(DISTINCT qq.subtopic, ' | ' ORDER BY qq.subtopic) FROM unnest(a.question_ids) AS aqid JOIN questions qq ON qq.id=aqid),'') AS subtopics FROM attempts a JOIN users u ON u.id=a.user_id WHERE ${where.join(' AND ')} ORDER BY COALESCE(a.submitted_at,a.started_at) DESC,a.id DESC`,params);
-    const csvCell=v=>{const x=String(v??'');return /[",\n\r]/.test(x)?'"'+x.replace(/"/g,'""')+'"':x;};
-    const header=['Name','Email','Exam','Exam Type','Topic','Subtopics','Date','Questions','Marks','Total Marks','Percentage'];
-    const lines=[header.join(',')].concat(q.rows.map(r=>{
-      const topics=String(r.subtopics||'').split(' | ').map(group4TopicForSubtopic).filter(Boolean);
-      return [r.name,r.email,r.exam,r.exam_type,[...new Set(topics)].join(' | '),r.subtopics,r.date,r.questions,r.marks,r.total_marks,r.percentage].map(csvCell).join(',');
-    }));
-    const filename='thiral_exam_overall_results_'+new Date().toISOString().slice(0,10)+'.csv';
-    res.setHeader('Content-Type','text/csv; charset=utf-16le');
+
+    /*
+       Excel workbook export: use Excel 2003 SpreadsheetML so that every Exam
+       is a separate worksheet/tab. This keeps Tamil text intact and works
+       with older desktop Excel versions too. No npm package is required.
+    */
+    const esc=v=>String(v??'')
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;').replace(/'/g,'&apos;');
+    const cell=(v,type='String')=>`<Cell><Data ss:Type="${type}">${esc(v)}</Data></Cell>`;
+    const headers=['Name','Email','Exam','Exam Type','Topic','Subtopics','Date','Questions','Marks','Total Marks','Percentage'];
+    const topicFromRow=r=>[...new Set(String(r.subtopics||'').split(' | ').map(group4TopicForSubtopic).filter(Boolean))].join(' | ');
+    const rows=q.rows.map(r=>({...r,topic:topicFromRow(r)}));
+
+    const safeSheetName=(name,used)=>{
+      let n=String(name||'Exam').replace(/[\\\/?*\[\]:]/g,' ').trim()||'Exam';
+      n=n.slice(0,31);
+      const base=n; let i=2;
+      while(used.has(n)){ const suffix=` (${i++})`; n=(base.slice(0,31-suffix.length)+suffix); }
+      used.add(n); return n;
+    };
+
+    const sheets=[]; const usedNames=new Set();
+    const groups=new Map();
+    for(const r of rows){ const key=String(r.exam||'Unknown Exam'); if(!groups.has(key))groups.set(key,[]); groups.get(key).push(r); }
+
+    const summaryRows=[
+      ['Exam','Exam Type','Records','Participants','Average %','Highest %','Lowest %'],
+      ...[...groups.entries()].map(([name,rs])=>{
+        const p=new Set(rs.map(x=>String(x.email||x.name||x.attempt_id))).size;
+        const scores=rs.map(x=>Number(x.percentage)||0);
+        const avg=scores.length?scores.reduce((a,b)=>a+b,0)/scores.length:0;
+        const highest=scores.length?Math.max(...scores):0;
+        const lowest=scores.length?Math.min(...scores):0;
+        return [name,rs[0]?.exam_type||'',rs.length,p,avg.toFixed(2),highest.toFixed(2),lowest.toFixed(2)];
+      })
+    ];
+
+    const sheetXml=(name,dataRows)=>{
+      const headerXml=`<Row>${headers.map(h=>cell(h)).join('')}</Row>`;
+      const dataXml=dataRows.map(r=>`<Row>${[
+        r.name,r.email,r.exam,r.exam_type,r.topic,r.subtopics,r.date,r.questions,r.marks,r.total_marks,r.percentage
+      ].map((v,i)=>cell(v,[7,8,9].includes(i)?'Number':'String')).join('')}</Row>`).join('');
+      return `<Worksheet ss:Name="${esc(name)}"><Table>${headerXml}${dataXml}</Table></Worksheet>`;
+    };
+
+    sheets.push(`<Worksheet ss:Name="Summary"><Table>${summaryRows.map((row,ri)=>`<Row>${row.map((v,i)=>cell(v,ri>0&&i>=2?'Number':'String')).join('')}</Row>`).join('')}</Table></Worksheet>`);
+    for(const [examName,rs] of groups.entries()) sheets.push(sheetXml(safeSheetName(examName,usedNames),rs));
+    if(!groups.size) sheets.push(sheetXml(safeSheetName('No Results',usedNames),[]));
+
+    const xml=`<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet" xmlns:html="http://www.w3.org/TR/REC-html40">
+<Styles><Style ss:ID="Default" ss:Name="Normal"><Alignment ss:Vertical="Center"/><Font ss:FontName="Arial" ss:Size="10"/></Style></Styles>
+${sheets.join('\n')}
+</Workbook>`;
+
+    const filename='thiral_exam_overall_results_'+new Date().toISOString().slice(0,10)+'.xml';
+    res.setHeader('Content-Type','application/vnd.ms-excel; charset=utf-8');
     res.setHeader('Content-Disposition',`attachment; filename="${filename}"`);
-    res.send(Buffer.from('\ufeff'+lines.join('\r\n'),'utf16le'));
+    res.send('\ufeff'+xml);
   }catch(e){console.error('[ADMIN EXAM EXPORT]',e);sendError(res,500,'Exam export service error.');}
 });
 
