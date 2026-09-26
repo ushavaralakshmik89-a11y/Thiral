@@ -71,41 +71,50 @@ function sendError(res, status, error) {
    the Tamil UI key or its English label for bilingual rows. Never delete or
    rewrite existing question data: requests simply match both known labels. */
 const SUBJECT_ALIASES = {
-  '???? ?????':'gs','General Knowledge':'gs','general knowledge':'gs',
-  'General Studies':'gs','general studies':'gs',
-  'Aptitude':'apt','aptitude':'apt','?????':'tamil','Tamil':'tamil'
+  'தமிழ்':'tamil','Tamil':'tamil',
+  'பொது அறிவு':'gs','General Knowledge':'gs','general knowledge':'gs',
+  'பொது அறிவு / General Studies':'gs','General Studies':'gs','general studies':'gs',
+  'திறனறிவு / Aptitude':'apt','Aptitude':'apt','aptitude':'apt'
 };
 const GROUP4_SUBTOPIC_ALIASES = {
-  '?????? ???????':'Ancient India','Ancient India':'?????? ???????',
-  '???????? ???????':'Medieval India','Medieval India':'???????? ???????',
-  '???? ???????':'Modern India','Modern India':'???? ???????',
-  '?????????? ?????????':'Indian Freedom Movement','Indian Freedom Movement':'?????????? ?????????',
-  '???? ?????':'Sangam Age','Sangam Age':'???? ?????',
-  '?????':'Cholas','Cholas':'?????','?????????':'Pandyas','Pandyas':'?????????',
-  '???????':'Pallavas','Pallavas':'???????','????????':'Nayaks','Nayaks':'????????',
-  '????????????':'Constitution','Constitution':'????????????',
-  '???????? ????????':'Fundamental Rights','Fundamental Rights':'???????? ????????',
-  '????????????':'Parliament','Parliament':'????????????',
-  '????? ????':'State Government','State Government':'????? ????',
-  '?????????':'Local Government','Local Government':'?????????',
-  '???????':'India','India':'???????','?????????':'Tamil Nadu','Tamil Nadu':'?????????',
-  '??????':'Rivers','Rivers':'??????','??????':'Mountains','Mountains':'??????',
-  '???????':'Resources','Resources':'???????','?????????':'Physics','Physics':'?????????',
-  '?????????':'Chemistry','Chemistry':'?????????','????????':'Biology','Biology':'????????',
-  '?????????????':'Environment','Environment':'?????????????',
-  '???????? ???????????':'Basic Economics','Basic Economics':'???????? ???????????',
-  '?????? ???????????':'Indian Economy','Indian Economy':'?????? ???????????',
-  '????????? ???????????':'Tamil Nadu Economy','Tamil Nadu Economy':'????????? ???????????',
-  '??????':'Numbers','Numbers':'??????','??????????':'Fractions','Fractions':'??????????',
-  '???????':'Percentage','Percentage':'???????','???????':'Ratio','Ratio':'???????',
-  '??????':'Average','Average':'??????','????????':'Area','Area':'????????',
-  '????????':'Perimeter','Perimeter':'????????','??????':'Volume','Volume':'??????',
-  '???????':'Units','Units':'???????','?????? ??????? ??????':'Profit and Loss','Profit and Loss':'?????? ??????? ??????',
-  '?????':'Interest','Interest':'?????','????? ??????? ????':'Time and Work','Time and Work':'????? ??????? ????',
-  '????? ??????? ?????':'Speed and Distance','Speed and Distance':'????? ??????? ?????',
-  '??? ?????':'Number Series','Number Series':'??? ?????','????????? ?????':'Alphabet Series','Alphabet Series':'????????? ?????',
-  '???????':'Analogy','Analogy':'???????','?????????????':'Classification','Classification':'?????????????',
-  '????????':'Coding','Coding':'????????'
+  'பண்டைய இந்தியா':'Ancient India','Ancient India':'பண்டைய இந்தியா',
+  'இடைக்கால இந்தியா':'Medieval India','Medieval India':'இடைக்கால இந்தியா',
+  'நவீன இந்தியா':'Modern India','Modern India':'நவீன இந்தியா',
+  'சுதந்திரப் போராட்டம்':'Indian Freedom Movement','Indian Freedom Movement':'சுதந்திரப் போராட்டம்',
+  'சங்க காலம்':'Sangam Age','Sangam Age':'சங்க காலம்',
+  'சோழர்':'Cholas','Cholas':'சோழர்','பாண்டியர்':'Pandyas','Pandyas':'பாண்டியர்',
+  'பல்லவர்':'Pallavas','Pallavas':'பல்லவர்','நாயக்கர்':'Nayaks','Nayaks':'நாயக்கர்',
+  'அரசியலமைப்பு':'Constitution','Constitution':'அரசியலமைப்பு',
+  'அடிப்படை உரிமைகள்':'Fundamental Rights','Fundamental Rights':'அடிப்படை உரிமைகள்',
+  'பாராளுமன்றம்':'Parliament','Parliament':'பாராளுமன்றம்',
+  'மாநில அரசு':'State Government','State Government':'மாநில அரசு',
+  'உள்ளாட்சி':'Local Government','Local Government':'உள்ளாட்சி',
+  'இந்தியா':'India','India':'இந்தியா','தமிழ்நாடு':'Tamil Nadu','Tamil Nadu':'தமிழ்நாடு',
+  'ஆறுகள்':'Rivers','Rivers':'ஆறுகள்','மலைகள்':'Mountains','Mountains':'மலைகள்','வளங்கள்':'Resources','Resources':'வளங்கள்',
+  'இயற்பியல்':'Physics','Physics':'இயற்பியல்','வேதியியல்':'Chemistry','Chemistry':'வேதியியல்',
+  'உயிரியல்':'Biology','Biology':'உயிரியல்','சுற்றுச்சூழல்':'Environment','Environment':'சுற்றுச்சூழல்',
+  'அடிப்படை பொருளாதாரம்':'Basic Economics','Basic Economics':'அடிப்படை பொருளாதாரம்',
+  'இந்திய பொருளாதாரம்':'Indian Economy','Indian Economy':'இந்திய பொருளாதாரம்',
+  'தமிழ்நாடு பொருளாதாரம்':'Tamil Nadu Economy','Tamil Nadu Economy':'தமிழ்நாடு பொருளாதாரம்',
+  'எண்கள்':'Numbers','Numbers':'எண்கள்','பின்னங்கள்':'Fractions','Fractions':'பின்னங்கள்',
+  'சதவீதம்':'Percentage','Percentage':'சதவீதம்','விகிதம்':'Ratio','Ratio':'விகிதம்','சராசரி':'Average','Average':'சராசரி',
+  'பரப்பளவு':'Area','Area':'பரப்பளவு','சுற்றளவு':'Perimeter','Perimeter':'சுற்றளவு',
+  'கனஅளவு':'Volume','Volume':'கனஅளவு','அலகுகள்':'Units','Units':'அலகுகள்',
+  'இலாபம் மற்றும் நட்டம்':'Profit and Loss','Profit and Loss':'இலாபம் மற்றும் நட்டம்',
+  'வட்டி':'Interest','Interest':'வட்டி','காலம் மற்றும் வேலை':'Time and Work','Time and Work':'காலம் மற்றும் வேலை',
+  'வேகம் மற்றும் தூரம்':'Speed and Distance','Speed and Distance':'வேகம் மற்றும் தூரம்',
+  'எண் தொடர்':'Number Series','Number Series':'எண் தொடர்','எழுத்துத் தொடர்':'Alphabet Series','Alphabet Series':'எழுத்துத் தொடர்',
+  'ஒப்புமை':'Analogy','Analogy':'ஒப்புமை','வகைப்படுத்தல்':'Classification','Classification':'வகைப்படுத்தல்',
+  'குறியீடு':'Coding','Coding':'குறியீடு',
+  'எழுத்து வகைகள்':'Letter Types','Letter Types':'எழுத்து வகைகள்','சொல் வகைகள்':'Word Types','Word Types':'சொல் வகைகள்',
+  'வேற்றுமை':'Cases','Cases':'வேற்றுமை','வினைச்சொல்':'Verb','Verb':'வினைச்சொல்','புணர்ச்சி':'Sandhi','Sandhi':'புணர்ச்சி',
+  'ஒருபொருட்பன்மொழி':'Synonyms','Synonyms':'ஒருபொருட்பன்மொழி','எதிர்ச்சொல்':'Antonyms','Antonyms':'எதிர்ச்சொல்',
+  'இணைச்சொல்':'Related Words','Related Words':'இணைச்சொல்','மரபுத்தொடர்':'Idioms','Idioms':'மரபுத்தொடர்','கலைச்சொல்':'Technical Terms','Technical Terms':'கலைச்சொல்',
+  'சங்க இலக்கியம்':'Sangam Literature','Sangam Literature':'சங்க இலக்கியம்','பதினெண்கீழ்க்கணக்கு':'Pathinenkilkanakku','Pathinenkilkanakku':'பதினெண்கீழ்க்கணக்கு',
+  'காப்பியங்கள்':'Epics','Epics':'காப்பியங்கள்','பக்தி இலக்கியம்':'Bhakti Literature','Bhakti Literature':'பக்தி இலக்கியம்',
+  'நவீன இலக்கியம்':'Modern Literature','Modern Literature':'நவீன இலக்கியம்','அறத்துப்பால்':'Aram','Aram':'அறத்துப்பால்',
+  'பொருட்பால்':'Porul','Porul':'பொருட்பால்','இன்பத்துப்பால்':'Inbam','Inbam':'இன்பத்துப்பால்',
+  'குறள் பொருள்':'Kural Meaning','Kural Meaning':'குறள் பொருள்','குறள் சார்ந்த கருத்துகள்':'Kural Concepts','Kural Concepts':'குறள் சார்ந்த கருத்துகள்'
 };
 function canonicalSubject(raw){ return SUBJECT_ALIASES[String(raw||'').trim()] || String(raw||'').trim(); }
 function subjectCandidates(raw){
@@ -1209,13 +1218,31 @@ api.get('/admin/exam-results', requireAdmin, async (req,res)=>{
     const offset=(page-1)*limit;
     const pageParams=params.slice();
     pageParams.push(limit,offset);
-    const rowsQ=await pool.query(`SELECT u.name,u.email,a.exam,${typeSql} AS exam_type,to_char(COALESCE(a.submitted_at,a.started_at),'DD-MM-YYYY HH24:MI') AS date,COALESCE(a.total_count,0)::int AS questions,COALESCE(a.correct_count,0)::int AS marks,COALESCE(a.total_count,0)::int AS total_marks,COALESCE(a.score,0)::numeric(10,2) AS percentage,COALESCE((SELECT string_agg(DISTINCT qq.subtopic, ' | ' ORDER BY qq.subtopic) FROM unnest(a.question_ids) AS aqid JOIN questions qq ON qq.id=aqid),'') AS subtopics FROM attempts a JOIN users u ON u.id=a.user_id WHERE ${whereSql} ORDER BY COALESCE(a.submitted_at,a.started_at) DESC,a.id DESC LIMIT $${pageParams.length-1} OFFSET $${pageParams.length}`,pageParams);
+    const rowsQ=await pool.query(`SELECT a.id AS attempt_id,u.name,u.email,a.exam,${typeSql} AS exam_type,to_char(COALESCE(a.submitted_at,a.started_at),'DD-MM-YYYY HH24:MI') AS date,COALESCE(a.total_count,0)::int AS questions,COALESCE(a.correct_count,0)::int AS marks,COALESCE(a.total_count,0)::int AS total_marks,COALESCE(a.score,0)::numeric(10,2) AS percentage,COALESCE((SELECT string_agg(DISTINCT qq.subtopic, ' | ' ORDER BY qq.subtopic) FROM unnest(a.question_ids) AS aqid JOIN questions qq ON qq.id=aqid),'') AS subtopics FROM attempts a JOIN users u ON u.id=a.user_id WHERE ${whereSql} ORDER BY COALESCE(a.submitted_at,a.started_at) DESC,a.id DESC LIMIT $${pageParams.length-1} OFFSET $${pageParams.length}`,pageParams);
 
-    const rows=rowsQ.rows;
+    const rows=rowsQ.rows.map(r=>({ ...r, topic:[...new Set(String(r.subtopics||'').split(' | ').map(group4TopicForSubtopic).filter(Boolean))].join(' | ') }));
     const c=countQ.rows[0]||{};
     const examsQ=await pool.query(`SELECT DISTINCT a.exam FROM attempts a WHERE a.status='SUBMITTED' ORDER BY a.exam`);
     res.json({ok:true,rows,total:Number(c.total||0),limit,page,exams:examsQ.rows.map(x=>x.exam).filter(Boolean),summary:{participants:Number(c.participants||0),attempts:Number(c.total||0),total_questions:Number(c.total_questions||0),average_pct:Number(c.average_pct||0),highest_pct:Number(c.highest_pct||0),lowest_pct:Number(c.lowest_pct||0)}});
   }catch(e){console.error('[ADMIN EXAM RESULTS]',e);sendError(res,500,'Exam results service error.');}
+});
+
+api.get('/admin/exam-results/:attemptId', requireAdmin, async (req,res)=>{
+  try{
+    const id=Number(req.params.attemptId);
+    if(!Number.isInteger(id) || id<1) return sendError(res,400,'Invalid attempt ID.');
+    const typeSql=`CASE WHEN lower(a.exam) LIKE '%model%' THEN 'Model Exam' WHEN a.mode='mock' THEN 'Mock Test' WHEN a.mode='bank' THEN 'Question Bank' WHEN a.total_count=10 THEN '10 Questions' WHEN a.total_count=20 THEN '20 Questions' WHEN a.total_count=50 THEN '50 Questions' ELSE 'Practice' END`;
+    const q=await pool.query(`SELECT a.id AS attempt_id,u.name,u.email,a.exam,${typeSql} AS exam_type,to_char(COALESCE(a.submitted_at,a.started_at),'DD-MM-YYYY HH24:MI') AS date,COALESCE(a.total_count,0)::int AS questions,COALESCE(a.correct_count,0)::int AS correct,COALESCE(a.score,0)::numeric(10,2) AS percentage FROM attempts a JOIN users u ON u.id=a.user_id WHERE a.id=$1 AND a.status='SUBMITTED' LIMIT 1`,[id]);
+    if(!q.rowCount) return sendError(res,404,'Result not found.');
+    const r=q.rows[0];
+    const subsQ=await pool.query(`SELECT DISTINCT qq.subtopic FROM unnest((SELECT question_ids FROM attempts WHERE id=$1)) AS aqid JOIN questions qq ON qq.id=aqid WHERE qq.subtopic IS NOT NULL ORDER BY qq.subtopic`,[id]);
+    const subtopics=subsQ.rows.map(x=>x.subtopic).filter(Boolean);
+    const topic=[...new Set(subtopics.map(group4TopicForSubtopic).filter(Boolean))].join(' | ');
+    const eventQ=await pool.query(`SELECT metadata FROM activity_events WHERE event_type='ATTEMPT_SUBMITTED' AND metadata->>'attempt_id'=$1 ORDER BY id DESC LIMIT 1`,[String(id)]);
+    const unanswered=eventQ.rowCount ? Math.max(0,Number(eventQ.rows[0].metadata?.unanswered||0)) : 0;
+    const wrong=Math.max(0,Number(r.questions)-Number(r.correct)-unanswered);
+    res.json({ok:true,result:{...r,wrong,unanswered,topic,subtopics:subtopics.join(' | ')}});
+  }catch(e){console.error('[ADMIN EXAM RESULT DETAIL]',e);sendError(res,500,'Exam result detail service error.');}
 });
 
 api.get('/admin/exam-results/export', requireAdmin, async (req,res)=>{
@@ -1255,7 +1282,7 @@ api.get('/admin/exam-results/export', requireAdmin, async (req,res)=>{
       where.push(type==='model'?`lower(a.exam) LIKE '%model%'`:type==='mock'?`a.mode='mock'`:type==='bank'?`a.mode='bank'`:type==='10'?`a.total_count=10`:type==='20'?`a.total_count=20`:type==='50'?`a.total_count=50`:`(a.mode='practice' AND lower(a.exam) NOT LIKE '%model%' AND a.total_count NOT IN (10,20,50))`);
     }
     const typeSql=`CASE WHEN lower(a.exam) LIKE '%model%' THEN 'Model Exam' WHEN a.mode='mock' THEN 'Mock Test' WHEN a.mode='bank' THEN 'Question Bank' WHEN a.total_count=10 THEN '10 Questions' WHEN a.total_count=20 THEN '20 Questions' WHEN a.total_count=50 THEN '50 Questions' ELSE 'Practice' END`;
-    const q=await pool.query(`SELECT u.name,u.email,a.exam,${typeSql} AS exam_type,to_char(COALESCE(a.submitted_at,a.started_at),'DD-MM-YYYY HH24:MI') AS date,COALESCE(a.total_count,0)::int AS questions,COALESCE(a.correct_count,0)::int AS marks,COALESCE(a.total_count,0)::int AS total_marks,COALESCE(a.score,0)::numeric(10,2) AS percentage,COALESCE((SELECT string_agg(DISTINCT qq.subtopic, ' | ' ORDER BY qq.subtopic) FROM unnest(a.question_ids) AS aqid JOIN questions qq ON qq.id=aqid),'') AS subtopics FROM attempts a JOIN users u ON u.id=a.user_id WHERE ${where.join(' AND ')} ORDER BY COALESCE(a.submitted_at,a.started_at) DESC,a.id DESC`,params);
+    const q=await pool.query(`SELECT a.id AS attempt_id,u.name,u.email,a.exam,${typeSql} AS exam_type,to_char(COALESCE(a.submitted_at,a.started_at),'DD-MM-YYYY HH24:MI') AS date,COALESCE(a.total_count,0)::int AS questions,COALESCE(a.correct_count,0)::int AS marks,COALESCE(a.total_count,0)::int AS total_marks,COALESCE(a.score,0)::numeric(10,2) AS percentage,COALESCE((SELECT string_agg(DISTINCT qq.subtopic, ' | ' ORDER BY qq.subtopic) FROM unnest(a.question_ids) AS aqid JOIN questions qq ON qq.id=aqid),'') AS subtopics FROM attempts a JOIN users u ON u.id=a.user_id WHERE ${where.join(' AND ')} ORDER BY COALESCE(a.submitted_at,a.started_at) DESC,a.id DESC`,params);
     const csvCell=v=>{const x=String(v??'');return /[",\n\r]/.test(x)?'"'+x.replace(/"/g,'""')+'"':x;};
     const header=['Name','Email','Exam','Exam Type','Topic','Subtopics','Date','Questions','Marks','Total Marks','Percentage'];
     const lines=[header.join(',')].concat(q.rows.map(r=>{
@@ -1263,9 +1290,9 @@ api.get('/admin/exam-results/export', requireAdmin, async (req,res)=>{
       return [r.name,r.email,r.exam,r.exam_type,[...new Set(topics)].join(' | '),r.subtopics,r.date,r.questions,r.marks,r.total_marks,r.percentage].map(csvCell).join(',');
     }));
     const filename='thiral_exam_overall_results_'+new Date().toISOString().slice(0,10)+'.csv';
-    res.setHeader('Content-Type','text/csv; charset=utf-8');
+    res.setHeader('Content-Type','text/csv; charset=utf-16le');
     res.setHeader('Content-Disposition',`attachment; filename="${filename}"`);
-    res.send('\ufeff'+lines.join('\r\n'));
+    res.send(Buffer.from('\ufeff'+lines.join('\r\n'),'utf16le'));
   }catch(e){console.error('[ADMIN EXAM EXPORT]',e);sendError(res,500,'Exam export service error.');}
 });
 
