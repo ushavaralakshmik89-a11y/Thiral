@@ -752,6 +752,40 @@ a{
 <h3>👨‍🎓 Registered Students</h3>
 <p class="small">பதிவு செய்த ஒவ்வொரு மாணவரின் பெயர், Email, தொலைபேசி, பாலினம், பிறந்த தேதி, பதிவு நேரம் மற்றும் கடைசி Login நேரம் இங்கே காட்டப்படும். Password மட்டும் Admin-க்கும் காட்டப்படாது.</p>
 <div id="adminStudentList"></div>
+
+<hr>
+<h3>📊 Result History / தேர்வு முடிவு வரலாறு</h3>
+<p class="small">ஒவ்வொரு மாணவரின் Practice, 10/20/50 Questions, Mock Test, Question Bank மற்றும் எதிர்காலத்தில் server மூலம் உருவாக்கப்படும் தேர்வுகளின் submitted history இங்கே central database-லிருந்து பார்க்கலாம். ஒவ்வொரு attempt-மும் தனி record.</p>
+
+<div class="card" style="box-shadow:none;border:1px solid #dbeafe;background:#f8fbff">
+  <h3 style="margin-top:0">🔎 All Student Results</h3>
+  <div class="grid">
+    <div><label>Student ID / மாணவர் ID</label><input id="adminResultStudentFilter" placeholder="உதா: THR-000001"></div>
+    <div><label>Exam / தேர்வு</label><select id="adminResultExamFilter"><option value="">அனைத்து தேர்வுகளும்</option></select></div>
+    <div><label>Test Type / வகை</label>
+      <select id="adminResultModeFilter">
+        <option value="">அனைத்தும்</option>
+        <option value="practice">Practice / 10-20-50 Questions</option>
+        <option value="mock">Mock Test</option>
+        <option value="bank">Question Bank</option>
+      </select>
+    </div>
+    <div><label>From Date</label><input id="adminResultFromFilter" type="date"></div>
+    <div><label>To Date</label><input id="adminResultToFilter" type="date"></div>
+    <div><label>Min %</label><input id="adminResultMinScoreFilter" type="number" min="0" max="100" step="0.01" placeholder="0"></div>
+    <div><label>Max %</label><input id="adminResultMaxScoreFilter" type="number" min="0" max="100" step="0.01" placeholder="100"></div>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button onclick="loadAdminResults(1)">🔎 Search Results</button>
+    <button class="secondary" onclick="clearAdminResultFilters()">Clear</button>
+    <button class="secondary" onclick="exportAdminResults()">📥 Excel Export</button>
+  </div>
+  <p id="adminResultsMsg" class="small"></p>
+  <div id="adminResultsSummary" class="grid" style="margin:12px 0"></div>
+  <div id="adminResultsTable" style="overflow:auto"></div>
+  <div id="adminResultsPager" style="display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;margin-top:14px"></div>
+</div>
+
 <hr>
 <h3>📚 Content Management</h3>
 <p>Subjects → Topics → Subtopics → Study Material → Questions ஆகியவற்றை Admin நிர்வகிக்கும் பகுதி.</p>
@@ -3690,6 +3724,7 @@ window.V91_ADV_NUM=V91_ADV_NUM;
           '<td>'+escapeHtml138(x.last_login_at?new Date(x.last_login_at).toLocaleString():'-')+'</td>'+
           '<td>'+escapeHtml138(statusText)+'</td>'+
           '<td><button class="'+actionClass+'" onclick="toggleStudentStatus(\''+escapeHtml138(x.student_id||'')+'\','+(active?'true':'false')+')">'+actionText+'</button>'+
+          '<button class="secondary" style="margin-left:6px" onclick="viewStudentResults(\''+escapeHtml138(x.student_id||'')+'\')">📊 View Details</button>'+
           (active ? '<button class="secondary" style="margin-left:6px" onclick="setStudentTemporaryPassword(\''+escapeHtml138(x.student_id||'')+'\')">🔑 Set Temporary Password</button>' : '')+
           '</td></tr>';
       }).join('');
@@ -3704,6 +3739,226 @@ window.V91_ADV_NUM=V91_ADV_NUM;
     }
   }
 
+
+  function adminResultQueryParams(){
+    var p=new URLSearchParams();
+    var ids=[
+      ['student_id','adminResultStudentFilter'],
+      ['exam','adminResultExamFilter'],
+      ['mode','adminResultModeFilter'],
+      ['from','adminResultFromFilter'],
+      ['to','adminResultToFilter'],
+      ['min_score','adminResultMinScoreFilter'],
+      ['max_score','adminResultMaxScoreFilter']
+    ];
+    ids.forEach(function(x){
+      var node=el(x[1]), value=node ? String(node.value||'').trim() : '';
+      if(value) p.set(x[0],value);
+    });
+    return p;
+  }
+
+  function adminResultDate(v){
+    return v ? new Date(v).toLocaleString('en-IN') : '-';
+  }
+
+  function adminResultExamLabel(v){
+    if(typeof EXAMS!=='undefined' && EXAMS[v] && EXAMS[v].title) return EXAMS[v].title;
+    return v || '-';
+  }
+
+  function populateAdminResultExamFilter(students){
+    var select=el('adminResultExamFilter');
+    if(!select) return;
+    var current=select.value;
+    var values=[];
+    (students||[]).forEach(function(x){
+      if(x.exam && values.indexOf(x.exam)<0) values.push(x.exam);
+    });
+    /* Existing UI already has the known exam catalogue. Keep future/new
+       exam values too, by adding values returned from the server later. */
+    var known=Object.keys(typeof EXAMS!=='undefined'?EXAMS:{});
+    values=Array.from(new Set(known.concat(values)));
+    select.innerHTML='<option value="">அனைத்து தேர்வுகளும்</option>'+
+      values.map(function(v){
+        return '<option value="'+escapeHtml138(v)+'">'+escapeHtml138(adminResultExamLabel(v))+'</option>';
+      }).join('');
+    if(current && values.indexOf(current)>=0) select.value=current;
+  }
+
+  function clearAdminResultFilters(){
+    ['adminResultStudentFilter','adminResultFromFilter','adminResultToFilter','adminResultMinScoreFilter','adminResultMaxScoreFilter'].forEach(function(id){
+      if(el(id)) el(id).value='';
+    });
+    if(el('adminResultExamFilter')) el('adminResultExamFilter').value='';
+    if(el('adminResultModeFilter')) el('adminResultModeFilter').value='';
+    loadAdminResults(1);
+  }
+
+  async function loadAdminResults(page){
+    page=Math.max(1,Number(page)||1);
+    var msg=el('adminResultsMsg');
+    if(msg) msg.textContent='Result history loading...';
+    try{
+      var p=adminResultQueryParams();
+      p.set('page',String(page));
+      p.set('limit','100');
+      var d=await api138('/admin/results?'+p.toString());
+      window.__thiralAdminResultsPage=d;
+      var rows=d.results||[];
+
+      if(msg) msg.textContent=(d.total||0)+' result records. Page '+d.page+' / '+Math.max(1,d.pages||1)+'.';
+
+      if(el('adminResultsSummary')){
+        el('adminResultsSummary').innerHTML=
+          '<div class="card" style="box-shadow:none"><b>Total Records</b><h3>'+Number(d.total||0).toLocaleString('en-IN')+'</h3></div>'+
+          '<div class="card" style="box-shadow:none"><b>Current Page</b><h3>'+Number(rows.length).toLocaleString('en-IN')+'</h3></div>';
+      }
+
+      var tableRows=rows.map(function(r){
+        return '<tr>'+
+          '<td>'+escapeHtml138(r.student_id||'')+'</td>'+
+          '<td>'+escapeHtml138(r.name||'')+'</td>'+
+          '<td>'+escapeHtml138(adminResultExamLabel(r.exam))+'</td>'+
+          '<td>'+escapeHtml138(r.mode_label||r.mode||'')+'</td>'+
+          '<td>'+escapeHtml138(r.total_count||0)+'</td>'+
+          '<td>'+escapeHtml138(r.correct_count||0)+'</td>'+
+          '<td>'+escapeHtml138(r.wrong_count||0)+'</td>'+
+          '<td>'+escapeHtml138(r.unanswered_count||0)+'</td>'+
+          '<td>'+escapeHtml138(r.score==null?'-':String(r.score)+'%')+'</td>'+
+          '<td>'+escapeHtml138(adminResultDate(r.submitted_at||r.started_at))+'</td>'+
+          '<td><button class="secondary" onclick="viewStudentResults(&quot;'+escapeHtml138(r.student_id||'')+'&quot;)">View</button></td>'+
+          '</tr>';
+      }).join('');
+
+      if(el('adminResultsTable')){
+        el('adminResultsTable').innerHTML=rows ? 
+          '<table><tr><th>Student ID</th><th>Name</th><th>Exam</th><th>Type</th><th>Questions</th><th>Correct / Marks</th><th>Wrong</th><th>Unanswered</th><th>Percentage</th><th>Date</th><th>Action</th></tr>'+tableRows+'</table>'
+          : '<p class="small">இந்த filter-க்கு result இல்லை.</p>';
+      }
+
+      var pages=Math.max(1,Number(d.pages||1));
+      var pager='';
+      if(page>1) pager+='<button class="secondary" onclick="loadAdminResults('+(page-1)+')">← Previous</button>';
+      pager+='<span class="badge">Page '+page+' / '+pages+'</span>';
+      if(page<pages) pager+='<button class="secondary" onclick="loadAdminResults('+(page+1)+')">Next →</button>';
+      if(el('adminResultsPager')) el('adminResultsPager').innerHTML=pager;
+
+    }catch(e){
+      if(msg) msg.textContent=e.message;
+      if(el('adminResultsTable')) el('adminResultsTable').innerHTML='';
+    }
+  }
+
+  window.loadAdminResults=loadAdminResults;
+  window.clearAdminResultFilters=clearAdminResultFilters;
+
+  window.exportAdminResults=async function(){
+    try{
+      var p=adminResultQueryParams();
+      var response=await fetch(V138_API+'/api/admin/results/export?'+p.toString(),{credentials:'include'});
+      if(!response.ok){
+        var err={};
+        try{err=await response.json();}catch(_){}
+        throw new Error(err.error||('HTTP '+response.status));
+      }
+      var blob=await response.blob();
+      var url=URL.createObjectURL(blob);
+      var a=document.createElement('a');
+      a.href=url;
+      a.download='thiral-results.xls';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function(){URL.revokeObjectURL(url);},1000);
+    }catch(e){
+      alert(e.message||'Excel export failed.');
+    }
+  };
+
+  window.viewStudentResults=async function(studentId){
+    try{
+      var d=await api138('/admin/results/student/'+encodeURIComponent(studentId));
+      var st=d.student||{};
+      var sm=d.summary||{};
+      var rows=d.results||[];
+
+      if(el('adminStudentDetailTitle')) el('adminStudentDetailTitle').textContent=
+        '📊 '+(st.name||studentId)+' – Result History';
+
+      var summaryHtml=
+        '<div class="grid">'+
+        '<div class="card" style="box-shadow:none"><b>Student ID</b><h3>'+escapeHtml138(st.student_id||'-')+'</h3></div>'+
+        '<div class="card" style="box-shadow:none"><b>Total Exams / Attempts</b><h3>'+Number(sm.total_exams||0).toLocaleString('en-IN')+'</h3></div>'+
+        '<div class="card" style="box-shadow:none"><b>Total Questions</b><h3>'+Number(sm.total_questions||0).toLocaleString('en-IN')+'</h3></div>'+
+        '<div class="card" style="box-shadow:none"><b>Average %</b><h3>'+escapeHtml138(sm.average_percentage||0)+'%</h3></div>'+
+        '<div class="card" style="box-shadow:none"><b>Best Score</b><h3>'+escapeHtml138(sm.best_score||0)+'%</h3></div>'+
+        '<div class="card" style="box-shadow:none"><b>Marks</b><h3>'+Number(sm.marks_obtained||0)+' / '+Number(sm.total_marks||0)+'</h3></div>'+
+        '</div>';
+
+      var tableRows=rows.map(function(r){
+        return '<tr>'+
+          '<td>'+escapeHtml138(adminResultDate(r.submitted_at||r.started_at))+'</td>'+
+          '<td>'+escapeHtml138(adminResultExamLabel(r.exam))+'</td>'+
+          '<td>'+escapeHtml138(r.mode_label||r.mode||'')+'</td>'+
+          '<td>'+escapeHtml138(r.total_count||0)+'</td>'+
+          '<td>'+escapeHtml138(r.correct_count||0)+'</td>'+
+          '<td>'+escapeHtml138(r.wrong_count||0)+'</td>'+
+          '<td>'+escapeHtml138(r.unanswered_count||0)+'</td>'+
+          '<td>'+escapeHtml138(r.score==null?'-':String(r.score)+'%')+'</td>'+
+          '</tr>';
+      }).join('');
+
+      var body=summaryHtml+
+        '<p><b>Name:</b> '+escapeHtml138(st.name||'-')+' &nbsp; <b>Email:</b> '+escapeHtml138(st.email||'-')+'</p>'+
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0">'+
+        '<button onclick="exportSingleStudentResults(&quot;'+escapeHtml138(st.student_id||'')+'&quot;)">📥 Excel Export – இந்த மாணவர்</button>'+
+        '</div>'+
+        (tableRows ?
+          '<div style="overflow:auto"><table><tr><th>Date</th><th>Exam</th><th>Type</th><th>Questions</th><th>Marks</th><th>Wrong</th><th>Unanswered</th><th>Percentage</th></tr>'+tableRows+'</table></div>'
+          : '<p class="small">இந்த மாணவருக்கு submitted result history இல்லை.</p>');
+
+      if(el('adminStudentDetailBody')) el('adminStudentDetailBody').innerHTML=body;
+      if(el('adminStudentDetailModal')){
+        el('adminStudentDetailModal').classList.remove('hidden');
+        el('adminStudentDetailModal').style.display='flex';
+      }
+    }catch(e){
+      alert(e.message||'Student result history load failed.');
+    }
+  };
+
+  window.exportSingleStudentResults=async function(studentId){
+    try{
+      var p=new URLSearchParams();
+      p.set('student_id',studentId);
+      var response=await fetch(V138_API+'/api/admin/results/export?'+p.toString(),{credentials:'include'});
+      if(!response.ok){
+        var err={}; try{err=await response.json();}catch(_){}
+        throw new Error(err.error||('HTTP '+response.status));
+      }
+      var blob=await response.blob();
+      var url=URL.createObjectURL(blob);
+      var a=document.createElement('a');
+      a.href=url;
+      a.download='thiral-'+studentId+'-results.xls';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function(){URL.revokeObjectURL(url);},1000);
+    }catch(e){
+      alert(e.message||'Excel export failed.');
+    }
+  };
+
+  window.admin = loadAdminV138;
+  /* Result history is loaded only inside the Admin dashboard. */
+  var __thiralAdminOriginalLoad=loadAdminV138;
+  loadAdminV138 = (async function(){
+    var out=await __thiralAdminOriginalLoad.apply(this,arguments);
+    try{ populateAdminResultExamFilter(window.thiralV138Students||[]); await loadAdminResults(1); }catch(e){ console.warn('Admin results load:',e); }
+    return out;
+  });
   window.admin = loadAdminV138;
   window.openAdminStudentView = async function(filter){
     await loadAdminV138();
