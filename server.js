@@ -36,7 +36,7 @@ app.use((req, res, next) => {
 });
 
 const PORT = process.env.PORT || 10000;
-const THIRAL_SECURITY_VERSION = 'V166';
+const THIRAL_SECURITY_VERSION = 'V167';
 const isProd = process.env.NODE_ENV === 'production';
 
 if (!process.env.DATABASE_URL) {
@@ -222,9 +222,9 @@ async function ensureAdmin() {
 app.get('/health', async (req, res) => {
   try {
     await pool.query('SELECT 1');
-    res.json({ ok: true, service: 'Thiral V162 Secure OTP', database: 'ok', time: new Date().toISOString() });
+    res.json({ ok: true, service: 'Thiral V167 Secure Temporary Password', database: 'ok', time: new Date().toISOString() });
   } catch (e) {
-    res.status(503).json({ ok: false, service: 'Thiral V162 Secure OTP', database: 'error' });
+    res.status(503).json({ ok: false, service: 'Thiral V167 Secure Temporary Password', database: 'error' });
   }
 });
 
@@ -813,6 +813,21 @@ api.patch('/admin/students/:studentId/password', requireAdmin, async (req,res)=>
   }
 });
 
+api.post('/auth/heartbeat', requireAuth, async (req,res)=>{
+  try{
+    const sid = req.cookies?.thiral_session;
+    if(!sid) return sendError(res,401,'Login required.');
+    await pool.query(
+      `UPDATE sessions SET expires_at=now()+interval '30 minutes' WHERE id=$1`,
+      [sid]
+    );
+    res.json({ok:true,expires_at:new Date(Date.now()+30*60*1000).toISOString()});
+  }catch(e){
+    console.error('[HEARTBEAT] error:',e);
+    sendError(res,500,'Session heartbeat service error.');
+  }
+});
+
 api.post('/auth/logout', async (req, res) => {
   try {
     const sid = req.cookies?.thiral_session;
@@ -1112,6 +1127,71 @@ api.get('/results', requirePasswordReady, async (req,res)=>{
   }catch(e){console.error(e);sendError(res,500,'Results service error.');}
 });
 
+api.get('/admin/usage-monitor', requireAdmin, async (req,res)=>{
+  try{
+    const q = await pool.query(`
+      SELECT
+        (SELECT count(DISTINCT s.user_id)::int
+           FROM sessions s
+           JOIN users u ON u.id=s.user_id
+          WHERE s.expires_at > now()
+            AND u.role='STUDENT'
+            AND u.is_active=true) AS active_now,
+        (SELECT count(*)::int
+           FROM users u
+          WHERE u.role='STUDENT'
+            AND u.is_active=true
+            AND u.last_login_at >= current_date) AS active_today,
+        (SELECT count(*)::int
+           FROM users u
+          WHERE u.role='STUDENT'
+            AND u.is_active=true
+            AND u.last_login_at >= now()-interval '24 hours') AS active_24h,
+        (SELECT count(*)::int
+           FROM attempts a
+           JOIN users u ON u.id=a.user_id
+          WHERE u.role='STUDENT'
+            AND a.mode='practice'
+            AND a.started_at >= now()-interval '24 hours') AS practice_sessions_24h,
+        (SELECT count(*)::int
+           FROM attempts a
+           JOIN users u ON u.id=a.user_id
+          WHERE u.role='STUDENT'
+            AND a.mode='mock'
+            AND a.started_at >= now()-interval '24 hours') AS mock_tests_24h
+    `);
+
+    const students = await pool.query(`
+      SELECT DISTINCT ON (u.id)
+        u.student_id,u.name,u.last_login_at,s.expires_at
+      FROM sessions s
+      JOIN users u ON u.id=s.user_id
+      WHERE s.expires_at > now()
+        AND u.role='STUDENT'
+        AND u.is_active=true
+      ORDER BY u.id,s.expires_at DESC
+    `);
+
+    res.json({
+      ok:true,
+      active_now:Number(q.rows[0]?.active_now||0),
+      active_today:Number(q.rows[0]?.active_today||0),
+      active_24h:Number(q.rows[0]?.active_24h||0),
+      practice_sessions_24h:Number(q.rows[0]?.practice_sessions_24h||0),
+      mock_tests_24h:Number(q.rows[0]?.mock_tests_24h||0),
+      online_students:students.rows.map(x=>({
+        student_id:x.student_id,
+        name:x.name,
+        last_login_at:x.last_login_at,
+        session_expires_at:x.expires_at
+      }))
+    });
+  }catch(e){
+    console.error('[ADMIN USAGE] error:',e);
+    sendError(res,500,'Usage monitor service error.');
+  }
+});
+
 api.get('/admin/summary', requireAdmin, async (req,res)=>{
   try{
     const q=await pool.query(`SELECT
@@ -1315,7 +1395,7 @@ async function start(){
     await ensurePasswordResetTables();
     await ensureQuestionHistory();
     await ensureAdmin();
-    app.listen(PORT,'0.0.0.0',()=>console.log(`Thiral V166 Secure Temporary Password listening on port ${PORT}`));
+    app.listen(PORT,'0.0.0.0',()=>console.log(`Thiral V167 Secure Temporary Password + Usage Monitor listening on port ${PORT}`));
   }catch(e){
     console.error('Startup failed:',e);
     process.exit(1);
