@@ -14,6 +14,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
 app.set('trust proxy', 1);
+app.disable('x-powered-by');
 
 // CORS for the separate Render Static Site (student website).
 // Credentials are required because student login uses an httpOnly session cookie.
@@ -36,7 +37,7 @@ app.use((req, res, next) => {
 });
 
 const PORT = process.env.PORT || 10000;
-const THIRAL_SECURITY_VERSION = 'V171';
+const THIRAL_SECURITY_VERSION = 'V180_SECURITY_HARDENED';
 const isProd = process.env.NODE_ENV === 'production';
 
 if (!process.env.DATABASE_URL) {
@@ -53,14 +54,31 @@ const pool = new Pool({
 
 app.use(helmet({
   contentSecurityPolicy: false,
-  crossOriginEmbedderPolicy: false
+  crossOriginEmbedderPolicy: false,
+  frameguard: { action: 'deny' },
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  noSniff: true,
+  hsts: isProd ? { maxAge: 31536000, includeSubDomains: true, preload: false } : false
 }));
 app.use(compression());
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
 
-const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false });
-const apiLimiter = rateLimit({ windowMs: 60 * 1000, max: 180, standardHeaders: true, legacyHeaders: false });
+/* CSRF/origin guard for browser state-changing requests. The UI is hosted on
+   the exact origin below. Same-origin/server-to-server requests without an
+   Origin header are still allowed. */
+app.use((req,res,next)=>{
+  if(['POST','PUT','PATCH','DELETE'].includes(req.method)) {
+    const origin=String(req.headers.origin||'').trim();
+    if(origin && !allowedOrigins.has(origin)) {
+      return sendError(res,403,'ACCESS DENIED: Untrusted request origin.');
+    }
+  }
+  next();
+});
+
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 12, standardHeaders: true, legacyHeaders: false, skipSuccessfulRequests: false });
+const apiLimiter = rateLimit({ windowMs: 60 * 1000, max: 120, standardHeaders: true, legacyHeaders: false });
 
 function sendError(res, status, error) {
   return res.status(status).json({ error });
@@ -68,8 +86,7 @@ function sendError(res, status, error) {
 
 
 function clientIp(req){
-  const xf=String(req.headers['x-forwarded-for']||'').split(',')[0].trim();
-  return xf || String(req.ip||'').trim() || 'unknown';
+  return String(req.ip||'').trim() || 'unknown';
 }
 
 function clientUserAgent(req){
@@ -188,14 +205,14 @@ function setSessionCookie(res, id) {
   res.cookie('thiral_session', id, {
     httpOnly: true,
     secure: isProd,
-    sameSite: 'lax',
-    maxAge: 30 * 60 * 1000,
+    sameSite: 'strict',
+    maxAge: 20 * 60 * 1000,
     path: '/'
   });
 }
 
 function clearSessionCookie(res) {
-  res.clearCookie('thiral_session', { httpOnly: true, secure: isProd, sameSite: 'lax', path: '/' });
+  res.clearCookie('thiral_session', { httpOnly: true, secure: isProd, sameSite: 'strict', path: '/' });
 }
 
 async function getUserFromSession(req) {
@@ -297,11 +314,26 @@ api.get('/auth/me', async (req, res) => {
   } catch (e) { sendError(res, 500, 'Authentication service error.'); }
 });
 
+async function isLoginTemporarilyBlocked(email, ip){
+  const q=await pool.query(`
+    SELECT count(*)::int AS n
+    FROM security_events
+    WHERE event_type='FAILED_LOGIN'
+      AND created_at>=now()-interval '15 minutes'
+      AND (lower(coalesce(email,''))=lower($1) OR ip=$2)`,[email,ip]);
+  return Number(q.rows[0]?.n||0) >= 8;
+}
+
 api.post('/auth/login', authLimiter, async (req, res) => {
   try {
     const email = String(req.body?.email || '').trim().toLowerCase();
     const password = String(req.body?.password || '');
     if (!email || !password) return sendError(res, 400, 'ID/email and password are required.');
+    const loginIp=clientIp(req);
+    if(await isLoginTemporarilyBlocked(email,loginIp)){
+      await logSecurityEvent({req,eventType:'LOGIN_BLOCKED',email,details:'Temporary login block after repeated failed attempts',sendAlert:true});
+      return sendError(res,429,'Too many failed login attempts. Please try again later.');
+    }
     const q = await pool.query(
       `SELECT id,student_id,name,email,password_hash,phone,dob,gender,role,is_active,must_change_password FROM users WHERE lower(email)=lower($1) LIMIT 1`, [email]
     );
@@ -1707,8 +1739,17 @@ api.get('/group4/question-status', requirePasswordReady, async (req,res)=>{
 app.use('/api/admin', async (req, res, next) => {
   try {
     const user = await getUserFromSession(req);
-    if (!user) return sendError(res, 401, 'ACCESS DENIED: Login required.');
-    if (user.role !== 'ADMIN') return sendError(res, 403, 'ACCESS DENIED: Admin authorization required.');
+    if (!user) {
+      const ip=clientIp(req);
+      const recent=await pool.query(`SELECT count(*)::int AS n FROM security_events WHERE event_type='UNAUTHORIZED_ADMIN_ACCESS' AND ip=$1 AND created_at>=now()-interval '15 minutes'`,[ip]);
+      const alert=Number(recent.rows[0]?.n||0)===0;
+      await logSecurityEvent({req,eventType:'UNAUTHORIZED_ADMIN_ACCESS',details:`Blocked ${req.method} ${req.originalUrl}`,sendAlert:alert});
+      return sendError(res, 401, 'ACCESS DENIED: Login required.');
+    }
+    if (user.role !== 'ADMIN') {
+      await logSecurityEvent({req,eventType:'UNAUTHORIZED_ADMIN_ACCESS',userId:user.id,email:user.email,details:`Non-admin user attempted ${req.method} ${req.originalUrl}`,sendAlert:true});
+      return sendError(res, 403, 'ACCESS DENIED: Admin authorization required.');
+    }
     req.user = user;
     next();
   } catch (e) {
@@ -1743,6 +1784,7 @@ async function ensureSecurityEventsTable(){
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_security_events_created ON security_events(created_at DESC)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_security_events_type ON security_events(event_type,created_at DESC)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_security_events_ip_created ON security_events(ip,created_at DESC)`);
 }
 
 async function ensureMustChangePasswordColumn(){
