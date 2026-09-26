@@ -510,10 +510,10 @@ api.post('/auth/forgot-password/request', authLimiter, async (req,res)=>{
 
     const ins = await pool.query(
       `INSERT INTO password_reset_otps
-       (user_id,otp_hash,expires_at,attempts,used_at)
-       VALUES($1,$2,now()+interval '10 minutes',0,NULL)
+       (user_id,email,otp_hash,expires_at,attempts,used_at)
+       VALUES($1,$2,$3,now()+interval '10 minutes',0,NULL)
        RETURNING id`,
-      [user.id,otpHash]
+      [user.id,user.email,otpHash]
     );
 
     try{
@@ -1121,6 +1121,7 @@ async function ensurePasswordResetTables() {
     CREATE TABLE IF NOT EXISTS password_reset_otps (
       id BIGSERIAL PRIMARY KEY,
       user_id BIGINT NOT NULL,
+      email TEXT NOT NULL,
       otp_hash TEXT NOT NULL,
       expires_at TIMESTAMPTZ NOT NULL,
       attempts INTEGER NOT NULL DEFAULT 0,
@@ -1129,6 +1130,11 @@ async function ensurePasswordResetTables() {
       reset_token_hash TEXT NULL,
       used_at TIMESTAMPTZ NULL
     )
+  `);
+
+  await pool.query(`
+    ALTER TABLE password_reset_otps
+    ADD COLUMN IF NOT EXISTS email TEXT
   `);
 
   await pool.query(`
@@ -1172,7 +1178,7 @@ async function start(){
     await ensurePasswordResetTables();
     await ensureQuestionHistory();
     await ensureAdmin();
-    app.listen(PORT,'0.0.0.0',()=>console.log(`Thiral V162 Secure OTP listening on port ${PORT}`));
+    app.listen(PORT,'0.0.0.0',()=>console.log(`Thiral V165 Secure OTP listening on port ${PORT}`));
   }catch(e){
     console.error('Startup failed:',e);
     process.exit(1);
