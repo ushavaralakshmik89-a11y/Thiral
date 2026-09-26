@@ -146,7 +146,7 @@ async function getUserFromSession(req) {
   const sid = req.cookies?.thiral_session;
   if (!sid) return null;
   const q = await pool.query(
-    `SELECT u.id,u.student_id,u.name,u.email,u.phone,u.dob,u.gender,u.role,u.is_active,s.expires_at
+    `SELECT u.id,u.student_id,u.name,u.email,u.phone,u.dob,u.gender,u.role,u.is_active,u.must_change_password,s.expires_at
      FROM sessions s JOIN users u ON u.id=s.user_id
      WHERE s.id=$1 AND s.expires_at > now() AND u.is_active=true`, [sid]
   );
@@ -213,9 +213,9 @@ async function ensureAdmin() {
 app.get('/health', async (req, res) => {
   try {
     await pool.query('SELECT 1');
-    res.json({ ok: true, service: 'Thiral V166 Secure OTP', database: 'ok', time: new Date().toISOString() });
+    res.json({ ok: true, service: 'Thiral V162 Secure OTP', database: 'ok', time: new Date().toISOString() });
   } catch (e) {
-    res.status(503).json({ ok: false, service: 'Thiral V166 Secure OTP', database: 'error' });
+    res.status(503).json({ ok: false, service: 'Thiral V162 Secure OTP', database: 'error' });
   }
 });
 
@@ -235,7 +235,7 @@ api.post('/auth/login', authLimiter, async (req, res) => {
     const password = String(req.body?.password || '');
     if (!email || !password) return sendError(res, 400, 'ID/email and password are required.');
     const q = await pool.query(
-      `SELECT id,student_id,name,email,password_hash,phone,dob,gender,role,is_active FROM users WHERE lower(email)=lower($1) LIMIT 1`, [email]
+      `SELECT id,student_id,name,email,password_hash,phone,dob,gender,role,is_active,must_change_password FROM users WHERE lower(email)=lower($1) LIMIT 1`, [email]
     );
     const u = q.rows[0];
     if (!u || !u.is_active) return sendError(res, 401, 'Invalid ID/email or password.');
@@ -645,21 +645,14 @@ api.post('/auth/forgot-password/reset', authLimiter, async (req,res)=>{
 
     const passwordHash = await argon2.hash(newPassword);
 
-    /*
-      Use one dedicated PostgreSQL client for the password-reset transaction.
-      This preserves all existing data and makes the password update,
-      OTP invalidation, session invalidation and audit event atomic.
-    */
-    const client = await pool.connect();
+    await pool.query('BEGIN');
     try{
-      await client.query('BEGIN');
-
-      await client.query(
+      await pool.query(
         `UPDATE users SET password_hash=$1 WHERE id=$2`,
         [passwordHash,row.user_id]
       );
 
-      await client.query(
+      await pool.query(
         `UPDATE password_reset_otps
          SET used_at=now(),reset_token_hash=NULL
          WHERE id=$1`,
@@ -667,23 +660,21 @@ api.post('/auth/forgot-password/reset', authLimiter, async (req,res)=>{
       );
 
       /* Password reset invalidates all existing sessions for this student. */
-      await client.query(
+      await pool.query(
         `DELETE FROM sessions WHERE user_id=$1`,
         [row.user_id]
       );
 
-      await client.query(
+      await pool.query(
         `INSERT INTO activity_events(user_id,event_type,metadata)
          VALUES($1,'PASSWORD_RESET',$2)`,
         [row.user_id,JSON.stringify({method:'OTP'})]
       );
 
-      await client.query('COMMIT');
+      await pool.query('COMMIT');
     }catch(e){
-      try{ await client.query('ROLLBACK'); }catch(_){}
+      await pool.query('ROLLBACK');
       throw e;
-    }finally{
-      client.release();
     }
 
     return res.json({ok:true,message:'Password reset successfully.'});
@@ -693,6 +684,138 @@ api.post('/auth/forgot-password/reset', authLimiter, async (req,res)=>{
   }
 });
 
+
+
+api.post('/auth/change-password', requireAuth, async (req,res)=>{
+  try{
+    if(req.user.role !== 'STUDENT'){
+      return sendError(res,403,'Only student accounts can change this password.');
+    }
+
+    const currentPassword = String(req.body?.current_password || '');
+    const newPassword = String(req.body?.new_password || '');
+    const confirmPassword = String(req.body?.confirm_password || '');
+
+    if(!currentPassword || !newPassword || !confirmPassword){
+      return sendError(res,400,'Current password, new password and confirm password are required.');
+    }
+
+    if(newPassword.length < 8){
+      return sendError(res,400,'New Password must be at least 8 characters.');
+    }
+
+    if(newPassword !== confirmPassword){
+      return sendError(res,400,'New Password and Confirm Password must match.');
+    }
+
+    if(newPassword === currentPassword){
+      return sendError(res,400,'New Password must be different from the temporary password.');
+    }
+
+    const q = await pool.query(
+      `SELECT id,password_hash,must_change_password,is_active,role
+       FROM users WHERE id=$1 LIMIT 1`,
+      [req.user.id]
+    );
+
+    if(!q.rowCount || !q.rows[0].is_active || q.rows[0].role !== 'STUDENT'){
+      return sendError(res,401,'Invalid password change request.');
+    }
+
+    const validCurrent = await argon2.verify(q.rows[0].password_hash,currentPassword);
+    if(!validCurrent){
+      return sendError(res,401,'Current password is incorrect.');
+    }
+
+    const passwordHash = await argon2.hash(newPassword);
+
+    await pool.query(
+      `UPDATE users
+       SET password_hash=$1,must_change_password=false
+       WHERE id=$2`,
+      [passwordHash,req.user.id]
+    );
+
+    await pool.query(
+      `INSERT INTO activity_events(user_id,event_type,metadata)
+       VALUES($1,'PASSWORD_CHANGED',$2)`,
+      [req.user.id,JSON.stringify({method:'FORCED_FIRST_LOGIN'})]
+    );
+
+    return res.json({ok:true,message:'Password changed successfully.'});
+  }catch(e){
+    console.error('[PASSWORD] Change error:',e);
+    return sendError(res,500,'Password change service error.');
+  }
+});
+
+api.patch('/admin/students/:studentId/password', requireAdmin, async (req,res)=>{
+  const client = await pool.connect();
+  try{
+    const studentId = String(req.params.studentId || '').trim();
+    const temporaryPassword = String(req.body?.temporary_password || '');
+
+    if(!studentId || temporaryPassword.length < 8){
+      return sendError(res,400,'Student ID and a temporary password of at least 8 characters are required.');
+    }
+
+    await client.query('BEGIN');
+
+    const q = await client.query(
+      `SELECT id,student_id,role,is_active
+       FROM users WHERE student_id=$1 LIMIT 1 FOR UPDATE`,
+      [studentId]
+    );
+
+    if(!q.rowCount){
+      await client.query('ROLLBACK');
+      return sendError(res,404,'Student not found.');
+    }
+
+    const target = q.rows[0];
+    if(target.role !== 'STUDENT'){
+      await client.query('ROLLBACK');
+      return sendError(res,400,'Only STUDENT accounts can be changed here.');
+    }
+    if(!target.is_active){
+      await client.query('ROLLBACK');
+      return sendError(res,400,'Student account is inactive. Reactivate it before setting a temporary password.');
+    }
+
+    const passwordHash = await argon2.hash(temporaryPassword);
+
+    await client.query(
+      `UPDATE users
+       SET password_hash=$1,must_change_password=true
+       WHERE id=$2`,
+      [passwordHash,target.id]
+    );
+
+    /* Force every old session to re-login with the temporary password. */
+    await client.query(`DELETE FROM sessions WHERE user_id=$1`,[target.id]);
+
+    await client.query(
+      `INSERT INTO activity_events(user_id,event_type,metadata)
+       VALUES($1,'TEMP_PASSWORD_SET',$2)`,
+      [req.user.id,JSON.stringify({target_student_id:target.student_id})]
+    );
+
+    await client.query('COMMIT');
+
+    return res.json({
+      ok:true,
+      student_id:target.student_id,
+      must_change_password:true,
+      message:'Temporary password set. Student must change it at next login.'
+    });
+  }catch(e){
+    try{ await client.query('ROLLBACK'); }catch(_){}
+    console.error('[ADMIN] Temporary password error:',e);
+    return sendError(res,500,'Temporary password service error.');
+  }finally{
+    client.release();
+  }
+});
 
 api.post('/auth/logout', async (req, res) => {
   try {
@@ -1125,6 +1248,14 @@ app.get('/{*splat}', (req,res)=>{
 
 /* Create the history table/index without touching existing question data. */
 
+
+async function ensureMustChangePasswordColumn(){
+  await pool.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT false
+  `);
+}
+
 async function ensurePasswordResetTables() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS password_reset_otps (
@@ -1184,10 +1315,11 @@ async function ensureQuestionHistory() {
 async function start(){
   try{
     await pool.query('SELECT 1');
+    await ensureMustChangePasswordColumn();
     await ensurePasswordResetTables();
     await ensureQuestionHistory();
     await ensureAdmin();
-    app.listen(PORT,'0.0.0.0',()=>console.log(`Thiral V165 Secure OTP listening on port ${PORT}`));
+    app.listen(PORT,'0.0.0.0',()=>console.log(`Thiral V166 Secure Temporary Password listening on port ${PORT}`));
   }catch(e){
     console.error('Startup failed:',e);
     process.exit(1);
