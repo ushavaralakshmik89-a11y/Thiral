@@ -172,6 +172,15 @@ async function requireAdmin(req, res, next) {
   });
 }
 
+async function requirePasswordReady(req, res, next) {
+  await requireAuth(req, res, () => {
+    if (req.user.role === 'STUDENT' && req.user.must_change_password === true) {
+      return sendError(res, 403, 'PASSWORD_CHANGE_REQUIRED');
+    }
+    next();
+  });
+}
+
 async function ensureAdmin() {
   const adminId = (process.env.ADMIN_ID || '').trim();
   const adminPassword = process.env.ADMIN_PASSWORD || '';
@@ -183,7 +192,7 @@ async function ensureAdmin() {
   const existing = await pool.query('SELECT id FROM users WHERE email=$1 LIMIT 1', [adminId]);
   if (existing.rowCount) {
     await pool.query(
-      `UPDATE users SET role='ADMIN', is_active=true, password_hash=$1, email=$2 WHERE id=$3`,
+      `UPDATE users SET role='ADMIN', is_active=true, must_change_password=false, password_hash=$1, email=$2 WHERE id=$3`,
       [hash, adminId, existing.rows[0].id]
     );
     console.log(`Admin account ready: ${adminId}`);
@@ -201,8 +210,8 @@ async function ensureAdmin() {
     }
 
     await pool.query(
-      `INSERT INTO users(student_id,name,email,password_hash,role,is_active)
-       VALUES($1,$2,$3,$4,'ADMIN',true)`,
+      `INSERT INTO users(student_id,name,email,password_hash,role,is_active,must_change_password)
+       VALUES($1,$2,$3,$4,'ADMIN',true,false)`,
       [studentId, 'Thiral Administrator', adminId, hash]
     );
 
@@ -687,6 +696,7 @@ api.post('/auth/forgot-password/reset', authLimiter, async (req,res)=>{
 
 
 api.post('/auth/change-password', requireAuth, async (req,res)=>{
+  const client = await pool.connect();
   try{
     if(req.user.role !== 'STUDENT'){
       return sendError(res,403,'Only student accounts can change this password.');
@@ -699,22 +709,19 @@ api.post('/auth/change-password', requireAuth, async (req,res)=>{
     if(!currentPassword || !newPassword || !confirmPassword){
       return sendError(res,400,'Current password, new password and confirm password are required.');
     }
-
     if(newPassword.length < 8){
       return sendError(res,400,'New Password must be at least 8 characters.');
     }
-
     if(newPassword !== confirmPassword){
       return sendError(res,400,'New Password and Confirm Password must match.');
     }
-
     if(newPassword === currentPassword){
       return sendError(res,400,'New Password must be different from the temporary password.');
     }
 
-    const q = await pool.query(
+    const q = await client.query(
       `SELECT id,password_hash,must_change_password,is_active,role
-       FROM users WHERE id=$1 LIMIT 1`,
+       FROM users WHERE id=$1 LIMIT 1 FOR UPDATE`,
       [req.user.id]
     );
 
@@ -728,24 +735,27 @@ api.post('/auth/change-password', requireAuth, async (req,res)=>{
     }
 
     const passwordHash = await argon2.hash(newPassword);
-
-    await pool.query(
+    await client.query('BEGIN');
+    await client.query(
       `UPDATE users
        SET password_hash=$1,must_change_password=false
        WHERE id=$2`,
       [passwordHash,req.user.id]
     );
-
-    await pool.query(
+    await client.query(
       `INSERT INTO activity_events(user_id,event_type,metadata)
        VALUES($1,'PASSWORD_CHANGED',$2)`,
-      [req.user.id,JSON.stringify({method:'FORCED_FIRST_LOGIN'})]
+      [req.user.id,JSON.stringify({method:q.rows[0].must_change_password ? 'FORCED_FIRST_LOGIN' : 'SELF_SERVICE'})]
     );
+    await client.query('COMMIT');
 
     return res.json({ok:true,message:'Password changed successfully.'});
   }catch(e){
+    try{ await client.query('ROLLBACK'); }catch(_){}
     console.error('[PASSWORD] Change error:',e);
     return sendError(res,500,'Password change service error.');
+  }finally{
+    client.release();
   }
 });
 
@@ -759,47 +769,33 @@ api.patch('/admin/students/:studentId/password', requireAdmin, async (req,res)=>
       return sendError(res,400,'Student ID and a temporary password of at least 8 characters are required.');
     }
 
-    await client.query('BEGIN');
-
     const q = await client.query(
       `SELECT id,student_id,role,is_active
        FROM users WHERE student_id=$1 LIMIT 1 FOR UPDATE`,
       [studentId]
     );
 
-    if(!q.rowCount){
-      await client.query('ROLLBACK');
-      return sendError(res,404,'Student not found.');
-    }
+    if(!q.rowCount) return sendError(res,404,'Student not found.');
 
     const target = q.rows[0];
-    if(target.role !== 'STUDENT'){
-      await client.query('ROLLBACK');
-      return sendError(res,400,'Only STUDENT accounts can be changed here.');
-    }
-    if(!target.is_active){
-      await client.query('ROLLBACK');
-      return sendError(res,400,'Student account is inactive. Reactivate it before setting a temporary password.');
-    }
+    if(target.role !== 'STUDENT') return sendError(res,400,'Only STUDENT accounts can be changed here.');
+    if(!target.is_active) return sendError(res,400,'Student account is inactive. Reactivate it before setting a temporary password.');
 
     const passwordHash = await argon2.hash(temporaryPassword);
 
+    await client.query('BEGIN');
     await client.query(
       `UPDATE users
        SET password_hash=$1,must_change_password=true
        WHERE id=$2`,
       [passwordHash,target.id]
     );
-
-    /* Force every old session to re-login with the temporary password. */
     await client.query(`DELETE FROM sessions WHERE user_id=$1`,[target.id]);
-
     await client.query(
       `INSERT INTO activity_events(user_id,event_type,metadata)
        VALUES($1,'TEMP_PASSWORD_SET',$2)`,
       [req.user.id,JSON.stringify({target_student_id:target.student_id})]
     );
-
     await client.query('COMMIT');
 
     return res.json({
@@ -826,7 +822,7 @@ api.post('/auth/logout', async (req, res) => {
   res.json({ ok: true });
 });
 
-api.get('/questions', requireAuth, async (req, res) => {
+api.get('/questions', requirePasswordReady, async (req, res) => {
   try {
     const exam = String(req.query.exam || '').trim();
     const rawSubject = String(req.query.subject || '').trim();
@@ -885,7 +881,7 @@ api.get('/questions', requireAuth, async (req, res) => {
    Existing /questions API is intentionally left unchanged.
    Practice gets only the requested number of fresh questions.
 */
-api.get('/practice/questions', requireAuth, async (req, res) => {
+api.get('/practice/questions', requirePasswordReady, async (req, res) => {
   try {
     const exam = String(req.query.exam || '').trim();
     const rawSubject = String(req.query.subject || '').trim();
@@ -968,7 +964,7 @@ api.get('/practice/questions', requireAuth, async (req, res) => {
   }
 });
 
-api.post('/attempts', requireAuth, async (req,res)=>{
+api.post('/attempts', requirePasswordReady, async (req,res)=>{
   try {
     const {exam,subject,mode,language,questionIds}=req.body||{};
     if(!exam || !subject || !['practice','mock','bank'].includes(mode) || !['ta','en','mixed'].includes(language) || !Array.isArray(questionIds) || !questionIds.length) return sendError(res,400,'Invalid attempt.');
@@ -1000,7 +996,7 @@ api.post('/attempts', requireAuth, async (req,res)=>{
   }catch(e){console.error(e);sendError(res,500,'Attempt service error.');}
 });
 
-api.post('/attempts/:id/check-answer', requireAuth, async (req,res)=>{
+api.post('/attempts/:id/check-answer', requirePasswordReady, async (req,res)=>{
   try {
     const attemptId=Number(req.params.id);
     const questionId=Number(req.body?.questionId);
@@ -1062,7 +1058,7 @@ api.post('/attempts/:id/check-answer', requireAuth, async (req,res)=>{
   }
 });
 
-api.post('/attempts/:id/submit', requireAuth, async (req,res)=>{
+api.post('/attempts/:id/submit', requirePasswordReady, async (req,res)=>{
   try {
     const id=Number(req.params.id);
     const a=await pool.query(`SELECT * FROM attempts WHERE id=$1 AND user_id=$2 LIMIT 1`,[id,req.user.id]);
@@ -1109,7 +1105,7 @@ api.post('/attempts/:id/submit', requireAuth, async (req,res)=>{
   }catch(e){console.error(e);sendError(res,500,'Grading service error.');}
 });
 
-api.get('/results', requireAuth, async (req,res)=>{
+api.get('/results', requirePasswordReady, async (req,res)=>{
   try{
     const q=await pool.query(`SELECT id,exam,subject,mode,language,score,correct_count,total_count,started_at,submitted_at FROM attempts WHERE user_id=$1 AND status='SUBMITTED' ORDER BY started_at DESC LIMIT 100`,[req.user.id]);
     res.json({results:q.rows});
@@ -1133,7 +1129,7 @@ api.get('/admin/summary', requireAdmin, async (req,res)=>{
 
 api.get('/admin/students', requireAdmin, async (req,res)=>{
   try{
-    const q=await pool.query(`SELECT student_id,name,email,phone,gender,dob,created_at,last_login_at,is_active FROM users WHERE role='STUDENT' ORDER BY is_active DESC, created_at DESC LIMIT 5000`);
+    const q=await pool.query(`SELECT student_id,name,email,phone,gender,dob,created_at,last_login_at,is_active,must_change_password FROM users WHERE role='STUDENT' ORDER BY is_active DESC, created_at DESC LIMIT 5000`);
     res.json({students:q.rows});
   }catch(e){console.error(e);sendError(res,500,'Admin students error.');}
 });
@@ -1210,7 +1206,7 @@ api.patch('/admin/students/:studentId/status', requireAdmin, async (req,res)=>{
   }
 });
 
-api.get('/group4/question-status', requireAuth, async (req,res)=>{
+api.get('/group4/question-status', requirePasswordReady, async (req,res)=>{
   try{
     const rows=await pool.query(`
       SELECT subject,language,count(*)::int AS total,
