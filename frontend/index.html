@@ -740,6 +740,17 @@ a{
 
 </div>
 <hr>
+<div class="card" style="margin-top:16px;border:1px solid #fecaca">
+<h3>🛡️ Security Monitor / பாதுகாப்பு</h3>
+<p class="small">Admin account மற்றும் பாதுகாப்பு தொடர்பான நிகழ்வுகளை மட்டும் Admin பார்க்க முடியும். Password, OTP அல்லது sensitive data இங்கே காட்டப்படாது.</p>
+<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+<button onclick="loadSecurityEvents138()">🔄 Security Refresh</button>
+</div>
+<p id="securityMsg138" class="small"></p>
+<div id="securityStats138" class="grid admin-stat-grid" style="margin-top:10px"></div>
+<div id="securityEvents138" style="margin-top:14px"></div>
+</div>
+<hr>
 <h3>💡 Student Suggestions / Feedback</h3>
 <div class="grid">
 <button onclick="filterAdminSuggestions('all')">அனைத்தும்</button>
@@ -4732,6 +4743,30 @@ window.startPractice=async function(n){
   window.__THIRAL_GROUP4_ONLY_FINAL__=true;
 })();
 </script>
-<script id="thiral-forgot-password-otp-v158">
+<script>
+(function(){
+  function escSecurity(v){
+    return String(v ?? '').replace(/[&<>"']/g,function(c){return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]);});
+  }
+  window.loadSecurityEvents138 = async function(){
+    var msg=document.getElementById('securityMsg138');
+    var stats=document.getElementById('securityStats138');
+    var box=document.getElementById('securityEvents138');
+    if(msg) msg.textContent='Loading...';
+    try{
+      var d=await api138('/admin/security/events?limit=100');
+      var st=d.stats||{};
+      if(stats) stats.innerHTML=
+        '<div class="card admin-stat-card"><h3>🔴 Failed Logins</h3><p>'+(st.failed_logins||0)+'</p><span class="small">Last 24 hours</span></div>'+
+        '<div class="card admin-stat-card"><h3>🟢 Successful Admin Logins</h3><p>'+(st.successful_admin_logins||0)+'</p><span class="small">Last 24 hours</span></div>'+
+        '<div class="card admin-stat-card"><h3>🚫 Unauthorized Admin Access</h3><p>'+(st.unauthorized_admin_access||0)+'</p><span class="small">Last 24 hours</span></div>';
+      var rows=(d.events||[]).map(function(x){
+        return '<tr><td>'+escSecurity(x.created_at||'')+'</td><td>'+escSecurity(x.event_type||'')+'</td><td>'+escSecurity(x.email||'-')+'</td><td>'+escSecurity(x.ip||'-')+'</td><td>'+escSecurity(x.user_agent||'-')+'</td><td>'+escSecurity(x.details||'')+'</td></tr>';
+      }).join('');
+      if(box) box.innerHTML=rows?'<div style="overflow:auto"><table><thead><tr><th>Date</th><th>Event</th><th>Email</th><th>IP</th><th>Browser</th><th>Details</th></tr></thead><tbody>'+rows+'</tbody></table></div>':'<p class="small">Security events இல்லை.</p>';
+      if(msg) msg.textContent='Security data refreshed.';
+    }catch(e){ if(msg) msg.textContent='Security: '+(e&&e.message||e); }
+  };
+})();
 </script>
 </body></html>
