@@ -36,7 +36,7 @@ app.use((req, res, next) => {
 });
 
 const PORT = process.env.PORT || 10000;
-const THIRAL_SECURITY_VERSION = 'V167';
+const THIRAL_SECURITY_VERSION = 'V168';
 const isProd = process.env.NODE_ENV === 'production';
 
 if (!process.env.DATABASE_URL) {
@@ -1129,7 +1129,7 @@ api.get('/results', requirePasswordReady, async (req,res)=>{
 
 api.get('/admin/usage-monitor', requireAdmin, async (req,res)=>{
   try{
-    const q = await pool.query(`
+    const summary = await pool.query(`
       SELECT
         (SELECT count(DISTINCT s.user_id)::int
            FROM sessions s
@@ -1161,9 +1161,9 @@ api.get('/admin/usage-monitor', requireAdmin, async (req,res)=>{
             AND a.started_at >= now()-interval '24 hours') AS mock_tests_24h
     `);
 
-    const students = await pool.query(`
+    const online = await pool.query(`
       SELECT DISTINCT ON (u.id)
-        u.student_id,u.name,u.last_login_at,s.expires_at
+        u.student_id,u.name,u.email,u.last_login_at,s.expires_at
       FROM sessions s
       JOIN users u ON u.id=s.user_id
       WHERE s.expires_at > now()
@@ -1172,18 +1172,102 @@ api.get('/admin/usage-monitor', requireAdmin, async (req,res)=>{
       ORDER BY u.id,s.expires_at DESC
     `);
 
+    const last24 = await pool.query(`
+      SELECT
+        u.student_id,u.name,u.email,
+        u.last_login_at,
+        count(DISTINCT a.id)::int AS activity_count,
+        max(a.started_at) AS last_activity_at
+      FROM users u
+      LEFT JOIN attempts a
+        ON a.user_id=u.id
+       AND a.started_at >= now()-interval '24 hours'
+      WHERE u.role='STUDENT'
+        AND u.is_active=true
+        AND (
+          u.last_login_at >= now()-interval '24 hours'
+          OR a.id IS NOT NULL
+        )
+      GROUP BY u.id,u.student_id,u.name,u.email,u.last_login_at
+      ORDER BY COALESCE(u.last_login_at,'1970-01-01'::timestamptz) DESC,
+               COALESCE(max(a.started_at),'1970-01-01'::timestamptz) DESC
+    `);
+
+    const practice = await pool.query(`
+      SELECT
+        u.student_id,u.name,u.email,
+        count(a.id)::int AS session_count,
+        min(a.started_at) AS first_started_at,
+        max(a.started_at) AS last_started_at,
+        count(*) FILTER (WHERE a.status='SUBMITTED')::int AS completed_count
+      FROM attempts a
+      JOIN users u ON u.id=a.user_id
+      WHERE u.role='STUDENT'
+        AND u.is_active=true
+        AND a.mode='practice'
+        AND a.started_at >= now()-interval '24 hours'
+      GROUP BY u.id,u.student_id,u.name,u.email
+      ORDER BY count(a.id) DESC,max(a.started_at) DESC
+    `);
+
+    const mock = await pool.query(`
+      SELECT
+        u.student_id,u.name,u.email,
+        count(a.id)::int AS test_count,
+        min(a.started_at) AS first_started_at,
+        max(a.started_at) AS last_started_at,
+        count(*) FILTER (WHERE a.status='SUBMITTED')::int AS completed_count,
+        count(*) FILTER (WHERE a.status='SUBMITTED' AND a.score IS NOT NULL)::int AS scored_count
+      FROM attempts a
+      JOIN users u ON u.id=a.user_id
+      WHERE u.role='STUDENT'
+        AND u.is_active=true
+        AND a.mode='mock'
+        AND a.started_at >= now()-interval '24 hours'
+      GROUP BY u.id,u.student_id,u.name,u.email
+      ORDER BY count(a.id) DESC,max(a.started_at) DESC
+    `);
+
     res.json({
       ok:true,
-      active_now:Number(q.rows[0]?.active_now||0),
-      active_today:Number(q.rows[0]?.active_today||0),
-      active_24h:Number(q.rows[0]?.active_24h||0),
-      practice_sessions_24h:Number(q.rows[0]?.practice_sessions_24h||0),
-      mock_tests_24h:Number(q.rows[0]?.mock_tests_24h||0),
-      online_students:students.rows.map(x=>({
+      active_now:Number(summary.rows[0]?.active_now||0),
+      active_today:Number(summary.rows[0]?.active_today||0),
+      active_24h:Number(summary.rows[0]?.active_24h||0),
+      practice_sessions_24h:Number(summary.rows[0]?.practice_sessions_24h||0),
+      mock_tests_24h:Number(summary.rows[0]?.mock_tests_24h||0),
+      online_students:online.rows.map(x=>({
         student_id:x.student_id,
         name:x.name,
+        email:x.email,
         last_login_at:x.last_login_at,
         session_expires_at:x.expires_at
+      })),
+      last24_students:last24.rows.map(x=>({
+        student_id:x.student_id,
+        name:x.name,
+        email:x.email,
+        last_login_at:x.last_login_at,
+        activity_count:Number(x.activity_count||0),
+        last_activity_at:x.last_activity_at
+      })),
+      practice_students:practice.rows.map(x=>({
+        student_id:x.student_id,
+        name:x.name,
+        email:x.email,
+        session_count:Number(x.session_count||0),
+        completed_count:Number(x.completed_count||0),
+        first_started_at:x.first_started_at,
+        last_started_at:x.last_started_at
+      })),
+      mock_students:mock.rows.map(x=>({
+        student_id:x.student_id,
+        name:x.name,
+        email:x.email,
+        test_count:Number(x.test_count||0),
+        completed_count:Number(x.completed_count||0),
+        scored_count:Number(x.scored_count||0),
+        first_started_at:x.first_started_at,
+        last_started_at:x.last_started_at
       }))
     });
   }catch(e){
@@ -1191,7 +1275,6 @@ api.get('/admin/usage-monitor', requireAdmin, async (req,res)=>{
     sendError(res,500,'Usage monitor service error.');
   }
 });
-
 api.get('/admin/summary', requireAdmin, async (req,res)=>{
   try{
     const q=await pool.query(`SELECT
@@ -1395,7 +1478,7 @@ async function start(){
     await ensurePasswordResetTables();
     await ensureQuestionHistory();
     await ensureAdmin();
-    app.listen(PORT,'0.0.0.0',()=>console.log(`Thiral V167 Secure Temporary Password + Usage Monitor listening on port ${PORT}`));
+    app.listen(PORT,'0.0.0.0',()=>console.log(`Thiral V168 Secure Temporary Password + Detailed Usage Monitor listening on port ${PORT}`));
   }catch(e){
     console.error('Startup failed:',e);
     process.exit(1);
