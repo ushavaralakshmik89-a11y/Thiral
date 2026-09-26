@@ -36,7 +36,7 @@ app.use((req, res, next) => {
 });
 
 const PORT = process.env.PORT || 10000;
-const THIRAL_SECURITY_VERSION = 'V168';
+const THIRAL_SECURITY_VERSION = 'V170';
 const isProd = process.env.NODE_ENV === 'production';
 
 if (!process.env.DATABASE_URL) {
@@ -1281,9 +1281,9 @@ api.get('/admin/summary', requireAdmin, async (req,res)=>{
       count(*)::int AS total,
       count(*) FILTER (WHERE created_at::date=current_date)::int AS today,
       count(*) FILTER (WHERE date_trunc('month',created_at)=date_trunc('month',now()))::int AS month,
-      count(*) FILTER (WHERE gender='???')::int AS male,
-      count(*) FILTER (WHERE gender='????')::int AS female,
-      count(*) FILTER (WHERE gender='???????? ???????')::int AS third,
+      count(*) FILTER (WHERE trim(COALESCE(gender,''))='ஆண்')::int AS male,
+      count(*) FILTER (WHERE trim(COALESCE(gender,''))='பெண்')::int AS female,
+      count(*) FILTER (WHERE trim(COALESCE(gender,''))='மூன்றாம் பாலினம்')::int AS third,
       max(last_login_at) AS last_login
       FROM users WHERE role='STUDENT' AND is_active=true`);
     res.json({students:{total:q.rows[0].total,today:q.rows[0].today,month:q.rows[0].month,male:q.rows[0].male,female:q.rows[0].female,third:q.rows[0].third,lastLogin:q.rows[0].last_login||null}});
@@ -1478,7 +1478,7 @@ async function start(){
     await ensurePasswordResetTables();
     await ensureQuestionHistory();
     await ensureAdmin();
-    app.listen(PORT,'0.0.0.0',()=>console.log(`Thiral V168 Secure Temporary Password + Detailed Usage Monitor listening on port ${PORT}`));
+    app.listen(PORT,'0.0.0.0',()=>console.log(`Thiral V170 Secure Temporary Password + Gender Summary + Detailed Usage Monitor listening on port ${PORT}`));
   }catch(e){
     console.error('Startup failed:',e);
     process.exit(1);
