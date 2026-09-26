@@ -36,7 +36,7 @@ app.use((req, res, next) => {
 });
 
 const PORT = process.env.PORT || 10000;
-const THIRAL_SECURITY_VERSION = 'V172-FINAL';
+const THIRAL_SECURITY_VERSION = 'V171';
 const isProd = process.env.NODE_ENV === 'production';
 
 if (!process.env.DATABASE_URL) {
@@ -46,7 +46,7 @@ if (!process.env.DATABASE_URL) {
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : undefined,
-  max: 10,
+  max: 5,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 10000
 });
@@ -172,56 +172,13 @@ async function requireAdmin(req, res, next) {
   });
 }
 
-
-async function ensureSecuritySchema() {
-  // Future users use these fields immediately; existing rows keep their current passwords.
-  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT false`);
-  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ`);
-
-  // Activity is central-server data. Passwords are never written here.
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS activity_events (
-      id BIGSERIAL PRIMARY KEY,
-      user_id BIGINT NOT NULL,
-      event_type VARCHAR(80) NOT NULL,
-      metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    )
-  `);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_activity_events_user_created ON activity_events(user_id, created_at DESC)`);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_activity_events_type_created ON activity_events(event_type, created_at DESC)`);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_sessions_user_expires ON sessions(user_id, expires_at DESC)`);
-}
-
-function strongPassword(value) {
-  const p = String(value || '');
-  return p.length >= 8 && p.length <= 128;
-}
-
-async function createAuthenticatedSession(userId) {
-  const sid = newSessionId();
-  await pool.query(`DELETE FROM sessions WHERE expires_at <= now()`);
-  await pool.query(`INSERT INTO sessions(id,user_id,expires_at) VALUES($1,$2,now()+interval '30 minutes')`, [sid, userId]);
-  return sid;
-}
-
-async function invalidateUserSessions(userId) {
-  await pool.query(`DELETE FROM sessions WHERE user_id=$1`, [userId]);
-}
-
-async function requireStudentReady(req,res,next) {
-  try {
-    const user = await getUserFromSession(req);
-    if (!user) return sendError(res,401,'ACCESS DENIED: Login required.');
-    req.user = user;
-    if (user.role === 'STUDENT' && user.must_change_password) {
-      return sendError(res,403,'PASSWORD CHANGE REQUIRED: Set a new password before continuing.');
+async function requirePasswordReady(req, res, next) {
+  await requireAuth(req, res, () => {
+    if (req.user.role === 'STUDENT' && req.user.must_change_password === true) {
+      return sendError(res, 403, 'PASSWORD_CHANGE_REQUIRED');
     }
     next();
-  } catch(e) {
-    console.error(e);
-    sendError(res,500,'Authentication service error.');
-  }
+  });
 }
 
 async function ensureAdmin() {
@@ -235,7 +192,7 @@ async function ensureAdmin() {
   const existing = await pool.query('SELECT id FROM users WHERE email=$1 LIMIT 1', [adminId]);
   if (existing.rowCount) {
     await pool.query(
-      `UPDATE users SET role='ADMIN', is_active=true, password_hash=$1, email=$2, must_change_password=false WHERE id=$3`,
+      `UPDATE users SET role='ADMIN', is_active=true, must_change_password=false, password_hash=$1, email=$2 WHERE id=$3`,
       [hash, adminId, existing.rows[0].id]
     );
     console.log(`Admin account ready: ${adminId}`);
@@ -253,8 +210,8 @@ async function ensureAdmin() {
     }
 
     await pool.query(
-      `INSERT INTO users(student_id,name,email,password_hash,role,is_active)
-       VALUES($1,$2,$3,$4,'ADMIN',true)`,
+      `INSERT INTO users(student_id,name,email,password_hash,role,is_active,must_change_password)
+       VALUES($1,$2,$3,$4,'ADMIN',true,false)`,
       [studentId, 'Thiral Administrator', adminId, hash]
     );
 
@@ -265,9 +222,9 @@ async function ensureAdmin() {
 app.get('/health', async (req, res) => {
   try {
     await pool.query('SELECT 1');
-    res.json({ ok: true, service: 'Thiral V172-FINAL', database: 'ok', time: new Date().toISOString() });
+    res.json({ ok: true, service: 'Thiral V167 Secure Temporary Password', database: 'ok', time: new Date().toISOString() });
   } catch (e) {
-    res.status(503).json({ ok: false, service: 'Thiral V172-FINAL', database: 'error' });
+    res.status(503).json({ ok: false, service: 'Thiral V167 Secure Temporary Password', database: 'error' });
   }
 });
 
@@ -293,7 +250,9 @@ api.post('/auth/login', authLimiter, async (req, res) => {
     if (!u || !u.is_active) return sendError(res, 401, 'Invalid ID/email or password.');
     const ok = await argon2.verify(u.password_hash, password);
     if (!ok) return sendError(res, 401, 'Invalid ID/email or password.');
-    const sid = await createAuthenticatedSession(u.id);
+    const sid = newSessionId();
+    await pool.query(`DELETE FROM sessions WHERE expires_at <= now()`);
+    await pool.query(`INSERT INTO sessions(id,user_id,expires_at) VALUES($1,$2,now()+interval '30 minutes')`, [sid, u.id]);
     await pool.query(`UPDATE users SET last_login_at=now() WHERE id=$1`, [u.id]);
     await pool.query(`INSERT INTO activity_events(user_id,event_type,metadata) VALUES($1,'LOGIN',$2)`, [u.id, JSON.stringify({ role: u.role })]);
     setSessionCookie(res, sid);
@@ -401,17 +360,17 @@ api.post('/auth/register', authLimiter, async (req, res) => {
     const ins = await client.query(
       `INSERT INTO users(student_id,name,email,password_hash,phone,dob,gender,role,is_active)
        VALUES($1,$2,$3,$4,$5,$6,$7,'STUDENT',true)
-       RETURNING id,student_id,name,email,phone,dob,gender,role,is_active,created_at,last_login_at,must_change_password`,
+       RETURNING id,student_id,name,email,phone,dob,gender,role,is_active,created_at,last_login_at`,
       [studentId, name, email, hash, phone, dob, gender]
     );
 
     const u = ins.rows[0];
     const sid = newSessionId();
-    await client.query(`INSERT INTO sessions(id,user_id,expires_at) VALUES($1,$2,now()+interval '30 minutes')`, [sid, u.id]);
-    await client.query(`UPDATE users SET last_login_at=now() WHERE id=$1`, [u.id]);
-    await client.query(`INSERT INTO activity_events(user_id,event_type,metadata) VALUES($1,'REGISTER',$2)`, [u.id, JSON.stringify({role:'STUDENT'})]);
-    u.last_login_at = new Date().toISOString();
-    u.must_change_password = false;
+    await client.query(
+      `INSERT INTO sessions(id,user_id,expires_at)
+       VALUES($1,$2,now()+interval '30 minutes')`,
+      [sid, u.id]
+    );
 
     await client.query('COMMIT');
     setSessionCookie(res, sid);
@@ -440,40 +399,433 @@ api.post('/auth/register', authLimiter, async (req, res) => {
 });
 
 
-api.post('/auth/change-password', requireAuth, async (req,res)=>{
+/* =========================================================
+   THIRAL V162 SECURE OTP
+   Password reset uses:
+   Render -> HTTPS -> Google Apps Script -> Gmail
+   No SMTP connection is required on Render.
+   ========================================================= */
+
+function otpConfigReady(){
+  return Boolean(
+    String(process.env.THIRAL_APPS_SCRIPT_URL || '').trim() &&
+    String(process.env.THIRAL_API_KEY || '').trim()
+  );
+}
+
+function hashOtp(value){
+  const pepper = String(process.env.OTP_PEPPER || '').trim();
+  return crypto
+    .createHash('sha256')
+    .update(pepper + ':' + String(value))
+    .digest('hex');
+}
+
+function newOtp(){
+  return String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+}
+
+function newResetToken(){
+  return crypto.randomBytes(32).toString('hex');
+}
+
+async function sendOtpThroughAppsScript(to, otp){
+  const url = String(process.env.THIRAL_APPS_SCRIPT_URL || '').trim();
+  const apiKey = String(process.env.THIRAL_API_KEY || '').trim();
+
+  if(!url || !apiKey) throw new Error('OTP bridge configuration is missing.');
+
+  const response = await fetch(url, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    redirect:'follow',
+    body:JSON.stringify({
+      api_key:apiKey,
+      to:String(to || '').trim().toLowerCase(),
+      otp:String(otp || '')
+    })
+  });
+
+  const text = await response.text();
+  let data = {};
+  try { data = JSON.parse(text); } catch (_) {}
+
+  if(!response.ok || data.ok !== true){
+    const err = new Error('OTP email delivery failed.');
+    err.status = response.status;
+    err.bridgeMessage = String(data.message || '').slice(0,200);
+    throw err;
+  }
+  return true;
+}
+
+function otpPublicMessage(){
+  return 'If the registered email exists, an OTP has been sent.';
+}
+
+api.post('/auth/forgot-password/request', authLimiter, async (req,res)=>{
   try{
-    if(req.user.role !== 'STUDENT') return sendError(res,400,'Only student accounts use this password change flow.');
-    const password = String(req.body?.password || '');
-    const confirm = String(req.body?.confirmPassword || '');
-    if(!strongPassword(password)) return sendError(res,400,'Password must be 8 to 128 characters.');
-    if(password !== confirm) return sendError(res,400,'Password and confirmation do not match.');
-    const hash = await argon2.hash(password);
-    await pool.query(`UPDATE users SET password_hash=$1,must_change_password=false WHERE id=$2`,[hash,req.user.id]);
-    await invalidateUserSessions(req.user.id);
-    const sid = await createAuthenticatedSession(req.user.id);
-    await pool.query(`INSERT INTO activity_events(user_id,event_type,metadata) VALUES($1,'PASSWORD_CHANGED',$2)`,[req.user.id,JSON.stringify({forced:false})]);
-    setSessionCookie(res,sid);
-    res.json({ok:true,must_change_password:false});
-  }catch(e){console.error(e);sendError(res,500,'Password change service error.');}
+    const email = String(req.body?.email || '').trim().toLowerCase();
+
+    if(!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+      return sendError(res,400,'Valid email is required.');
+    }
+
+    if(!otpConfigReady()){
+      console.error('[OTP] Bridge configuration missing.');
+      return sendError(res,503,'OTP service is not configured.');
+    }
+
+    const q = await pool.query(
+      `SELECT id,email,is_active,role
+       FROM users
+       WHERE lower(email)=lower($1)
+       LIMIT 1`,
+      [email]
+    );
+
+    /*
+      Do not reveal whether an email is registered.
+      Only active STUDENT accounts can use student password reset.
+    */
+    const user = q.rows[0];
+    if(!user || !user.is_active || user.role !== 'STUDENT'){
+      return res.json({ok:true,message:otpPublicMessage()});
+    }
+
+    const recent = await pool.query(
+      `SELECT id
+       FROM password_reset_otps
+       WHERE user_id=$1
+         AND created_at > now() - interval '60 seconds'
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [user.id]
+    );
+
+    if(recent.rowCount){
+      return sendError(res,429,'Please wait before requesting another OTP.');
+    }
+
+    const otp = newOtp();
+    const otpHash = hashOtp(otp);
+
+    await pool.query(
+      `UPDATE password_reset_otps
+       SET used_at=now()
+       WHERE user_id=$1 AND used_at IS NULL`,
+      [user.id]
+    );
+
+    const ins = await pool.query(
+      `INSERT INTO password_reset_otps
+       (user_id,email,otp_hash,expires_at,attempts,used_at)
+       VALUES($1,$2,$3,now()+interval '10 minutes',0,NULL)
+       RETURNING id`,
+      [user.id,user.email,otpHash]
+    );
+
+    try{
+      await sendOtpThroughAppsScript(user.email,otp);
+      console.log('[OTP] Apps Script mail sent successfully.');
+    }catch(mailErr){
+      await pool.query(
+        `UPDATE password_reset_otps SET used_at=now() WHERE id=$1`,
+        [ins.rows[0].id]
+      );
+      console.error('[OTP] Apps Script mail failed:', {
+        status:mailErr?.status || null,
+        message:mailErr?.message || String(mailErr),
+        bridgeMessage:mailErr?.bridgeMessage || null
+      });
+      return sendError(res,502,'OTP email delivery failed.');
+    }
+
+    return res.json({ok:true,message:otpPublicMessage()});
+  }catch(e){
+    console.error('[OTP] Request error:',e);
+    return sendError(res,500,'OTP service error.');
+  }
 });
 
-api.post('/admin/students/:studentId/temporary-password', requireAdmin, async (req,res)=>{
+api.post('/auth/forgot-password/verify', authLimiter, async (req,res)=>{
   try{
-    const studentId=String(req.params.studentId||'').trim();
-    if(!studentId) return sendError(res,400,'Student ID is required.');
-    const q=await pool.query(`SELECT id,student_id,role,is_active FROM users WHERE student_id=$1 LIMIT 1`,[studentId]);
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const otp = String(req.body?.otp || '').trim();
+
+    if(!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !/^\d{6}$/.test(otp)){
+      return sendError(res,400,'Email and 6-digit OTP are required.');
+    }
+
+    const q = await pool.query(
+      `SELECT o.id,o.user_id,o.otp_hash,o.expires_at,o.attempts,
+              u.email,u.is_active,u.role
+       FROM password_reset_otps o
+       JOIN users u ON u.id=o.user_id
+       WHERE lower(u.email)=lower($1)
+         AND o.used_at IS NULL
+       ORDER BY o.created_at DESC
+       LIMIT 1`,
+      [email]
+    );
+
+    if(!q.rowCount) return sendError(res,400,'Invalid or expired OTP.');
+
+    const row = q.rows[0];
+
+    if(!row.is_active || row.role !== 'STUDENT'){
+      return sendError(res,400,'Invalid or expired OTP.');
+    }
+
+    if(new Date(row.expires_at).getTime() <= Date.now()){
+      return sendError(res,400,'OTP has expired.');
+    }
+
+    if(Number(row.attempts) >= 5){
+      return sendError(res,429,'Too many incorrect OTP attempts.');
+    }
+
+    const suppliedHash = hashOtp(otp);
+
+    if(!crypto.timingSafeEqual(
+      Buffer.from(suppliedHash,'utf8'),
+      Buffer.from(String(row.otp_hash),'utf8')
+    )){
+      await pool.query(
+        `UPDATE password_reset_otps
+         SET attempts=attempts+1
+         WHERE id=$1`,
+        [row.id]
+      );
+      return sendError(res,400,'Invalid or expired OTP.');
+    }
+
+    const resetToken = newResetToken();
+    const resetTokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
+
+    await pool.query(
+      `UPDATE password_reset_otps
+       SET verified_at=now(),reset_token_hash=$1
+       WHERE id=$2`,
+      [resetTokenHash,row.id]
+    );
+
+    return res.json({ok:true,reset_token:resetToken});
+  }catch(e){
+    console.error('[OTP] Verify error:',e);
+    return sendError(res,500,'OTP verification service error.');
+  }
+});
+
+api.post('/auth/forgot-password/reset', authLimiter, async (req,res)=>{
+  try{
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const resetToken = String(req.body?.reset_token || '').trim();
+    const newPassword = String(req.body?.password || '');
+
+    if(!email || !resetToken || newPassword.length < 8){
+      return sendError(res,400,'Email, reset token and password (minimum 8 characters) are required.');
+    }
+
+    const tokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
+
+    const q = await pool.query(
+      `SELECT o.id,o.user_id,o.reset_token_hash,o.verified_at,
+              u.email,u.is_active,u.role
+       FROM password_reset_otps o
+       JOIN users u ON u.id=o.user_id
+       WHERE lower(u.email)=lower($1)
+         AND o.reset_token_hash=$2
+         AND o.used_at IS NULL
+         AND o.verified_at IS NOT NULL
+         AND o.expires_at > now()
+       ORDER BY o.created_at DESC
+       LIMIT 1`,
+      [email,tokenHash]
+    );
+
+    if(!q.rowCount) return sendError(res,400,'Invalid or expired password reset token.');
+
+    const row = q.rows[0];
+
+    if(!row.is_active || row.role !== 'STUDENT'){
+      return sendError(res,400,'Invalid password reset request.');
+    }
+
+    const passwordHash = await argon2.hash(newPassword);
+
+    await pool.query('BEGIN');
+    try{
+      await pool.query(
+        `UPDATE users SET password_hash=$1 WHERE id=$2`,
+        [passwordHash,row.user_id]
+      );
+
+      await pool.query(
+        `UPDATE password_reset_otps
+         SET used_at=now(),reset_token_hash=NULL
+         WHERE id=$1`,
+        [row.id]
+      );
+
+      /* Password reset invalidates all existing sessions for this student. */
+      await pool.query(
+        `DELETE FROM sessions WHERE user_id=$1`,
+        [row.user_id]
+      );
+
+      await pool.query(
+        `INSERT INTO activity_events(user_id,event_type,metadata)
+         VALUES($1,'PASSWORD_RESET',$2)`,
+        [row.user_id,JSON.stringify({method:'OTP'})]
+      );
+
+      await pool.query('COMMIT');
+    }catch(e){
+      await pool.query('ROLLBACK');
+      throw e;
+    }
+
+    return res.json({ok:true,message:'Password reset successfully.'});
+  }catch(e){
+    console.error('[OTP] Password reset error:',e);
+    return sendError(res,500,'Password reset service error.');
+  }
+});
+
+
+
+api.post('/auth/change-password', requireAuth, async (req,res)=>{
+  const client = await pool.connect();
+  try{
+    if(req.user.role !== 'STUDENT'){
+      return sendError(res,403,'Only student accounts can change this password.');
+    }
+
+    const currentPassword = String(req.body?.current_password || '');
+    const newPassword = String(req.body?.new_password || '');
+    const confirmPassword = String(req.body?.confirm_password || '');
+
+    if(!currentPassword || !newPassword || !confirmPassword){
+      return sendError(res,400,'Current password, new password and confirm password are required.');
+    }
+    if(newPassword.length < 8){
+      return sendError(res,400,'New Password must be at least 8 characters.');
+    }
+    if(newPassword !== confirmPassword){
+      return sendError(res,400,'New Password and Confirm Password must match.');
+    }
+    if(newPassword === currentPassword){
+      return sendError(res,400,'New Password must be different from the temporary password.');
+    }
+
+    const q = await client.query(
+      `SELECT id,password_hash,must_change_password,is_active,role
+       FROM users WHERE id=$1 LIMIT 1 FOR UPDATE`,
+      [req.user.id]
+    );
+
+    if(!q.rowCount || !q.rows[0].is_active || q.rows[0].role !== 'STUDENT'){
+      return sendError(res,401,'Invalid password change request.');
+    }
+
+    const validCurrent = await argon2.verify(q.rows[0].password_hash,currentPassword);
+    if(!validCurrent){
+      return sendError(res,401,'Current password is incorrect.');
+    }
+
+    const passwordHash = await argon2.hash(newPassword);
+    await client.query('BEGIN');
+    await client.query(
+      `UPDATE users
+       SET password_hash=$1,must_change_password=false
+       WHERE id=$2`,
+      [passwordHash,req.user.id]
+    );
+    await client.query(
+      `INSERT INTO activity_events(user_id,event_type,metadata)
+       VALUES($1,'PASSWORD_CHANGED',$2)`,
+      [req.user.id,JSON.stringify({method:q.rows[0].must_change_password ? 'FORCED_FIRST_LOGIN' : 'SELF_SERVICE'})]
+    );
+    await client.query('COMMIT');
+
+    return res.json({ok:true,message:'Password changed successfully.'});
+  }catch(e){
+    try{ await client.query('ROLLBACK'); }catch(_){}
+    console.error('[PASSWORD] Change error:',e);
+    return sendError(res,500,'Password change service error.');
+  }finally{
+    client.release();
+  }
+});
+
+api.patch('/admin/students/:studentId/password', requireAdmin, async (req,res)=>{
+  const client = await pool.connect();
+  try{
+    const studentId = String(req.params.studentId || '').trim();
+    const temporaryPassword = String(req.body?.temporary_password || '');
+
+    if(!studentId || temporaryPassword.length < 8){
+      return sendError(res,400,'Student ID and a temporary password of at least 8 characters are required.');
+    }
+
+    const q = await client.query(
+      `SELECT id,student_id,role,is_active
+       FROM users WHERE student_id=$1 LIMIT 1 FOR UPDATE`,
+      [studentId]
+    );
+
     if(!q.rowCount) return sendError(res,404,'Student not found.');
-    const target=q.rows[0];
-    if(target.role!=='STUDENT') return sendError(res,400,'Only STUDENT accounts can receive a temporary password.');
-    if(!target.is_active) return sendError(res,400,'Inactive student cannot receive a temporary password.');
-    const temporaryPassword = crypto.randomBytes(9).toString('base64url').slice(0,12);
-    const hash=await argon2.hash(temporaryPassword);
-    await pool.query(`UPDATE users SET password_hash=$1,must_change_password=true WHERE id=$2`,[hash,target.id]);
-    await invalidateUserSessions(target.id);
-    await pool.query(`INSERT INTO activity_events(user_id,event_type,metadata) VALUES($1,'TEMPORARY_PASSWORD_SET',$2)`,[req.user.id,JSON.stringify({target_student_id:target.student_id})]);
-    // The plaintext temporary password is returned once to the Admin and never stored.
-    res.json({ok:true,student_id:target.student_id,temporary_password:temporaryPassword});
-  }catch(e){console.error('Temporary password error:',e);sendError(res,500,'Temporary password service error.');}
+
+    const target = q.rows[0];
+    if(target.role !== 'STUDENT') return sendError(res,400,'Only STUDENT accounts can be changed here.');
+    if(!target.is_active) return sendError(res,400,'Student account is inactive. Reactivate it before setting a temporary password.');
+
+    const passwordHash = await argon2.hash(temporaryPassword);
+
+    await client.query('BEGIN');
+    await client.query(
+      `UPDATE users
+       SET password_hash=$1,must_change_password=true
+       WHERE id=$2`,
+      [passwordHash,target.id]
+    );
+    await client.query(`DELETE FROM sessions WHERE user_id=$1`,[target.id]);
+    await client.query(
+      `INSERT INTO activity_events(user_id,event_type,metadata)
+       VALUES($1,'TEMP_PASSWORD_SET',$2)`,
+      [req.user.id,JSON.stringify({target_student_id:target.student_id})]
+    );
+    await client.query('COMMIT');
+
+    return res.json({
+      ok:true,
+      student_id:target.student_id,
+      must_change_password:true,
+      message:'Temporary password set. Student must change it at next login.'
+    });
+  }catch(e){
+    try{ await client.query('ROLLBACK'); }catch(_){}
+    console.error('[ADMIN] Temporary password error:',e);
+    return sendError(res,500,'Temporary password service error.');
+  }finally{
+    client.release();
+  }
+});
+
+api.post('/auth/heartbeat', requireAuth, async (req,res)=>{
+  try{
+    const sid = req.cookies?.thiral_session;
+    if(!sid) return sendError(res,401,'Login required.');
+    await pool.query(
+      `UPDATE sessions SET expires_at=now()+interval '30 minutes' WHERE id=$1`,
+      [sid]
+    );
+    res.json({ok:true,expires_at:new Date(Date.now()+30*60*1000).toISOString()});
+  }catch(e){
+    console.error('[HEARTBEAT] error:',e);
+    sendError(res,500,'Session heartbeat service error.');
+  }
 });
 
 api.post('/auth/logout', async (req, res) => {
@@ -485,7 +837,7 @@ api.post('/auth/logout', async (req, res) => {
   res.json({ ok: true });
 });
 
-api.get('/questions', requireStudentReady, async (req, res) => {
+api.get('/questions', requirePasswordReady, async (req, res) => {
   try {
     const exam = String(req.query.exam || '').trim();
     const rawSubject = String(req.query.subject || '').trim();
@@ -544,7 +896,7 @@ api.get('/questions', requireStudentReady, async (req, res) => {
    Existing /questions API is intentionally left unchanged.
    Practice gets only the requested number of fresh questions.
 */
-api.get('/practice/questions', requireStudentReady, async (req, res) => {
+api.get('/practice/questions', requirePasswordReady, async (req, res) => {
   try {
     const exam = String(req.query.exam || '').trim();
     const rawSubject = String(req.query.subject || '').trim();
@@ -627,7 +979,7 @@ api.get('/practice/questions', requireStudentReady, async (req, res) => {
   }
 });
 
-api.post('/attempts', requireStudentReady, async (req,res)=>{
+api.post('/attempts', requirePasswordReady, async (req,res)=>{
   try {
     const {exam,subject,mode,language,questionIds}=req.body||{};
     if(!exam || !subject || !['practice','mock','bank'].includes(mode) || !['ta','en','mixed'].includes(language) || !Array.isArray(questionIds) || !questionIds.length) return sendError(res,400,'Invalid attempt.');
@@ -659,7 +1011,7 @@ api.post('/attempts', requireStudentReady, async (req,res)=>{
   }catch(e){console.error(e);sendError(res,500,'Attempt service error.');}
 });
 
-api.post('/attempts/:id/check-answer', requireStudentReady, async (req,res)=>{
+api.post('/attempts/:id/check-answer', requirePasswordReady, async (req,res)=>{
   try {
     const attemptId=Number(req.params.id);
     const questionId=Number(req.body?.questionId);
@@ -721,7 +1073,7 @@ api.post('/attempts/:id/check-answer', requireStudentReady, async (req,res)=>{
   }
 });
 
-api.post('/attempts/:id/submit', requireStudentReady, async (req,res)=>{
+api.post('/attempts/:id/submit', requirePasswordReady, async (req,res)=>{
   try {
     const id=Number(req.params.id);
     const a=await pool.query(`SELECT * FROM attempts WHERE id=$1 AND user_id=$2 LIMIT 1`,[id,req.user.id]);
@@ -768,22 +1120,170 @@ api.post('/attempts/:id/submit', requireStudentReady, async (req,res)=>{
   }catch(e){console.error(e);sendError(res,500,'Grading service error.');}
 });
 
-api.get('/results', requireStudentReady, async (req,res)=>{
+api.get('/results', requirePasswordReady, async (req,res)=>{
   try{
     const q=await pool.query(`SELECT id,exam,subject,mode,language,score,correct_count,total_count,started_at,submitted_at FROM attempts WHERE user_id=$1 AND status='SUBMITTED' ORDER BY started_at DESC LIMIT 100`,[req.user.id]);
     res.json({results:q.rows});
   }catch(e){console.error(e);sendError(res,500,'Results service error.');}
 });
 
+api.get('/admin/usage-monitor', requireAdmin, async (req,res)=>{
+  try{
+    const summary = await pool.query(`
+      SELECT
+        (SELECT count(DISTINCT s.user_id)::int
+           FROM sessions s
+           JOIN users u ON u.id=s.user_id
+          WHERE s.expires_at > now()
+            AND u.role='STUDENT'
+            AND u.is_active=true) AS active_now,
+        (SELECT count(*)::int
+           FROM users u
+          WHERE u.role='STUDENT'
+            AND u.is_active=true
+            AND u.last_login_at >= current_date) AS active_today,
+        (SELECT count(*)::int
+           FROM users u
+          WHERE u.role='STUDENT'
+            AND u.is_active=true
+            AND u.last_login_at >= now()-interval '24 hours') AS active_24h,
+        (SELECT count(*)::int
+           FROM attempts a
+           JOIN users u ON u.id=a.user_id
+          WHERE u.role='STUDENT'
+            AND a.mode='practice'
+            AND a.started_at >= now()-interval '24 hours') AS practice_sessions_24h,
+        (SELECT count(*)::int
+           FROM attempts a
+           JOIN users u ON u.id=a.user_id
+          WHERE u.role='STUDENT'
+            AND a.mode='mock'
+            AND a.started_at >= now()-interval '24 hours') AS mock_tests_24h
+    `);
+
+    const online = await pool.query(`
+      SELECT DISTINCT ON (u.id)
+        u.student_id,u.name,u.email,u.last_login_at,s.expires_at
+      FROM sessions s
+      JOIN users u ON u.id=s.user_id
+      WHERE s.expires_at > now()
+        AND u.role='STUDENT'
+        AND u.is_active=true
+      ORDER BY u.id,s.expires_at DESC
+    `);
+
+    const last24 = await pool.query(`
+      SELECT
+        u.student_id,u.name,u.email,
+        u.last_login_at,
+        count(DISTINCT a.id)::int AS activity_count,
+        max(a.started_at) AS last_activity_at
+      FROM users u
+      LEFT JOIN attempts a
+        ON a.user_id=u.id
+       AND a.started_at >= now()-interval '24 hours'
+      WHERE u.role='STUDENT'
+        AND u.is_active=true
+        AND (
+          u.last_login_at >= now()-interval '24 hours'
+          OR a.id IS NOT NULL
+        )
+      GROUP BY u.id,u.student_id,u.name,u.email,u.last_login_at
+      ORDER BY COALESCE(u.last_login_at,'1970-01-01'::timestamptz) DESC,
+               COALESCE(max(a.started_at),'1970-01-01'::timestamptz) DESC
+    `);
+
+    const practice = await pool.query(`
+      SELECT
+        u.student_id,u.name,u.email,
+        count(a.id)::int AS session_count,
+        min(a.started_at) AS first_started_at,
+        max(a.started_at) AS last_started_at,
+        count(*) FILTER (WHERE a.status='SUBMITTED')::int AS completed_count
+      FROM attempts a
+      JOIN users u ON u.id=a.user_id
+      WHERE u.role='STUDENT'
+        AND u.is_active=true
+        AND a.mode='practice'
+        AND a.started_at >= now()-interval '24 hours'
+      GROUP BY u.id,u.student_id,u.name,u.email
+      ORDER BY count(a.id) DESC,max(a.started_at) DESC
+    `);
+
+    const mock = await pool.query(`
+      SELECT
+        u.student_id,u.name,u.email,
+        count(a.id)::int AS test_count,
+        min(a.started_at) AS first_started_at,
+        max(a.started_at) AS last_started_at,
+        count(*) FILTER (WHERE a.status='SUBMITTED')::int AS completed_count,
+        count(*) FILTER (WHERE a.status='SUBMITTED' AND a.score IS NOT NULL)::int AS scored_count
+      FROM attempts a
+      JOIN users u ON u.id=a.user_id
+      WHERE u.role='STUDENT'
+        AND u.is_active=true
+        AND a.mode='mock'
+        AND a.started_at >= now()-interval '24 hours'
+      GROUP BY u.id,u.student_id,u.name,u.email
+      ORDER BY count(a.id) DESC,max(a.started_at) DESC
+    `);
+
+    res.json({
+      ok:true,
+      active_now:Number(summary.rows[0]?.active_now||0),
+      active_today:Number(summary.rows[0]?.active_today||0),
+      active_24h:Number(summary.rows[0]?.active_24h||0),
+      practice_sessions_24h:Number(summary.rows[0]?.practice_sessions_24h||0),
+      mock_tests_24h:Number(summary.rows[0]?.mock_tests_24h||0),
+      online_students:online.rows.map(x=>({
+        student_id:x.student_id,
+        name:x.name,
+        email:x.email,
+        last_login_at:x.last_login_at,
+        session_expires_at:x.expires_at
+      })),
+      last24_students:last24.rows.map(x=>({
+        student_id:x.student_id,
+        name:x.name,
+        email:x.email,
+        last_login_at:x.last_login_at,
+        activity_count:Number(x.activity_count||0),
+        last_activity_at:x.last_activity_at
+      })),
+      practice_students:practice.rows.map(x=>({
+        student_id:x.student_id,
+        name:x.name,
+        email:x.email,
+        session_count:Number(x.session_count||0),
+        completed_count:Number(x.completed_count||0),
+        first_started_at:x.first_started_at,
+        last_started_at:x.last_started_at
+      })),
+      mock_students:mock.rows.map(x=>({
+        student_id:x.student_id,
+        name:x.name,
+        email:x.email,
+        test_count:Number(x.test_count||0),
+        completed_count:Number(x.completed_count||0),
+        scored_count:Number(x.scored_count||0),
+        first_started_at:x.first_started_at,
+        last_started_at:x.last_started_at
+      }))
+    });
+  }catch(e){
+    console.error('[ADMIN USAGE] error:',e);
+    sendError(res,500,'Usage monitor service error.');
+  }
+});
 api.get('/admin/summary', requireAdmin, async (req,res)=>{
   try{
     const q=await pool.query(`SELECT
       count(*)::int AS total,
       count(*) FILTER (WHERE created_at::date=current_date)::int AS today,
       count(*) FILTER (WHERE date_trunc('month',created_at)=date_trunc('month',now()))::int AS month,
-      count(*) FILTER (WHERE gender IN ('ஆண்','Male','male'))::int AS male,
-      count(*) FILTER (WHERE gender IN ('பெண்','Female','female'))::int AS female,
-      count(*) FILTER (WHERE gender IN ('மூன்றாம் பாலினம்','Third Gender','third'))::int AS third,
+      count(*) FILTER (WHERE trim(COALESCE(gender,''))='ஆண்')::int AS male,
+      count(*) FILTER (WHERE trim(COALESCE(gender,''))='பெண்')::int AS female,
+      count(*) FILTER (WHERE trim(COALESCE(gender,''))='மூன்றாம் பாலினம்')::int AS third,
       max(last_login_at) AS last_login
       FROM users WHERE role='STUDENT' AND is_active=true`);
     res.json({students:{total:q.rows[0].total,today:q.rows[0].today,month:q.rows[0].month,male:q.rows[0].male,female:q.rows[0].female,third:q.rows[0].third,lastLogin:q.rows[0].last_login||null}});
@@ -792,7 +1292,7 @@ api.get('/admin/summary', requireAdmin, async (req,res)=>{
 
 api.get('/admin/students', requireAdmin, async (req,res)=>{
   try{
-    const q=await pool.query(`SELECT student_id,name,email,phone,gender,dob,created_at,last_login_at,is_active FROM users WHERE role='STUDENT' ORDER BY is_active DESC, created_at DESC LIMIT 20000`);
+    const q=await pool.query(`SELECT student_id,name,email,phone,gender,dob,created_at,last_login_at,is_active,must_change_password FROM users WHERE role='STUDENT' ORDER BY is_active DESC, created_at DESC LIMIT 5000`);
     res.json({students:q.rows});
   }catch(e){console.error(e);sendError(res,500,'Admin students error.');}
 });
@@ -869,67 +1369,7 @@ api.patch('/admin/students/:studentId/status', requireAdmin, async (req,res)=>{
   }
 });
 
-
-api.post('/activity', requireAuth, async (req,res)=>{
-  try{
-    const eventType=String(req.body?.event || 'heartbeat').trim().slice(0,80) || 'heartbeat';
-    const allowed=new Set(['login_active','heartbeat','foreground','logout','practice_start','practice_complete','mock_start','mock_complete']);
-    if(!allowed.has(eventType)) return sendError(res,400,'Invalid activity event.');
-    const meta={};
-    if(req.body?.exam) meta.exam=String(req.body.exam).slice(0,100);
-    if(req.body?.subject) meta.subject=String(req.body.subject).slice(0,100);
-    if(req.body?.mode) meta.mode=String(req.body.mode).slice(0,50);
-    await pool.query(`INSERT INTO activity_events(user_id,event_type,metadata) VALUES($1,$2,$3)`,[req.user.id,eventType,JSON.stringify(meta)]);
-    if(eventType!=='logout') await pool.query(`UPDATE sessions SET expires_at=now()+interval '30 minutes' WHERE id=$1`,[req.cookies?.thiral_session]);
-    res.json({ok:true});
-  }catch(e){console.error('Activity error:',e);sendError(res,500,'Activity service error.');}
-});
-
-api.get('/admin/usage-monitor', requireAdmin, async (req,res)=>{
-  try{
-    const summary=await pool.query(`
-      SELECT
-        (SELECT count(DISTINCT s.user_id)::int FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.expires_at>now() AND u.role='STUDENT' AND u.is_active=true) AS active_now,
-        (SELECT count(*)::int FROM users u WHERE u.role='STUDENT' AND u.is_active=true AND u.last_login_at>=current_date) AS active_today,
-        (SELECT count(DISTINCT u.id)::int FROM users u LEFT JOIN activity_events e ON e.user_id=u.id AND e.created_at>=now()-interval '24 hours' WHERE u.role='STUDENT' AND u.is_active=true AND (u.last_login_at>=now()-interval '24 hours' OR e.id IS NOT NULL)) AS active_24h,
-        (SELECT count(*)::int FROM attempts a JOIN users u ON u.id=a.user_id WHERE u.role='STUDENT' AND a.mode='practice' AND a.started_at>=now()-interval '24 hours') AS practice_sessions_24h,
-        (SELECT count(*)::int FROM attempts a JOIN users u ON u.id=a.user_id WHERE u.role='STUDENT' AND a.mode='mock' AND a.started_at>=now()-interval '24 hours') AS mock_tests_24h`);
-
-    const online=await pool.query(`
-      SELECT DISTINCT ON (u.id) u.student_id,u.name,u.email,u.last_login_at,s.expires_at
-      FROM sessions s JOIN users u ON u.id=s.user_id
-      WHERE s.expires_at>now() AND u.role='STUDENT' AND u.is_active=true
-      ORDER BY u.id,s.expires_at DESC`);
-
-    const last24=await pool.query(`
-      SELECT u.student_id,u.name,u.email,u.last_login_at,
-             count(e.id)::int AS activity_count,max(e.created_at) AS last_activity_at
-      FROM users u LEFT JOIN activity_events e ON e.user_id=u.id AND e.created_at>=now()-interval '24 hours'
-      WHERE u.role='STUDENT' AND u.is_active=true AND (u.last_login_at>=now()-interval '24 hours' OR e.id IS NOT NULL)
-      GROUP BY u.id,u.student_id,u.name,u.email,u.last_login_at
-      ORDER BY GREATEST(COALESCE(u.last_login_at,'epoch'::timestamptz),COALESCE(max(e.created_at),'epoch'::timestamptz)) DESC`);
-
-    const practice=await pool.query(`
-      SELECT u.student_id,u.name,u.email,count(a.id)::int AS session_count,
-             count(*) FILTER (WHERE a.status='SUBMITTED')::int AS completed_count,
-             min(a.started_at) AS first_started_at,max(a.started_at) AS last_started_at
-      FROM attempts a JOIN users u ON u.id=a.user_id
-      WHERE u.role='STUDENT' AND u.is_active=true AND a.mode='practice' AND a.started_at>=now()-interval '24 hours'
-      GROUP BY u.id,u.student_id,u.name,u.email ORDER BY count(a.id) DESC,max(a.started_at) DESC`);
-
-    const mock=await pool.query(`
-      SELECT u.student_id,u.name,u.email,count(a.id)::int AS test_count,
-             count(*) FILTER (WHERE a.status='SUBMITTED')::int AS completed_count,
-             min(a.started_at) AS first_started_at,max(a.started_at) AS last_started_at
-      FROM attempts a JOIN users u ON u.id=a.user_id
-      WHERE u.role='STUDENT' AND u.is_active=true AND a.mode='mock' AND a.started_at>=now()-interval '24 hours'
-      GROUP BY u.id,u.student_id,u.name,u.email ORDER BY count(a.id) DESC,max(a.started_at) DESC`);
-
-    res.json({ok:true,summary:summary.rows[0],online_students:online.rows,last24_students:last24.rows,practice_students:practice.rows,mock_students:mock.rows});
-  }catch(e){console.error('Usage monitor error:',e);sendError(res,500,'Usage monitor service error.');}
-});
-
-api.get('/group4/question-status', requireAuth, async (req,res)=>{
+api.get('/group4/question-status', requirePasswordReady, async (req,res)=>{
   try{
     const rows=await pool.query(`
       SELECT subject,language,count(*)::int AS total,
@@ -966,6 +1406,47 @@ app.get('/{*splat}', (req,res)=>{
 });
 
 /* Create the history table/index without touching existing question data. */
+
+
+async function ensureMustChangePasswordColumn(){
+  await pool.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT false
+  `);
+}
+
+async function ensurePasswordResetTables() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS password_reset_otps (
+      id BIGSERIAL PRIMARY KEY,
+      user_id BIGINT NOT NULL,
+      email TEXT NOT NULL,
+      otp_hash TEXT NOT NULL,
+      expires_at TIMESTAMPTZ NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      verified_at TIMESTAMPTZ NULL,
+      reset_token_hash TEXT NULL,
+      used_at TIMESTAMPTZ NULL
+    )
+  `);
+
+  await pool.query(`
+    ALTER TABLE password_reset_otps
+    ADD COLUMN IF NOT EXISTS email TEXT
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_password_reset_otps_user_created
+    ON password_reset_otps(user_id, created_at DESC)
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_password_reset_otps_token
+    ON password_reset_otps(reset_token_hash)
+  `);
+}
+
 async function ensureQuestionHistory() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS question_history (
@@ -990,13 +1471,33 @@ async function ensureQuestionHistory() {
    PostgreSQL advisory transaction lock. Existing users, questions,
    attempts, results and admin data are not deleted or rewritten.
 */
+
+/* Backfill Last Login for older accounts from the server-side LOGIN audit trail.
+   This does not touch passwords, registrations, results or attempts. */
+async function backfillLastLoginFromAudit(){
+  await pool.query(`
+    UPDATE users u
+       SET last_login_at = x.last_login
+      FROM (
+        SELECT user_id, MAX(created_at) AS last_login
+          FROM activity_events
+         WHERE event_type='LOGIN'
+         GROUP BY user_id
+      ) x
+     WHERE u.id=x.user_id
+       AND (u.last_login_at IS NULL OR u.last_login_at < x.last_login)
+  `);
+}
+
 async function start(){
   try{
     await pool.query('SELECT 1');
-    await ensureSecuritySchema();
+    await ensureMustChangePasswordColumn();
+    await ensurePasswordResetTables();
     await ensureQuestionHistory();
+    await backfillLastLoginFromAudit();
     await ensureAdmin();
-    app.listen(PORT,'0.0.0.0',()=>console.log(`Thiral V172-FINAL listening on port ${PORT}`));
+    app.listen(PORT,'0.0.0.0',()=>console.log(`Thiral V171 Secure Temporary Password + Gender Summary + Detailed Usage Monitor listening on port ${PORT}`));
   }catch(e){
     console.error('Startup failed:',e);
     process.exit(1);
