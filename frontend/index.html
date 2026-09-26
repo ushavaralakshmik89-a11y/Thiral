@@ -754,7 +754,7 @@ a{
 <div id="adminStudentList"></div>
 <hr>
 <h3>📊 Exam Overall Results / தேர்வு ஒட்டுமொத்த முடிவுகள்</h3>
-<p class="small">ஒரு தேர்வில் எழுதிய அனைத்து attempts-ன் ஒட்டுமொத்த முடிவுகள். Student ID / Name காட்டப்படாது. ஒவ்வொரு attempt-மும் தனி record ஆக இருக்கும்.</p>
+<p class="small">ஒரு தேர்வில் எழுதிய அனைத்து attempts-ன் ஒட்டுமொத்த முடிவுகள். மாணவர் பெயர் மற்றும் Email மட்டும் அடையாளமாக காட்டப்படும்; Student ID காட்டப்படாது. ஒவ்வொரு attempt-மும் தனி record ஆக இருக்கும்.</p>
 <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
   <div><label for="adminExamFilter">Exam / தேர்வு</label><select id="adminExamFilter"><option value="">அனைத்து தேர்வுகளும்</option></select></div>
   <div><label for="adminExamTypeFilter">Exam Type / வகை</label><select id="adminExamTypeFilter"><option value="">அனைத்தும்</option><option value="model">Model Exam</option><option value="mock">Mock Test</option><option value="practice">Practice</option><option value="bank">Question Bank</option><option value="10">10 Questions</option><option value="20">20 Questions</option><option value="50">50 Questions</option></select></div>
@@ -3768,9 +3768,9 @@ window.V91_ADV_NUM=V91_ADV_NUM;
       if(el('examOverallLowest'))el('examOverallLowest').textContent=(sm.lowest_pct??0)+'%';
       if(el('examOverallQuestions'))el('examOverallQuestions').textContent=String(sm.total_questions??0);
       var rows=(d.rows||[]).map(function(r){
-        return '<tr><td>'+escapeHtml138(r.exam||'')+'</td><td>'+escapeHtml138(r.exam_type||'')+'</td><td>'+escapeHtml138(r.date||'-')+'</td><td>'+String(r.questions??0)+'</td><td>'+String(r.marks??0)+'</td><td>'+String(r.total_marks??0)+'</td><td>'+String(r.percentage??0)+'%</td></tr>';
+        return '<tr><td>'+escapeHtml138(r.name||'')+'</td><td>'+escapeHtml138(r.email||'')+'</td><td>'+escapeHtml138(r.exam||'')+'</td><td>'+escapeHtml138(r.exam_type||'')+'</td><td>'+escapeHtml138(r.date||'-')+'</td><td>'+String(r.questions??0)+'</td><td>'+String(r.marks??0)+'</td><td>'+String(r.total_marks??0)+'</td><td>'+String(r.percentage??0)+'%</td></tr>';
       }).join('');
-      if(list)list.innerHTML=rows?'<table><tr><th>Exam</th><th>Exam Type</th><th>Date</th><th>Questions</th><th>Marks</th><th>Total Marks</th><th>%</th></tr>'+rows+'</table>':'<p>No submitted results found.</p>';
+      if(list)list.innerHTML=rows?'<table><tr><th>Name</th><th>Email</th><th>Exam</th><th>Exam Type</th><th>Date</th><th>Questions</th><th>Marks</th><th>Total Marks</th><th>%</th></tr>'+rows+'</table>':'<p>No submitted results found.</p>';
       var pager=el('adminExamResultsPager');
       var total=Number(d.total||0), limit=Number(d.limit||100), pages=Math.max(1,Math.ceil(total/limit));
       if(pager)pager.innerHTML=(page>1?'<button class="secondary" onclick="loadAdminExamResults('+(page-1)+')">◀ Previous</button>':'')+(page<pages?'<button class="secondary" onclick="loadAdminExamResults('+(page+1)+')">Next ▶</button>':'')+'<span class="small">Page '+page+' / '+pages+' · '+total+' records</span>';
