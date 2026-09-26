@@ -1157,7 +1157,7 @@ function group4TopicForSubtopic(v){
   return '';
 }
 
-/* Admin: exam-wise overall results. Student identity is deliberately omitted from the response. */
+/* Admin: exam-wise overall results. Student identity is included for result reporting. */
 api.get('/admin/exam-results', requireAdmin, async (req,res)=>{
   try{
     const exam = String(req.query.exam || '').trim();
@@ -1227,24 +1227,6 @@ api.get('/admin/exam-results', requireAdmin, async (req,res)=>{
   }catch(e){console.error('[ADMIN EXAM RESULTS]',e);sendError(res,500,'Exam results service error.');}
 });
 
-api.get('/admin/exam-results/:attemptId', requireAdmin, async (req,res)=>{
-  try{
-    const id=Number(req.params.attemptId);
-    if(!Number.isInteger(id) || id<1) return sendError(res,400,'Invalid attempt ID.');
-    const typeSql=`CASE WHEN lower(a.exam) LIKE '%model%' THEN 'Model Exam' WHEN a.mode='mock' THEN 'Mock Test' WHEN a.mode='bank' THEN 'Question Bank' WHEN a.total_count=10 THEN '10 Questions' WHEN a.total_count=20 THEN '20 Questions' WHEN a.total_count=50 THEN '50 Questions' ELSE 'Practice' END`;
-    const q=await pool.query(`SELECT a.id AS attempt_id,u.name,u.email,a.exam,${typeSql} AS exam_type,to_char(COALESCE(a.submitted_at,a.started_at),'DD-MM-YYYY HH24:MI') AS date,COALESCE(a.total_count,0)::int AS questions,COALESCE(a.correct_count,0)::int AS correct,COALESCE(a.score,0)::numeric(10,2) AS percentage FROM attempts a JOIN users u ON u.id=a.user_id WHERE a.id=$1 AND a.status='SUBMITTED' LIMIT 1`,[id]);
-    if(!q.rowCount) return sendError(res,404,'Result not found.');
-    const r=q.rows[0];
-    const subsQ=await pool.query(`SELECT DISTINCT qq.subtopic FROM unnest((SELECT question_ids FROM attempts WHERE id=$1)) AS aqid JOIN questions qq ON qq.id=aqid WHERE qq.subtopic IS NOT NULL ORDER BY qq.subtopic`,[id]);
-    const subtopics=subsQ.rows.map(x=>x.subtopic).filter(Boolean);
-    const topic=[...new Set(subtopics.map(group4TopicForSubtopic).filter(Boolean))].join(' | ');
-    const eventQ=await pool.query(`SELECT metadata FROM activity_events WHERE event_type='ATTEMPT_SUBMITTED' AND metadata->>'attempt_id'=$1 ORDER BY id DESC LIMIT 1`,[String(id)]);
-    const unanswered=eventQ.rowCount ? Math.max(0,Number(eventQ.rows[0].metadata?.unanswered||0)) : 0;
-    const wrong=Math.max(0,Number(r.questions)-Number(r.correct)-unanswered);
-    res.json({ok:true,result:{...r,wrong,unanswered,topic,subtopics:subtopics.join(' | ')}});
-  }catch(e){console.error('[ADMIN EXAM RESULT DETAIL]',e);sendError(res,500,'Exam result detail service error.');}
-});
-
 api.get('/admin/exam-results/export', requireAdmin, async (req,res)=>{
   try{
     const exam=String(req.query.exam||'').trim();
@@ -1295,6 +1277,26 @@ api.get('/admin/exam-results/export', requireAdmin, async (req,res)=>{
     res.send(Buffer.from('\ufeff'+lines.join('\r\n'),'utf16le'));
   }catch(e){console.error('[ADMIN EXAM EXPORT]',e);sendError(res,500,'Exam export service error.');}
 });
+
+
+api.get('/admin/exam-results/:attemptId', requireAdmin, async (req,res)=>{
+  try{
+    const id=Number(req.params.attemptId);
+    if(!Number.isInteger(id) || id<1) return sendError(res,400,'Invalid attempt ID.');
+    const typeSql=`CASE WHEN lower(a.exam) LIKE '%model%' THEN 'Model Exam' WHEN a.mode='mock' THEN 'Mock Test' WHEN a.mode='bank' THEN 'Question Bank' WHEN a.total_count=10 THEN '10 Questions' WHEN a.total_count=20 THEN '20 Questions' WHEN a.total_count=50 THEN '50 Questions' ELSE 'Practice' END`;
+    const q=await pool.query(`SELECT a.id AS attempt_id,u.name,u.email,a.exam,${typeSql} AS exam_type,to_char(COALESCE(a.submitted_at,a.started_at),'DD-MM-YYYY HH24:MI') AS date,COALESCE(a.total_count,0)::int AS questions,COALESCE(a.correct_count,0)::int AS correct,COALESCE(a.score,0)::numeric(10,2) AS percentage FROM attempts a JOIN users u ON u.id=a.user_id WHERE a.id=$1 AND a.status='SUBMITTED' LIMIT 1`,[id]);
+    if(!q.rowCount) return sendError(res,404,'Result not found.');
+    const r=q.rows[0];
+    const subsQ=await pool.query(`SELECT DISTINCT qq.subtopic FROM unnest((SELECT question_ids FROM attempts WHERE id=$1)) AS aqid JOIN questions qq ON qq.id=aqid WHERE qq.subtopic IS NOT NULL ORDER BY qq.subtopic`,[id]);
+    const subtopics=subsQ.rows.map(x=>x.subtopic).filter(Boolean);
+    const topic=[...new Set(subtopics.map(group4TopicForSubtopic).filter(Boolean))].join(' | ');
+    const eventQ=await pool.query(`SELECT metadata FROM activity_events WHERE event_type='ATTEMPT_SUBMITTED' AND metadata->>'attempt_id'=$1 ORDER BY id DESC LIMIT 1`,[String(id)]);
+    const unanswered=eventQ.rowCount ? Math.max(0,Number(eventQ.rows[0].metadata?.unanswered||0)) : 0;
+    const wrong=Math.max(0,Number(r.questions)-Number(r.correct)-unanswered);
+    res.json({ok:true,result:{...r,wrong,unanswered,topic,subtopics:subtopics.join(' | ')}});
+  }catch(e){console.error('[ADMIN EXAM RESULT DETAIL]',e);sendError(res,500,'Exam result detail service error.');}
+});
+
 
 api.get('/admin/usage-monitor', requireAdmin, async (req,res)=>{
   try{
