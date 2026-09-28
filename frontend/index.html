@@ -4792,7 +4792,7 @@ window.startPractice=async function(n){
     var box=document.getElementById('securityEvents138');
     if(msg) msg.textContent='Loading...';
     try{
-      var d=await api138('/admin/security/events?limit=100');
+      var apiClient = window.thiralV138Api; if(typeof apiClient!=='function') throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.'); var d=await apiClient('/admin/security/events?limit=100');
       var st=d.stats||{};
       if(stats) stats.innerHTML=
         '<div class="card admin-stat-card"><h3>🔴 Failed Logins</h3><p>'+(st.failed_logins||0)+'</p><span class="small">Last 24 hours</span></div>'+
