@@ -732,6 +732,7 @@ a{
 <div class="card admin-stat-card" role="button" tabindex="0" onclick="toggleUsageDetail('usageMockDetail')" onkeydown="if(event.key==='Enter'||event.key===' ')toggleUsageDetail('usageMockDetail')" style="cursor:pointer"><h3>🎯 Mock Tests</h3><p id="onlineMockCount">-</p><span class="small">யார் யார் என்பதை காண்க ▾</span></div>
 </div>
 <p id="onlineMonitorMsg" class="small">மேலுள்ள எண்ணிக்கையை அழுத்தினால் அந்த எண்ணிக்கைக்கான முழு விவரங்கள் திறக்கும்.</p>
+<button class="secondary" onclick="refreshOnlineMonitor()">🔄 Usage Refresh</button>
 <div id="onlineStudentList" class="hidden" style="margin-top:14px"></div>
 <div id="usageLast24Detail" class="hidden" style="margin-top:18px"></div>
 <div id="usagePracticeDetail" class="hidden" style="margin-top:18px"></div>
@@ -747,7 +748,8 @@ a{
 </div>
 <p id="securityMsg138" class="small"></p>
 <div id="securityStats138" class="grid admin-stat-grid" style="margin-top:10px"></div>
-<div id="securityEvents138" style="margin-top:14px"></div>
+<p id="securitySelectMsg138" class="small">மேலுள்ள Security card-ஐ கிளிக் செய்தால் அந்த வகை நிகழ்வுகள் மட்டும் தனியாக காட்டப்படும்.</p>
+<div id="securityDetail138" class="hidden" style="margin-top:14px"></div>
 </div>
 <hr>
 <h3>💡 Student Suggestions / Feedback</h3>
@@ -3974,26 +3976,10 @@ window.V91_ADV_NUM=V91_ADV_NUM;
   };
 
 
-  window.toggleUsageDetail=async function(id){
+  window.toggleUsageDetail=function(id){
     var node=document.getElementById(id);
     if(!node) return;
-
-    var detailIds=['onlineStudentList','usageLast24Detail','usagePracticeDetail','usageMockDetail'];
-    var wasHidden=node.classList.contains('hidden');
-
-    detailIds.forEach(function(otherId){
-      var other=document.getElementById(otherId);
-      if(other && otherId!==id) other.classList.add('hidden');
-    });
-
-    if(!wasHidden){
-      node.classList.add('hidden');
-      return;
-    }
-
-    node.classList.remove('hidden');
-    node.innerHTML='<div class="card" style="margin-top:10px"><p class="small">விவரங்கள் ஏற்றப்படுகின்றன...</p></div>';
-    await refreshOnlineMonitor();
+    node.classList.toggle('hidden');
   };
 
   window.openAdminStudentView = async function(filter){
@@ -4107,6 +4093,13 @@ window.V91_ADV_NUM=V91_ADV_NUM;
   window.addEventListener('load', function(){
     setTimeout(bootV138, 50);
   });
+  setInterval(function(){
+    var sec=document.getElementById('adminDashboard');
+    if(sec && !sec.classList.contains('hidden') && sec.style.display!=='none'){
+      refreshOnlineMonitor();
+    }
+  },60000);
+
 })();
 </script>
 
@@ -4784,24 +4777,63 @@ window.startPractice=async function(n){
 <script>
 (function(){
   function escSecurity(v){
-    return String(v ?? '').replace(/[&<>"']/g,function(c){return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]);});
+    return String(v ?? '').replace(/[&<>\"']/g,function(c){return ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]);});
   }
+  var securityEventsCache138=[];
+  var securityStatsCache138={};
+  var securityActiveFilter138='';
+
+  function securityRows138(rows){
+    if(!rows.length) return '<p class="small">இந்த வகை Security events இல்லை.</p>';
+    return '<div style="overflow:auto"><table><thead><tr><th>Date</th><th>Event</th><th>Email</th><th>IP</th><th>Browser</th><th>Details</th></tr></thead><tbody>'+rows.map(function(x){
+      return '<tr><td>'+escSecurity(x.created_at||'')+'</td><td>'+escSecurity(x.event_type||'')+'</td><td>'+escSecurity(x.email||'-')+'</td><td>'+escSecurity(x.ip||'-')+'</td><td>'+escSecurity(x.user_agent||'-')+'</td><td>'+escSecurity(x.details||'')+'</td></tr>';
+    }).join('')+'</tbody></table></div>';
+  }
+
+  window.showSecurityDetail138=function(type){
+    var titles={FAILED_LOGIN:'Failed Logins',ADMIN_LOGIN_SUCCESS:'Successful Admin Logins',UNAUTHORIZED_ADMIN_ACCESS:'Unauthorized Admin Access'};
+    var title=titles[type]||type;
+    var box=document.getElementById('securityDetail138');
+    var msg=document.getElementById('securitySelectMsg138');
+    if(!box) return;
+    if(securityActiveFilter138===type){
+      box.classList.add('hidden');
+      securityActiveFilter138='';
+      if(msg) msg.textContent='மேலுள்ள Security card-ஐ கிளிக் செய்தால் அந்த வகை நிகழ்வுகள் மட்டும் தனியாக காட்டப்படும்.';
+      return;
+    }
+    securityActiveFilter138=type;
+    var rows=securityEventsCache138.filter(function(x){return x.event_type===type;});
+    box.innerHTML='<h4 style="margin:0 0 10px">'+escSecurity(title)+'</h4>'+securityRows138(rows);
+    box.classList.remove('hidden');
+    if(msg) msg.textContent=title+' விவரங்கள் மட்டும் காட்டப்படுகிறது. மீண்டும் அதே card-ஐ கிளிக் செய்தால் மறையும்.';
+    box.scrollIntoView({behavior:'smooth',block:'nearest'});
+  };
+
+  function securityCard138(icon,title,count,type){
+    return '<div class="card admin-stat-card" role="button" tabindex="0" style="cursor:pointer" onclick="showSecurityDetail138(\''+type+'\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \')showSecurityDetail138(\''+type+'\')"><h3>'+icon+' '+title+'</h3><p>'+Number(count||0)+'</p><span class="small">கிளிக் செய்து விவரம் காண்க ▾</span></div>';
+  }
+
   window.loadSecurityEvents138 = async function(){
     var msg=document.getElementById('securityMsg138');
     var stats=document.getElementById('securityStats138');
-    var box=document.getElementById('securityEvents138');
+    var box=document.getElementById('securityDetail138');
     if(msg) msg.textContent='Loading...';
     try{
-      var apiClient = window.thiralV138Api; if(typeof apiClient!=='function') throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.'); var d=await apiClient('/admin/security/events?limit=100');
+      var apiClient=window.thiralV138Api;
+      if(typeof apiClient!=='function') throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
+      var d=await apiClient('/admin/security/events?limit=100');
       var st=d.stats||{};
+      securityEventsCache138=d.events||[];
+      securityStatsCache138=st;
+      securityActiveFilter138='';
+      if(box){box.classList.add('hidden');box.innerHTML='';}
       if(stats) stats.innerHTML=
-        '<div class="card admin-stat-card"><h3>🔴 Failed Logins</h3><p>'+(st.failed_logins||0)+'</p><span class="small">Last 24 hours</span></div>'+
-        '<div class="card admin-stat-card"><h3>🟢 Successful Admin Logins</h3><p>'+(st.successful_admin_logins||0)+'</p><span class="small">Last 24 hours</span></div>'+
-        '<div class="card admin-stat-card"><h3>🚫 Unauthorized Admin Access</h3><p>'+(st.unauthorized_admin_access||0)+'</p><span class="small">Last 24 hours</span></div>';
-      var rows=(d.events||[]).map(function(x){
-        return '<tr><td>'+escSecurity(x.created_at||'')+'</td><td>'+escSecurity(x.event_type||'')+'</td><td>'+escSecurity(x.email||'-')+'</td><td>'+escSecurity(x.ip||'-')+'</td><td>'+escSecurity(x.user_agent||'-')+'</td><td>'+escSecurity(x.details||'')+'</td></tr>';
-      }).join('');
-      if(box) box.innerHTML=rows?'<div style="overflow:auto"><table><thead><tr><th>Date</th><th>Event</th><th>Email</th><th>IP</th><th>Browser</th><th>Details</th></tr></thead><tbody>'+rows+'</tbody></table></div>':'<p class="small">Security events இல்லை.</p>';
+        securityCard138('🔴','Failed Logins',st.failed_logins,'FAILED_LOGIN')+
+        securityCard138('🟢','Successful Admin Logins',st.successful_admin_logins,'ADMIN_LOGIN_SUCCESS')+
+        securityCard138('🚫','Unauthorized Admin Access',st.unauthorized_admin_access,'UNAUTHORIZED_ADMIN_ACCESS');
+      var selectMsg=document.getElementById('securitySelectMsg138');
+      if(selectMsg) selectMsg.textContent='மேலுள்ள Security card-ஐ கிளிக் செய்தால் அந்த வகை நிகழ்வுகள் மட்டும் தனியாக காட்டப்படும்.';
       if(msg) msg.textContent='Security data refreshed.';
     }catch(e){ if(msg) msg.textContent='Security: '+(e&&e.message||e); }
   };
