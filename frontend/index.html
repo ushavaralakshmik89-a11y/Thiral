@@ -732,7 +732,6 @@ a{
 <div class="card admin-stat-card" role="button" tabindex="0" onclick="toggleUsageDetail('usageMockDetail')" onkeydown="if(event.key==='Enter'||event.key===' ')toggleUsageDetail('usageMockDetail')" style="cursor:pointer"><h3>🎯 Mock Tests</h3><p id="onlineMockCount">-</p><span class="small">யார் யார் என்பதை காண்க ▾</span></div>
 </div>
 <p id="onlineMonitorMsg" class="small">மேலுள்ள எண்ணிக்கையை அழுத்தினால் அந்த எண்ணிக்கைக்கான முழு விவரங்கள் திறக்கும்.</p>
-<button class="secondary" onclick="refreshOnlineMonitor()">🔄 Usage Refresh</button>
 <div id="onlineStudentList" class="hidden" style="margin-top:14px"></div>
 <div id="usageLast24Detail" class="hidden" style="margin-top:18px"></div>
 <div id="usagePracticeDetail" class="hidden" style="margin-top:18px"></div>
@@ -3976,10 +3975,18 @@ window.V91_ADV_NUM=V91_ADV_NUM;
   };
 
 
-  window.toggleUsageDetail=function(id){
+  window.toggleUsageDetail=async function(id){
+    var ids=['onlineStudentList','usageLast24Detail','usagePracticeDetail','usageMockDetail'];
     var node=document.getElementById(id);
     if(!node) return;
-    node.classList.toggle('hidden');
+    var wasOpen=!node.classList.contains('hidden');
+    ids.forEach(function(x){
+      var n=document.getElementById(x);
+      if(n) n.classList.add('hidden');
+    });
+    if(wasOpen) return;
+    await refreshOnlineMonitor();
+    node.classList.remove('hidden');
   };
 
   window.openAdminStudentView = async function(filter){
@@ -4093,13 +4100,6 @@ window.V91_ADV_NUM=V91_ADV_NUM;
   window.addEventListener('load', function(){
     setTimeout(bootV138, 50);
   });
-  setInterval(function(){
-    var sec=document.getElementById('adminDashboard');
-    if(sec && !sec.classList.contains('hidden') && sec.style.display!=='none'){
-      refreshOnlineMonitor();
-    }
-  },60000);
-
 })();
 </script>
 
