@@ -1751,6 +1751,9 @@ app.use('/api/admin', async (req, res, next) => {
       return sendError(res, 403, 'ACCESS DENIED: Admin authorization required.');
     }
     req.user = user;
+    res.setHeader('Cache-Control','no-store, no-cache, must-revalidate, private');
+    res.setHeader('Pragma','no-cache');
+    res.setHeader('Vary','Cookie, Origin');
     next();
   } catch (e) {
     console.error('Admin authorization error:', e);
