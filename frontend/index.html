@@ -531,6 +531,8 @@ a{
 <button onclick="startPractice(10)">📝 10 கேள்விகள்</button>
 <button onclick="startPractice(20)">📝 20 கேள்விகள்</button>
 <button onclick="startPractice(50)">📝 50 கேள்விகள்</button>
+<button onclick="startPractice(100)">📝 100 கேள்விகள்</button>
+<button onclick="startPractice(200)">📝 200 கேள்விகள்</button>
 <button onclick="startPractice(9999)">♾️ Question Bank முழுவதும் / தொடர்ச்சி</button>
 <button onclick="show('material')">📖 Study Material</button>
 
@@ -4257,10 +4259,16 @@ async function answer(value,timeout=false){
 async function loadPracticeQuestions(requested){
   const dbSubject = currentSubject==='gs' ? 'பொது அறிவு' : currentSubject==='apt' ? 'apt' : currentSubject==='tamil' ? 'tamil' : '';
   if(!dbSubject) throw new Error('Subject தேர்வு செய்யப்படவில்லை.');
-  const d=await api('/practice/questions-v2?exam='+encodeURIComponent(String(selectedExam||'group4'))+
+  let url='/practice/questions-v2?exam='+encodeURIComponent(String(selectedExam||'group4'))+
     '&subject='+encodeURIComponent(dbSubject)+
     '&language='+encodeURIComponent(contentLanguage==='en'?'en':'ta')+
-    '&limit='+encodeURIComponent(String(requested)));
+    '&limit='+encodeURIComponent(String(requested));
+  /* 10-question Practice is the selected Subtopic; 20/50/100/200/full
+     intentionally use the entire selected Subject across all Topics. */
+  if(Number(requested)===10 && currentSub){
+    url+='&subtopic='+encodeURIComponent(String(currentSub));
+  }
+  const d=await api(url);
   return Array.isArray(d.questions)?d.questions:[];
 }
 
@@ -4268,7 +4276,7 @@ async function startPractice(n){
   stop();
   const requested=Number(n||10);
   if(![10,20,50,100,200,500,1000,9999].includes(requested)){
-    if($('feedback'))$('feedback').textContent='Practice எண்ணிக்கை 10, 20, 50, 100, 200, 500, 1000 அல்லது “முழுவதும்” மட்டும்.';
+    if($('feedback'))$('feedback').textContent='Practice எண்ணிக்கை 10, 20, 50, 100, 200, 500, 1000 அல்லது Question Bank மட்டும்.';
     return;
   }
   T.q=[];T.answers={};T.checks={};T.i=0;T.attempt=null;T.submitted=false;T.busy=false;
