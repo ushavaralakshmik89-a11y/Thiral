@@ -1002,18 +1002,19 @@ api.get('/practice/questions', requirePasswordReady, async (req, res) => {
     const subjectCandidatesList = subjectCandidates(rawSubject);
     const language = String(req.query.language || 'ta').trim();
     const subtopic = String(req.query.subtopic || '').trim();
-    const limit = Math.min(
-      Math.max(parseInt(req.query.limit || '10', 10) || 10, 1),
-      200
-    );
+    const requested = parseInt(req.query.limit || '10', 10);
+    const limit = Number.isFinite(requested) ? requested : 10;
+    const infinite = limit === 0 || limit === 9999;
 
     if (!exam || !subject || !['ta', 'en'].includes(language)) {
       return sendError(res, 400, 'Invalid question request.');
     }
+    if (!infinite && ![10, 20, 50].includes(limit)) {
+      return sendError(res, 400, 'Practice count must be 10, 20, 50 or Infinity.');
+    }
 
     const params = [req.user.id, exam, subjectCandidatesList, language];
     let n = 5;
-
     let where = `
       q.exam = $2
       AND q.subject = ANY($3::text[])
@@ -1032,47 +1033,116 @@ api.get('/practice/questions', requirePasswordReady, async (req, res) => {
       n++;
     }
 
-    params.push(limit);
-
-    const sql = `
-      SELECT
-        q.id,
-        q.exam,
-        q.subject,
-        q.subtopic,
-        q.language,
-        q.question,
-        q.options,
-        q.explanation
-      FROM questions q
-      WHERE ${where}
-        AND NOT EXISTS (
-          SELECT 1
-          FROM question_history h
-          WHERE h.user_id = $1
-            AND h.question_id = q.id
-            AND h.mode = 'practice'
-        )
-      ORDER BY random()
-      LIMIT $${n}
+    /*
+       difficulty_stage is read-only here.
+       Tamil rows use questions.difficulty_stage when present.
+       GK/Aptitude rows can use the already-created question_difficulty_work table.
+       No question row is updated or deleted by this endpoint.
+    */
+    const baseSql = `
+      WITH base AS (
+        SELECT
+          q.id,
+          q.exam,
+          q.subject,
+          q.subtopic,
+          q.language,
+          q.question,
+          q.options,
+          q.explanation,
+          GREATEST(1, LEAST(5, COALESCE(q.difficulty_stage, dw.difficulty_stage, 3)))::int AS difficulty_stage,
+          EXISTS (
+            SELECT 1
+            FROM question_history h
+            WHERE h.user_id = $1
+              AND h.question_id = q.id
+              AND h.mode = 'practice'
+          ) AS already_used
+        FROM questions q
+        LEFT JOIN question_difficulty_work dw ON dw.question_id = q.id
+        WHERE ${where}
+      )
     `;
+
+    let sql;
+    if (infinite) {
+      /* Full available bank, grouped by the five difficulty stages.
+         Unused questions come first; once the user's pool is exhausted,
+         already-used questions become available for the next cycle. */
+      sql = baseSql + `
+        SELECT
+          id, exam, subject, subtopic, language, question, options, explanation,
+          difficulty_stage,
+          CASE difficulty_stage
+            WHEN 1 THEN 'Easy / எளிது'
+            WHEN 2 THEN 'Medium / நடுத்தரம்'
+            WHEN 3 THEN 'Hard / கடினம்'
+            WHEN 4 THEN 'Very Hard / மிகக் கடினம்'
+            ELSE 'Extreme / எக்ஸ்ட்ரீம்'
+          END AS difficulty
+        FROM base
+        ORDER BY already_used ASC, difficulty_stage ASC, random()
+      `;
+    } else {
+      /* Exact screen progression for 10/20/50.
+         1–10 Easy, 11–20 Medium, 21–30 Hard, 31–40 Very Hard, 41+ Extreme. */
+      const quota = limit === 10
+        ? [10,0,0,0,0]
+        : limit === 20
+          ? [10,10,0,0,0]
+          : [10,10,10,10,10];
+
+      const quotaValues = quota.map((x, i) => `(${i+1}, ${x})`).join(',');
+      sql = baseSql + `
+        , wanted(stage, quota) AS (VALUES ${quotaValues}),
+        ranked AS (
+          SELECT b.*, w.quota,
+            ROW_NUMBER() OVER (
+              PARTITION BY b.difficulty_stage
+              ORDER BY b.already_used ASC, random()
+            ) AS rn
+          FROM base b
+          JOIN wanted w ON w.stage = b.difficulty_stage
+        )
+        SELECT
+          id, exam, subject, subtopic, language, question, options, explanation,
+          difficulty_stage,
+          CASE difficulty_stage
+            WHEN 1 THEN 'Easy / எளிது'
+            WHEN 2 THEN 'Medium / நடுத்தரம்'
+            WHEN 3 THEN 'Hard / கடினம்'
+            WHEN 4 THEN 'Very Hard / மிகக் கடினம்'
+            ELSE 'Extreme / எக்ஸ்ட்ரீம்'
+          END AS difficulty
+        FROM ranked
+        WHERE rn <= quota
+        ORDER BY difficulty_stage ASC, rn ASC
+      `;
+    }
 
     const result = await pool.query(sql, params);
 
-    if (result.rows.length < limit) {
+    if (!infinite && result.rows.length < limit) {
       return sendError(
         res,
         409,
-        `???? ????????? ???????? ????? ????????? ${result.rows.length} ??????? ?????.`
+        `தேவையான difficulty கேள்விகள் போதவில்லை. கிடைத்தது ${result.rows.length}/${limit}.`
       );
     }
 
     res.json({
       questions: result.rows,
-      count: result.rows.length
+      count: result.rows.length,
+      difficultySequence: [
+        { from: 1, to: 10, stage: 1, label: 'Easy / எளிது' },
+        { from: 11, to: 20, stage: 2, label: 'Medium / நடுத்தரம்' },
+        { from: 21, to: 30, stage: 3, label: 'Hard / கடினம்' },
+        { from: 31, to: 40, stage: 4, label: 'Very Hard / மிகக் கடினம்' },
+        { from: 41, to: null, stage: 5, label: 'Extreme / எக்ஸ்ட்ரீம்' }
+      ]
     });
   } catch (e) {
-    console.error('Practice question error:', e);
+    console.error('Practice difficulty question error:', e);
     sendError(res, 500, 'Practice question service error.');
   }
 });
