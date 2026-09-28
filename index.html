@@ -672,18 +672,16 @@ a{
 </div>
 <div class="card" style="margin-top:16px;border:1px solid #dbeafe">
 <h3>📡 Beta Usage Monitor</h3>
-<p class="small">Beta Test-ல் தற்போது எத்தனை மாணவர்கள் உள்ளே இருக்கிறார்கள், கடந்த 24 மணி நேர பயன்பாடு மற்றும் Practice/Mock பயன்பாட்டை central activity data மூலம் பார்க்கும் பகுதி. மாணவர்களின் Password ஒருபோதும் அனுப்பப்படாது.</p>
+<p class="small">10 மாணவர்கள் Beta Test பயன்படுத்துகிறார்களா என்பதை central activity data மூலம் பார்க்கும் பகுதி. மாணவர்களின் Password ஒருபோதும் அனுப்பப்படாது.</p>
 <div class="grid admin-stat-grid">
-<div class="card admin-stat-card" role="button" tabindex="0" onclick="toggleUsageDetail('onlineStudentList')" onkeydown="if(event.key==='Enter'||event.key===' ')toggleUsageDetail('onlineStudentList')" style="cursor:pointer"><h3>🟢 Currently Online</h3><p id="onlineActiveNow">-</p><span class="small">விவரங்களை காண்க ▾</span></div>
-<div class="card admin-stat-card" role="button" tabindex="0" onclick="toggleUsageDetail('usageLast24Detail')" onkeydown="if(event.key==='Enter'||event.key===' ')toggleUsageDetail('usageLast24Detail')" style="cursor:pointer"><h3>🕐 Last 24 Hours</h3><p id="onlineActive24h">-</p><span class="small">விவரங்களை காண்க ▾</span></div>
-<div class="card admin-stat-card" role="button" tabindex="0" onclick="toggleUsageDetail('usagePracticeDetail')" onkeydown="if(event.key==='Enter'||event.key===' ')toggleUsageDetail('usagePracticeDetail')" style="cursor:pointer"><h3>📝 Practice Sessions</h3><p id="onlinePracticeCount">-</p><span class="small">யார் யார் என்பதை காண்க ▾</span></div>
-<div class="card admin-stat-card" role="button" tabindex="0" onclick="toggleUsageDetail('usageMockDetail')" onkeydown="if(event.key==='Enter'||event.key===' ')toggleUsageDetail('usageMockDetail')" style="cursor:pointer"><h3>🎯 Mock Tests</h3><p id="onlineMockCount">-</p><span class="small">யார் யார் என்பதை காண்க ▾</span></div>
+<div class="card admin-stat-card"><h3>🟢 Active Today</h3><p id="onlineActiveToday">-</p></div>
+<div class="card admin-stat-card"><h3>🕐 Last 24 Hours</h3><p id="onlineActive24h">-</p></div>
+<div class="card admin-stat-card"><h3>📝 Practice Sessions</h3><p id="onlinePracticeCount">-</p></div>
+<div class="card admin-stat-card"><h3>🎯 Mock Tests</h3><p id="onlineMockCount">-</p></div>
 </div>
-<p id="onlineMonitorMsg" class="small">மேலுள்ள எண்ணிக்கையை அழுத்தினால் அந்த எண்ணிக்கைக்கான முழு விவரங்கள் திறக்கும்.</p>
-<div id="onlineStudentList" class="hidden" style="margin-top:14px"></div>
-<div id="usageLast24Detail" class="hidden" style="margin-top:18px"></div>
-<div id="usagePracticeDetail" class="hidden" style="margin-top:18px"></div>
-<div id="usageMockDetail" class="hidden" style="margin-top:18px"></div>
+<p id="onlineMonitorMsg" class="small">Online tracking அமைக்கப்படவில்லை.</p>
+<button class="secondary" onclick="refreshOnlineMonitor()">🔄 Usage Refresh</button>
+<div id="onlineStudentList" style="margin-top:14px"></div>
 </div>
 <hr>
 <h3>💡 Student Suggestions / Feedback</h3>
@@ -3045,7 +3043,6 @@ window.V91_ADV_NUM=V91_ADV_NUM;
       if(!d.user || d.user.role !== 'ADMIN') throw new Error('Admin authorization required.');
       enterV138(d.user);
       await loadAdminV138();
-      if(window.refreshOnlineMonitor) await window.refreshOnlineMonitor();
       show('admin');
     }catch(e){
       var denied = String(e && e.message || '').indexOf('ACCESS DENIED') === 0;
@@ -3629,90 +3626,8 @@ window.V91_ADV_NUM=V91_ADV_NUM;
     show('adminStudentView');
   };
 
-  window.toggleUsageDetail=async function(id){
-    var node=document.getElementById(id);
-    if(!node) return;
-    if(node.classList.contains('hidden')){
-      if(window.refreshOnlineMonitor){
-        await window.refreshOnlineMonitor();
-      }
-      ['onlineStudentList','usageLast24Detail','usagePracticeDetail','usageMockDetail'].forEach(function(otherId){
-        var other=document.getElementById(otherId);
-        if(other && otherId!==id) other.classList.add('hidden');
-      });
-      node.classList.remove('hidden');
-    }else{
-      node.classList.add('hidden');
-    }
-  };
-
-  window.refreshOnlineMonitor=async function(){
-    function esc(s){
-      return String(s == null ? '' : s).replace(/[&<>'"]/g,function(c){
-        return {'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c];
-      });
-    }
-    function dt(v){
-      return v ? new Date(v).toLocaleString('en-IN') : '-';
-    }
-    function table(title, headers, rows, emptyText){
-      if(!rows.length) return '<div class="card" style="margin-top:10px"><h4>'+title+'</h4><p class="small">'+emptyText+'</p></div>';
-      var head='<tr>'+headers.map(function(h){return '<th>'+h+'</th>';}).join('')+'</tr>';
-      return '<div class="card" style="margin-top:10px;overflow:auto"><h4>'+title+'</h4><table>'+head+rows.join('')+'</table></div>';
-    }
-
-    try{
-      var d=await api138('/admin/usage-monitor');
-      if(el('onlineActiveNow')) el('onlineActiveNow').textContent=String(d.active_now ?? 0);
-      if(el('onlineActive24h')) el('onlineActive24h').textContent=String(d.active_24h ?? 0);
-      if(el('onlinePracticeCount')) el('onlinePracticeCount').textContent=String(d.practice_sessions_24h ?? 0);
-      if(el('onlineMockCount')) el('onlineMockCount').textContent=String(d.mock_tests_24h ?? 0);
-
-      var onlineRows=(d.online_students||[]).map(function(x){
-        return '<tr><td>'+esc(x.student_id)+'</td><td>'+esc(x.name)+'</td><td>'+esc(x.email)+'</td><td>'+esc(dt(x.last_login_at))+'</td><td>'+esc(dt(x.session_expires_at))+'</td></tr>';
-      });
-      if(el('onlineStudentList')) el('onlineStudentList').innerHTML=table(
-        '🟢 தற்போது Online-ல் இருப்பவர்கள் ('+(d.online_students||[]).length+')',
-        ['Student ID','Name','Email','Last Login','Session Valid Until'],
-        onlineRows,
-        'தற்போது valid session உள்ள Student இல்லை.'
-      );
-
-      var last24Rows=(d.last24_students||[]).map(function(x){
-        return '<tr><td>'+esc(x.student_id)+'</td><td>'+esc(x.name)+'</td><td>'+esc(x.email)+'</td><td>'+esc(dt(x.last_login_at))+'</td><td>'+esc(String(x.activity_count||0))+'</td><td>'+esc(dt(x.last_activity_at))+'</td></tr>';
-      });
-      if(el('usageLast24Detail')) el('usageLast24Detail').innerHTML=table(
-        '🕐 கடந்த 24 மணி நேரத்தில் பயன்படுத்திய மாணவர்கள் ('+(d.last24_students||[]).length+')',
-        ['Student ID','Name','Email','Last Login','Activity / Attempts','Last Activity'],
-        last24Rows,
-        'கடந்த 24 மணி நேரத்தில் பதிவு செய்யப்பட்ட Student activity இல்லை.'
-      );
-
-      var practiceRows=(d.practice_students||[]).map(function(x){
-        return '<tr><td>'+esc(x.student_id)+'</td><td>'+esc(x.name)+'</td><td>'+esc(x.email)+'</td><td><b>'+esc(String(x.session_count||0))+'</b></td><td>'+esc(String(x.completed_count||0))+'</td><td>'+esc(dt(x.last_started_at))+'</td></tr>';
-      });
-      if(el('usagePracticeDetail')) el('usagePracticeDetail').innerHTML=table(
-        '📝 Practice பயன்படுத்திய மாணவர்கள் ('+(d.practice_students||[]).length+')',
-        ['Student ID','Name','Email','Practice Sessions','Completed','Last Started'],
-        practiceRows,
-        'கடந்த 24 மணி நேரத்தில் Practice Session இல்லை.'
-      );
-
-      var mockRows=(d.mock_students||[]).map(function(x){
-        return '<tr><td>'+esc(x.student_id)+'</td><td>'+esc(x.name)+'</td><td>'+esc(x.email)+'</td><td><b>'+esc(String(x.test_count||0))+'</b></td><td>'+esc(String(x.completed_count||0))+'</td><td>'+esc(dt(x.last_started_at))+'</td></tr>';
-      });
-      if(el('usageMockDetail')) el('usageMockDetail').innerHTML=table(
-        '🎯 Mock Test பயன்படுத்திய மாணவர்கள் ('+(d.mock_students||[]).length+')',
-        ['Student ID','Name','Email','Mock Tests','Completed','Last Started'],
-        mockRows,
-        'கடந்த 24 மணி நேரத்தில் Mock Test இல்லை.'
-      );
-
-      if(el('onlineMonitorMsg')) el('onlineMonitorMsg').textContent=
-        'Server database-ல் உள்ள தற்போதைய Usage data காட்டப்படுகிறது. மேலுள்ள எண்ணிக்கையை அழுத்தி அந்த விவரங்களை பார்க்கலாம்.';
-    }catch(e){
-      if(el('onlineMonitorMsg')) el('onlineMonitorMsg').textContent='Usage Monitor: '+(e.message||'Data கிடைக்கவில்லை.');
-    }
+  window.refreshOnlineMonitor=function(){
+    if(el('onlineMonitorMsg')) el('onlineMonitorMsg').textContent='V138 backend telemetry summary is not exposed by the current API. Passwords are never sent to the browser.';
   };
 
   window.submitSuggestion=function(){
