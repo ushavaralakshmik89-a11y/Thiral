@@ -713,13 +713,13 @@ a{
 <section id="admin" class="card hidden">
 <div class="top"><h2>🛠️ Admin Dashboard</h2><button onclick="adminLogout()">Logout</button></div>
 <div class="grid admin-stat-grid">
-<div class="card admin-stat-card" role="button" tabindex="0" title="மாணவர் பட்டியலைத் திறக்க கிளிக் செய்யவும்"><h3>👨‍🎓 Total Students</h3><p id="statStudents">0</p><span class="small">கிளிக் செய்து முழுப் பட்டியல்</span></div>
-<div class="card admin-stat-card" role="button" tabindex="0" title="இன்று பதிவு செய்த மாணவர்களைப் பார்க்க"><h3>🆕 Today Registrations</h3><p id="statToday">0</p><span class="small">இன்றைய பதிவுகள்</span></div>
-<div class="card admin-stat-card" role="button" tabindex="0" title="இந்த மாத பதிவு விவரங்களைப் பார்க்க"><h3>📅 Monthly Registrations</h3><p id="statMonth">0</p><span class="small">இந்த மாதம்</span></div>
-<div class="card admin-stat-card" role="button" tabindex="0" title="ஆண் மாணவர்களைப் பார்க்க"><h3>♂️ ஆண்</h3><p id="statMale">0</p><span class="small">ஆண் மாணவர்கள்</span></div>
-<div class="card admin-stat-card" role="button" tabindex="0" title="பெண் மாணவர்களைப் பார்க்க"><h3>♀️ பெண்</h3><p id="statFemale">0</p><span class="small">பெண் மாணவர்கள்</span></div>
-<div class="card admin-stat-card" role="button" tabindex="0" title="மூன்றாம் பாலின மாணவர்களைப் பார்க்க"><h3>⚧️ மூன்றாம் பாலினம்</h3><p id="statThird">0</p><span class="small">மாணவர்கள்</span></div>
-<div class="card admin-stat-card" role="button" tabindex="0" title="கடைசி Login செய்த மாணவரைப் பார்க்க"><h3>🔑 Last Login</h3><p id="statLogin">-</p><span class="small">கிளிக் செய்து விவரம்</span></div>
+<div class="card admin-stat-card" role="button" tabindex="0" title="மாணவர் பட்டியலைத் திறக்க கிளிக் செய்யவும்" onclick="openAdminStudentView('all')" onkeydown="if(event.key==='Enter'||event.key===' ')openAdminStudentView('all')"><h3>👨‍🎓 Total Students</h3><p id="statStudents">0</p><span class="small">கிளிக் செய்து முழுப் பட்டியல்</span></div>
+<div class="card admin-stat-card" role="button" tabindex="0" title="இன்று பதிவு செய்த மாணவர்களைப் பார்க்க" onclick="openAdminStudentView('today')" onkeydown="if(event.key==='Enter'||event.key===' ')openAdminStudentView('today')"><h3>🆕 Today Registrations</h3><p id="statToday">0</p><span class="small">இன்றைய பதிவுகள்</span></div>
+<div class="card admin-stat-card" role="button" tabindex="0" title="இந்த மாத பதிவு விவரங்களைப் பார்க்க" onclick="openAdminStudentView('month')" onkeydown="if(event.key==='Enter'||event.key===' ')openAdminStudentView('month')"><h3>📅 Monthly Registrations</h3><p id="statMonth">0</p><span class="small">இந்த மாதம்</span></div>
+<div class="card admin-stat-card" role="button" tabindex="0" title="ஆண் மாணவர்களைப் பார்க்க" onclick="openAdminStudentView('male')" onkeydown="if(event.key==='Enter'||event.key===' ')openAdminStudentView('male')"><h3>♂️ ஆண்</h3><p id="statMale">0</p><span class="small">ஆண் மாணவர்கள்</span></div>
+<div class="card admin-stat-card" role="button" tabindex="0" title="பெண் மாணவர்களைப் பார்க்க" onclick="openAdminStudentView('female')" onkeydown="if(event.key==='Enter'||event.key===' ')openAdminStudentView('female')"><h3>♀️ பெண்</h3><p id="statFemale">0</p><span class="small">பெண் மாணவர்கள்</span></div>
+<div class="card admin-stat-card" role="button" tabindex="0" title="மூன்றாம் பாலின மாணவர்களைப் பார்க்க" onclick="openAdminStudentView('third')" onkeydown="if(event.key==='Enter'||event.key===' ')openAdminStudentView('third')"><h3>⚧️ மூன்றாம் பாலினம்</h3><p id="statThird">0</p><span class="small">மாணவர்கள்</span></div>
+<div class="card admin-stat-card" role="button" tabindex="0" title="கடைசி Login செய்த மாணவரைப் பார்க்க" onclick="openAdminStudentView('lastLogin')" onkeydown="if(event.key==='Enter'||event.key===' ')openAdminStudentView('lastLogin')"><h3>🔑 Last Login</h3><p id="statLogin">-</p><span class="small">கிளிக் செய்து விவரம்</span></div>
 <div class="card admin-stat-card" role="button" tabindex="0" title="Suggestions பகுதிக்குச் செல்ல" onclick="document.getElementById('adminSuggestionList')?.scrollIntoView({behavior:'smooth',block:'start'})"><h3>💡 Suggestions</h3><p id="statSuggestions">0</p><span class="small">Suggestions பட்டியல்</span></div>
 </div>
 <div class="card" style="margin-top:16px;border:1px solid #dbeafe">
@@ -760,10 +760,6 @@ a{
 </div>
 <div id="adminSuggestionList"></div>
 <hr>
-<h3>👨‍🎓 Registered Students</h3>
-<p class="small">பதிவு செய்த ஒவ்வொரு மாணவரின் பெயர், Email, தொலைபேசி, பாலினம், பிறந்த தேதி, பதிவு நேரம் மற்றும் கடைசி Login நேரம் இங்கே காட்டப்படும். Password மட்டும் Admin-க்கும் காட்டப்படாது.</p>
-<div id="adminStudentList"></div>
-<hr>
 <div class="card" style="margin-top:16px;border:1px solid #dbeafe">
 <h3>📥 Exam Results Excel / தேர்வு முடிவுகள் Excel</h3>
 <p class="small">தேவையான தேர்வை / வகையை / பாடத்தைத் தேர்ந்தெடுத்து Excel Export செய்யலாம். Browser-ல் result table காட்டப்படாது. தேர்வு வாரியாக தனித்தனி Excel tab-களில் முழு result records வரும்.</p>
@@ -792,6 +788,12 @@ a{
 <h3>🔒 Student Privacy</h3>
 <p>Student data-ஐ Admin மட்டும் பார்க்க முடியும். Production version-ல் server-side authentication, password hashing மற்றும் role-based access control கட்டாயம்.</p>
 <button class="secondary" onclick="show('home')">Home</button>
+</section>
+
+<section id="adminStudentView" class="card hidden">
+<div class="top"><h2 id="adminStudentDetailTitle">மாணவர் விவரங்கள்</h2><button class="secondary" onclick="show('admin')">← Dashboard</button></div>
+<p class="small">Dashboard-ல் தேர்ந்தெடுத்த எண்ணிக்கைக்கான மாணவர் விவரங்கள் மட்டும் இங்கே காட்டப்படும். Password எந்த நிலையிலும் காட்டப்படாது.</p>
+<div id="adminStudentDetailBody"></div>
 </section>
 
 </div>
@@ -3977,6 +3979,34 @@ window.V91_ADV_NUM=V91_ADV_NUM;
     var node=document.getElementById(id);
     if(!node) return;
     node.classList.toggle('hidden');
+  };
+
+  window.openAdminStudentView = async function(filter){
+    await loadAdminV138();
+    var list=window.thiralV138Students||[];
+    var title='மாணவர் விவரங்கள்';
+    var now=new Date();
+    if(filter==='today'){
+      list=list.filter(function(x){return x.created_at && new Date(x.created_at).toDateString()===now.toDateString();});
+      title='இன்றைய பதிவுகள்';
+    }else if(filter==='month'){
+      list=list.filter(function(x){var d=x.created_at&&new Date(x.created_at);return d&&d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();});
+      title='இந்த மாத பதிவுகள்';
+    }else if(filter==='male'){list=list.filter(function(x){return x.gender==='ஆண்';});title='ஆண் மாணவர்கள்';}
+    else if(filter==='female'){list=list.filter(function(x){return x.gender==='பெண்';});title='பெண் மாணவர்கள்';}
+    else if(filter==='third'){list=list.filter(function(x){return x.gender==='மூன்றாம் பாலினம்';});title='மூன்றாம் பாலின மாணவர்கள்';}
+    else if(filter==='lastLogin'){list=list.slice().sort(function(a,b){return new Date(b.last_login_at||0)-new Date(a.last_login_at||0);}).slice(0,1);title='கடைசி Login';}
+
+    if(el('adminStudentDetailTitle')) el('adminStudentDetailTitle').textContent=title;
+    if(el('adminStudentDetailBody')) el('adminStudentDetailBody').innerHTML=
+      '<table><tr><th>Student ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Gender</th><th>DOB</th><th>Registered</th><th>Last Login</th></tr>'+
+      list.map(function(x){return '<tr><td>'+escapeHtml138(x.student_id||'')+'</td><td>'+escapeHtml138(x.name||'')+
+      '</td><td>'+escapeHtml138(x.email||'')+'</td><td>'+escapeHtml138(x.phone||'')+
+      '</td><td>'+escapeHtml138(x.gender||'')+'</td><td>'+escapeHtml138(formatAdminDOB138(x.dob))+'</td>'+
+      '<td>'+escapeHtml138(x.created_at?new Date(x.created_at).toLocaleString():'-')+
+      '</td><td>'+escapeHtml138(x.last_login_at?new Date(x.last_login_at).toLocaleString():'-')+
+      '</td></tr>';}).join('')+'</table>';
+    show('adminStudentView');
   };
 
   window.refreshOnlineMonitor=async function(){
