@@ -1092,7 +1092,6 @@ api.get('/practice/questions-v2', requirePasswordReady, async (req,res)=>{
     const subject=canonicalSubject(rawSubject);
     const subjects=subjectCandidates(rawSubject);
     const language=String(req.query.language||'ta').trim();
-    const subtopic=String(req.query.subtopic||'').trim();
     const rawLimit=parseInt(req.query.limit||'10',10)||10;
     const limit=Math.max(rawLimit,1);
     if(!exam||!subject||!['ta','en'].includes(language)||limit>10000) return sendError(res,400,'Invalid practice request.');
@@ -1102,102 +1101,58 @@ api.get('/practice/questions-v2', requirePasswordReady, async (req,res)=>{
       ? `q."${QUESTION_DIFFICULTY_COLUMN}" AS difficulty`
       : `NULL::text AS difficulty`;
     const baseParams=[exam,subjects,language,req.user.id];
-    let baseWhere=`q.exam=$1 AND q.subject=ANY($2::text[]) AND q.language=$3 AND q.is_active=true
-      AND NOT EXISTS (SELECT 1 FROM question_reservations r WHERE r.question_id=q.id AND r.mode='practice' AND r.expires_at>now())`;
-
-    /* 10-question Practice is the only Practice size that is subtopic-specific.
-       20/50/100/200 and full-bank Practice use the entire selected subject. */
-    const subCandidates=subtopicCandidates(subtopic);
-    if(limit===10 && subCandidates.length){
-      if(subCandidates.length===1) baseWhere+=` AND q.subtopic=$5`;
-      else baseWhere+=` AND q.subtopic=ANY($5::text[])`;
-      baseParams.push(subCandidates);
-    }
+    const baseWhere=`q.exam=$1 AND q.subject=ANY($2::text[]) AND q.language=$3 AND q.is_active=true\n      AND NOT EXISTS (SELECT 1 FROM question_history h WHERE h.user_id=$4 AND h.question_id=q.id AND h.mode='practice')\n      AND NOT EXISTS (SELECT 1 FROM question_reservations r WHERE r.question_id=q.id AND r.mode='practice' AND r.expires_at>now())`;
 
     await client.query('BEGIN');
     await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`,[scopeKey]);
     await client.query(`DELETE FROM question_reservations WHERE expires_at<=now()`);
 
+    let rows=[];
     let effectiveLimit=limit;
     if(limit===9999){
-      const c=await client.query(`SELECT count(*)::int AS total FROM questions q WHERE ${baseWhere}`,baseParams);
-      effectiveLimit=Math.min(Number(c.rows[0]?.total||0),10000);
+      const c=await client.query(`SELECT count(*)::int AS total FROM questions q WHERE ${baseWhere}` ,baseParams);
+      effectiveLimit=Math.min(Number(c.rows[0]?.total||0),5000);
     }
-    if(effectiveLimit<=0){
-      await client.query('ROLLBACK');
-      return sendError(res,409,'இந்த தேர்வுக்கான Question Bank-ல் தற்போது கேள்விகள் இல்லை.');
-    }
-
-    const freshWhere=` AND NOT EXISTS (
-      SELECT 1 FROM question_history h
-      WHERE h.user_id=$${baseParams.length+1}
-        AND h.question_id=q.id AND h.mode='practice'
-    )`;
-
-    const take=async(extraWhere,count,paramsExtra=[],fresh=true)=>{
+    const take=async(extraWhere,count,paramsExtra=[])=>{
       if(count<=0)return [];
-      const freshPart=fresh?freshWhere:'';
-      const limitParam=baseParams.length+paramsExtra.length+(fresh?1:0)+1;
-      const params=[...baseParams,...(fresh?[req.user.id]:[]),...paramsExtra,count];
-      const q=await client.query(`
-        SELECT q.id,q.exam,q.subject,q.subtopic,q.language,q.question,q.options,q.explanation,${difficultySql}
-        FROM questions q
-        WHERE ${baseWhere}${freshPart} ${extraWhere||''}
-        ORDER BY random() LIMIT $${limitParam}
-      `,params);
+      const q=await client.query(`SELECT q.id,q.exam,q.subject,q.subtopic,q.language,q.question,q.options,q.explanation,${difficultySql}\n        FROM questions q WHERE ${baseWhere} ${extraWhere||''}\n        ORDER BY random() LIMIT $${baseParams.length+paramsExtra.length+1}`,
+        [...baseParams,...paramsExtra,count]);
       return q.rows;
     };
 
-    let rows=[];
-    if(effectiveLimit===10){
-      if(QUESTION_DIFFICULTY_COLUMN){
-        rows=await take(`AND lower(coalesce(q."${QUESTION_DIFFICULTY_COLUMN}"::text,'')) ~ $${baseParams.length+2}`,
-          effectiveLimit,[ '(easy|எளிது)' ],true);
-      }else{
-        rows=await take('',effectiveLimit,[],true);
+    if(effectiveLimit===10 && QUESTION_DIFFICULTY_COLUMN){
+      rows=await take(`AND lower(coalesce(q."${QUESTION_DIFFICULTY_COLUMN}"::text,'')) ~ $5`,1,['(easy|எளிது)'],10);
+      if(rows.length<10){
+        const existing=new Set(rows.map(x=>String(x.id)));
+        const more=await take(`AND NOT (q.id = ANY($5::bigint[]))`,10-rows.length,[rows.map(x=>Number(x.id))]);
+        rows.push(...more.filter(x=>!existing.has(String(x.id))));
       }
-      /* If fewer than 10 Easy questions exist, fill from the same selected pool. */
-      if(rows.length<effectiveLimit){
-        const used=rows.map(x=>Number(x.id));
-        const exclude=used.length?`AND q.id <> ALL($${baseParams.length+2}::bigint[])`:'';
-        const more=await take(exclude,effectiveLimit-rows.length,used.length?[used]:[],true);
-        rows.push(...more);
-      }
+    }else if(effectiveLimit===10){
+      rows=await take('',10);
     }else{
       const normalCount=effectiveLimit===20?2:5;
       if(QUESTION_DIFFICULTY_COLUMN){
-        const normalParam=baseParams.length+2;
-        rows=await take(`AND lower(coalesce(q."${QUESTION_DIFFICULTY_COLUMN}"::text,'')) ~ $${normalParam}`,
-          normalCount,['(normal|moderate|சாதாரணம்|மிதமானது)'],true);
+        rows=await take(`AND lower(coalesce(q."${QUESTION_DIFFICULTY_COLUMN}"::text,'')) ~ $5`,normalCount,['(normal|moderate|சாதாரணம்|மிதமானது)'],normalCount);
       }
-
-      const used=rows.map(x=>Number(x.id));
+      const usedIds=rows.map(x=>Number(x.id));
       const remaining=effectiveLimit-rows.length;
       if(remaining>0){
-        const exclude=used.length?`AND q.id <> ALL($${baseParams.length+2}::bigint[])`:'';
-        const paramsExtra=used.length?[used]:[];
-        let more;
+        const extraIds=usedIds.length ? `AND NOT (q.id = ANY($5::bigint[]))` : '';
+        let more=[];
         if(QUESTION_DIFFICULTY_COLUMN){
-          const nonNormalParam=baseParams.length+paramsExtra.length+2;
-          more=await take(`${exclude} AND lower(coalesce(q."${QUESTION_DIFFICULTY_COLUMN}"::text,'')) !~ $${nonNormalParam}`,
-            remaining,[...paramsExtra,'(normal|moderate|சாதாரணம்|மிதமானது)'],true);
+          more=await take(`${extraIds} AND lower(coalesce(q."${QUESTION_DIFFICULTY_COLUMN}"::text,'')) !~ $${usedIds.length?6:5}`,remaining,[...(usedIds.length?[usedIds]:[]),'(normal|moderate|சாதாரணம்|மிதமானது)']);
         }else{
-          more=await take(exclude,remaining,paramsExtra,true);
+          more=await take(extraIds,remaining,usedIds.length?[usedIds]:[]);
         }
         rows.push(...more);
+        if(rows.length<effectiveLimit){
+          const have=rows.map(x=>Number(x.id));
+          const fill=await take(`AND NOT (q.id = ANY($5::bigint[]))`,effectiveLimit-rows.length,[have]);
+          rows.push(...fill);
+        }
       }
 
-      /* If this user's unused pool is exhausted, begin a new cycle rather than
-         returning an artificial "no questions" error. Never duplicate inside
-         the current request. */
-      if(rows.length<effectiveLimit){
-        const used=rows.map(x=>Number(x.id));
-        const exclude=used.length?`AND q.id <> ALL($${baseParams.length+1}::bigint[])`:'';
-        const fill=await take(exclude,effectiveLimit-rows.length,used.length?[used]:[],false);
-        rows.push(...fill);
-      }
-
-      /* Mix the non-normal part so it does not become a block of one difficulty. */
+      /* Keep the post-normal portion varied when difficulty metadata exists. */
       if(rows.length>normalCount && QUESTION_DIFFICULTY_COLUMN){
         const head=rows.slice(0,Math.min(normalCount,rows.length));
         const groups=new Map();
@@ -1209,9 +1164,10 @@ api.get('/practice/questions-v2', requirePasswordReady, async (req,res)=>{
         for(const g of groups.values()){
           for(let i=g.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[g[i],g[j]]=[g[j],g[i]];}
         }
-        const keys=[...groups.keys()];
+        const keys=[...groups.keys()].sort((a,b)=>difficultySortKey(a)-difficultySortKey(b));
         const mixed=[];
-        while(mixed.length<rows.length-head.length){
+        let guard=0;
+        while(mixed.length<rows.length-head.length && keys.length && guard++<10000){
           const available=keys.filter(k=>groups.get(k)?.length);
           if(!available.length)break;
           const k=available[Math.floor(Math.random()*available.length)];
@@ -1219,7 +1175,7 @@ api.get('/practice/questions-v2', requirePasswordReady, async (req,res)=>{
         }
         rows=[...head,...mixed];
       }else{
-        for(let i=rows.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[rows[i],rows[j]]=[rows[j],rows[i]];}
+        for(let i=rows.length-1;i>normalCount;i--){const j=normalCount+Math.floor(Math.random()*(i-normalCount+1));[rows[i],rows[j]]=[rows[j],rows[i]];}
       }
     }
 
@@ -1228,13 +1184,8 @@ api.get('/practice/questions-v2', requirePasswordReady, async (req,res)=>{
       return sendError(res,409,`Practice-க்கு ${effectiveLimit} தனித்த கேள்விகள் கிடைக்கவில்லை. கிடைத்தது ${rows.length}.`);
     }
 
-    const ids=[...new Set(rows.map(x=>Number(x.id)))];
     const expires=new Date(Date.now()+30*60*1000);
-    await client.query(`
-      INSERT INTO question_reservations(question_id,user_id,mode,scope_key,expires_at)
-      SELECT x,$1,'practice',$2,$3 FROM unnest($4::bigint[]) x
-      ON CONFLICT (question_id,mode) DO NOTHING
-    `,[req.user.id,scopeKey,expires,ids]);
+    await client.query(`INSERT INTO question_reservations(question_id,user_id,mode,scope_key,expires_at)\n      SELECT x,$1,'practice',$2,$3 FROM unnest($4::bigint[]) x\n      ON CONFLICT (question_id,mode) DO NOTHING`,[req.user.id,scopeKey,expires,rows.map(x=>Number(x.id))]);
     await client.query('COMMIT');
     res.json({questions:rows,count:rows.length,reservation_expires_at:expires.toISOString(),requested:limit});
   }catch(e){
