@@ -990,89 +990,177 @@ api.get('/questions', requirePasswordReady, async (req, res) => {
   } catch(e) { console.error(e); sendError(res,500,'Question service error.'); }
 });
 
-/* ===== FAST PRACTICE API =====
-   Existing /questions API is intentionally left unchanged.
-   Practice gets only the requested number of fresh questions.
-*/
+/* ============================================================
+   FULL POOL PRACTICE ENGINE
+   10 / 20 / 50 / Infinity
+   Tamil-only question experience.
+
+   IMPORTANT:
+   - Existing questions are NOT updated or deleted.
+   - Difficulty is read from questions.difficulty_stage when present.
+   - GK/Aptitude fallback to question_difficulty_work.
+   - Student history prevents the same student from receiving a
+     previously used Practice question again.
+   ============================================================ */
 api.get('/practice/questions', requirePasswordReady, async (req, res) => {
   try {
     const exam = String(req.query.exam || '').trim();
     const rawSubject = String(req.query.subject || '').trim();
     const subject = canonicalSubject(rawSubject);
     const subjectCandidatesList = subjectCandidates(rawSubject);
-    const language = String(req.query.language || 'ta').trim();
+    const language = 'ta';
     const subtopic = String(req.query.subtopic || '').trim();
-    const limit = Math.min(
-      Math.max(parseInt(req.query.limit || '10', 10) || 10, 1),
-      200
+    const count = Math.min(
+      Math.max(parseInt(req.query.count || req.query.limit || '10', 10) || 10, 1),
+      9999
     );
 
-    if (!exam || !subject || !['ta', 'en'].includes(language)) {
-      return sendError(res, 400, 'Invalid question request.');
+    if (!exam || !subject || !subjectCandidatesList.length) {
+      return sendError(res, 400, 'Invalid practice request.');
     }
 
-    const params = [req.user.id, exam, subjectCandidatesList, language];
-    let n = 5;
+    const params = [req.user.id, exam, subjectCandidatesList];
+    let n = 4;
 
     let where = `
       q.exam = $2
       AND q.subject = ANY($3::text[])
-      AND q.language = $4
+      AND q.language = 'ta'
       AND q.is_active = true
     `;
 
-    const subCandidates = subtopicCandidates(subtopic);
-    if (subCandidates.length === 1) {
-      where += ` AND q.subtopic = $${n}`;
-      params.push(subCandidates[0]);
-      n++;
-    } else if (subCandidates.length > 1) {
-      where += ` AND q.subtopic = ANY($${n}::text[])`;
-      params.push(subCandidates);
-      n++;
+    /*
+      10-question Practice may use the selected subtopic.
+      20/50 use the complete subject pool.
+    */
+    if (count === 10 && subtopic) {
+      const subCandidates = subtopicCandidates(subtopic);
+      if (subCandidates.length === 1) {
+        where += ` AND q.subtopic = $${n}`;
+        params.push(subCandidates[0]);
+        n++;
+      } else if (subCandidates.length > 1) {
+        where += ` AND q.subtopic = ANY($${n}::text[])`;
+        params.push(subCandidates);
+        n++;
+      }
     }
 
-    params.push(limit);
+    /*
+      Infinity / Question Bank continuation.
+      This reads the full remaining Practice pool for the student.
+      There is intentionally no artificial 100/200-question pool here.
+    */
+    if (count === 9999) {
+      const sql = `
+        SELECT
+          q.id,
+          q.exam,
+          q.subject,
+          q.subtopic,
+          q.language,
+          q.question,
+          q.options,
+          q.explanation,
+          COALESCE(q.difficulty_stage, w.difficulty_stage) AS difficulty_stage
+        FROM questions q
+        LEFT JOIN question_difficulty_work w
+          ON w.question_id = q.id
+        WHERE ${where}
+          AND NOT EXISTS (
+            SELECT 1
+            FROM question_history h
+            WHERE h.user_id = $1
+              AND h.question_id = q.id
+              AND h.mode = 'practice'
+          )
+        ORDER BY random()
+      `;
 
-    const sql = `
-      SELECT
-        q.id,
-        q.exam,
-        q.subject,
-        q.subtopic,
-        q.language,
-        q.question,
-        q.options,
-        q.explanation
-      FROM questions q
-      WHERE ${where}
-        AND NOT EXISTS (
-          SELECT 1
-          FROM question_history h
-          WHERE h.user_id = $1
-            AND h.question_id = q.id
-            AND h.mode = 'practice'
-        )
-      ORDER BY random()
-      LIMIT $${n}
-    `;
+      const result = await pool.query(sql, params);
+      return res.json({
+        questions: result.rows,
+        count: result.rows.length,
+        mode: 'infinity'
+      });
+    }
 
-    const result = await pool.query(sql, params);
+    /*
+      Practice difficulty plan:
+        10 = 5 Easy + 5 Medium
+        20 = 5 Easy + 5 Medium + 5 Hard + 5 Very Hard
+        50 = 10 Easy + 15 Medium + 15 Hard + 10 Very Hard
 
-    if (result.rows.length < limit) {
-      return sendError(
-        res,
-        409,
-        `???? ????????? ???????? ????? ????????? ${result.rows.length} ??????? ?????.`
-      );
+      Stage mapping:
+        1 = Easy
+        2 = Medium
+        3 = Hard
+        4 = Very Hard
+    */
+    let plan;
+    if (count === 10) {
+      plan = [[1, 5], [2, 5]];
+    } else if (count === 20) {
+      plan = [[1, 5], [2, 5], [3, 5], [4, 5]];
+    } else if (count === 50) {
+      plan = [[1, 10], [2, 15], [3, 15], [4, 10]];
+    } else {
+      return sendError(res, 400, 'Practice count must be 10, 20, 50 or Infinity.');
+    }
+
+    const selected = [];
+
+    for (const [stage, amount] of plan) {
+      const stageParams = [...params, stage, amount];
+
+      const sql = `
+        SELECT
+          q.id,
+          q.exam,
+          q.subject,
+          q.subtopic,
+          q.language,
+          q.question,
+          q.options,
+          q.explanation,
+          COALESCE(q.difficulty_stage, w.difficulty_stage) AS difficulty_stage
+        FROM questions q
+        LEFT JOIN question_difficulty_work w
+          ON w.question_id = q.id
+        WHERE ${where}
+          AND COALESCE(q.difficulty_stage, w.difficulty_stage) = $${n}
+          AND NOT EXISTS (
+            SELECT 1
+            FROM question_history h
+            WHERE h.user_id = $1
+              AND h.question_id = q.id
+              AND h.mode = 'practice'
+          )
+        ORDER BY random()
+        LIMIT $${n + 1}
+      `;
+
+      const result = await pool.query(sql, stageParams);
+
+      if (result.rows.length < amount) {
+        return sendError(
+          res,
+          409,
+          `Difficulty stage ${stage} பகுதியில் ${amount} புதிய கேள்விகள் கிடைக்கவில்லை.`
+        );
+      }
+
+      selected.push(...result.rows);
     }
 
     res.json({
-      questions: result.rows,
-      count: result.rows.length
+      questions: selected,
+      count: selected.length,
+      mode: 'difficulty',
+      plan
     });
   } catch (e) {
-    console.error('Practice question error:', e);
+    console.error('Full pool practice error:', e);
     sendError(res, 500, 'Practice question service error.');
   }
 });
