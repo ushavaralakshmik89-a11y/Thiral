@@ -1092,135 +1092,102 @@ api.get('/practice/questions-v2', requirePasswordReady, async (req,res)=>{
     const subject=canonicalSubject(rawSubject);
     const subjects=subjectCandidates(rawSubject);
     const language=String(req.query.language||'ta').trim();
-    const requested=parseInt(req.query.limit||'10',10)||10;
-    const limit=Math.max(requested,1);
-    if(!exam||!subject||!['ta','en'].includes(language)||![10,20,50,100,200].includes(limit)){
-      return sendError(res,400,'Invalid practice request.');
-    }
+    const rawLimit=parseInt(req.query.limit||'10',10)||10;
+    const limit=Math.max(rawLimit,1);
+    if(!exam||!subject||!['ta','en'].includes(language)||limit>10000) return sendError(res,400,'Invalid practice request.');
 
     const scopeKey=`practice|${exam}|${subject}|${language}`;
     const difficultySql=QUESTION_DIFFICULTY_COLUMN
       ? `q."${QUESTION_DIFFICULTY_COLUMN}" AS difficulty`
       : `NULL::text AS difficulty`;
+    const baseParams=[exam,subjects,language,req.user.id];
+    const baseWhere=`q.exam=$1 AND q.subject=ANY($2::text[]) AND q.language=$3 AND q.is_active=true\n      AND NOT EXISTS (SELECT 1 FROM question_history h WHERE h.user_id=$4 AND h.question_id=q.id AND h.mode='practice')\n      AND NOT EXISTS (SELECT 1 FROM question_reservations r WHERE r.question_id=q.id AND r.mode='practice' AND r.expires_at>now())`;
 
     await client.query('BEGIN');
     await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`,[scopeKey]);
     await client.query(`DELETE FROM question_reservations WHERE expires_at<=now()`);
 
-    const common=`q.exam=$1 AND q.subject=ANY($2::text[]) AND q.language=$3 AND q.is_active=true
-      AND NOT EXISTS (SELECT 1 FROM question_reservations r WHERE r.question_id=q.id AND r.mode='practice' AND r.expires_at>now())`;
-    const fresh=`${common}
-      AND NOT EXISTS (SELECT 1 FROM question_history h WHERE h.user_id=$4 AND h.question_id=q.id AND h.mode='practice')`;
-    const usedByThisUser=`${common}
-      AND EXISTS (SELECT 1 FROM question_history h WHERE h.user_id=$4 AND h.question_id=q.id AND h.mode='practice')`;
-
-    const base=[exam,subjects,language,req.user.id];
-    const query=async (where, count, extra=[])=>{
+    let rows=[];
+    let effectiveLimit=limit;
+    if(limit===9999){
+      const c=await client.query(`SELECT count(*)::int AS total FROM questions q WHERE ${baseWhere}` ,baseParams);
+      effectiveLimit=Math.min(Number(c.rows[0]?.total||0),5000);
+    }
+    const take=async(extraWhere,count,paramsExtra=[])=>{
       if(count<=0)return [];
-      const params=[...base,...extra,count];
-      const limitPos=base.length+extra.length+1;
-      const q=await client.query(
-        `SELECT q.id,q.exam,q.subject,q.subtopic,q.language,q.question,q.options,q.explanation,${difficultySql}
-         FROM questions q WHERE ${where}
-         ORDER BY random() LIMIT $${limitPos}`,
-        params
-      );
+      const q=await client.query(`SELECT q.id,q.exam,q.subject,q.subtopic,q.language,q.question,q.options,q.explanation,${difficultySql}\n        FROM questions q WHERE ${baseWhere} ${extraWhere||''}\n        ORDER BY random() LIMIT $${baseParams.length+paramsExtra.length+1}`,
+        [...baseParams,...paramsExtra,count]);
       return q.rows;
     };
 
-    // A new cycle starts only after the user's fresh pool is exhausted.
-    // This preserves history while still guaranteeing that practice does not
-    // become permanently empty after one complete pass through the bank.
-    const fill=async (current, count, where, extra=[])=>{
-      if(current.length>=count)return current;
-      const more=await query(where,count-current.length,extra);
-      const seen=new Set(current.map(x=>String(x.id)));
-      for(const q of more){ if(!seen.has(String(q.id))){ current.push(q); seen.add(String(q.id)); } }
-      return current;
-    };
-
-    let rows=[];
-
-    if(limit===10){
-      const easy=`${fresh} AND lower(coalesce(q."${QUESTION_DIFFICULTY_COLUMN||'difficulty'}"::text,'')) ~ $5`;
-      const easyFallback = QUESTION_DIFFICULTY_COLUMN ? easy : fresh;
-      rows=await query(easyFallback,10,QUESTION_DIFFICULTY_COLUMN?['(easy|எளிது)']:[]);
+    if(effectiveLimit===10 && QUESTION_DIFFICULTY_COLUMN){
+      rows=await take(`AND lower(coalesce(q."${QUESTION_DIFFICULTY_COLUMN}"::text,'')) ~ $5`,1,['(easy|எளிது)'],10);
       if(rows.length<10){
-        const recycle=QUESTION_DIFFICULTY_COLUMN
-          ? `${usedByThisUser} AND lower(coalesce(q."${QUESTION_DIFFICULTY_COLUMN}"::text,'')) ~ $5`
-          : usedByThisUser;
-        rows=await fill(rows,10,recycle,QUESTION_DIFFICULTY_COLUMN?['(easy|எளிது)']:[]);
+        const existing=new Set(rows.map(x=>String(x.id)));
+        const more=await take(`AND NOT (q.id = ANY($5::bigint[]))`,10-rows.length,[rows.map(x=>Number(x.id))]);
+        rows.push(...more.filter(x=>!existing.has(String(x.id))));
       }
-    } else if(limit===100){
-      if(!QUESTION_DIFFICULTY_COLUMN){
-        await client.query('ROLLBACK');
-        return sendError(res,409,'100 Hard Practice-க்கு database-ல் difficulty metadata தேவை.');
+    }else if(effectiveLimit===10){
+      rows=await take('',10);
+    }else{
+      const normalCount=effectiveLimit===20?2:5;
+      if(QUESTION_DIFFICULTY_COLUMN){
+        rows=await take(`AND lower(coalesce(q."${QUESTION_DIFFICULTY_COLUMN}"::text,'')) ~ $5`,normalCount,['(normal|moderate|சாதாரணம்|மிதமானது)'],normalCount);
       }
-      const hard=`${fresh} AND lower(coalesce(q."${QUESTION_DIFFICULTY_COLUMN}"::text,'')) ~ $5`;
-      rows=await query(hard,100,['(hard|very\\s*hard|extreme|கடினம்|மிகக்\\s*கடினம்|மிகவும்\\s*கடினம்)']);
-      if(rows.length<100){
-        const recycle=`${usedByThisUser} AND lower(coalesce(q."${QUESTION_DIFFICULTY_COLUMN}"::text,'')) ~ $5`;
-        rows=await fill(rows,100,recycle,['(hard|very\\s*hard|extreme|கடினம்|மிகக்\\s*கடினம்|மிகவும்\\s*கடினம்)']);
-      }
-    } else if(limit===20 || limit===50){
-      if(!QUESTION_DIFFICULTY_COLUMN){
-        await client.query('ROLLBACK');
-        return sendError(res,409,`${limit} Practice-க்கு difficulty metadata தேவை.`);
-      }
-      const normalCount=limit===20?2:5;
-      const normalPattern='(normal|moderate|சாதாரணம்|மிதமானது)';
-      const highPattern='(medium|intermediate|hard|very\\s*hard|extreme|இடைநிலை|நடுத்தரம்|கடினம்|மிகக்\\s*கடினம்|மிகவும்\\s*கடினம்)';
-
-      rows=await query(`${fresh} AND lower(coalesce(q."${QUESTION_DIFFICULTY_COLUMN}"::text,'')) ~ $5`,normalCount,[normalPattern]);
-      if(rows.length<normalCount){
-        rows=await fill(rows,normalCount,`${usedByThisUser} AND lower(coalesce(q."${QUESTION_DIFFICULTY_COLUMN}"::text,'')) ~ $5`,[normalPattern]);
-      }
-      if(rows.length<normalCount){
-        await client.query('ROLLBACK');
-        return sendError(res,409,`${limit} Practice-க்கு தேவையான Normal/Moderate கேள்விகள் கிடைக்கவில்லை.`);
+      const usedIds=rows.map(x=>Number(x.id));
+      const remaining=effectiveLimit-rows.length;
+      if(remaining>0){
+        const extraIds=usedIds.length ? `AND NOT (q.id = ANY($5::bigint[]))` : '';
+        let more=[];
+        if(QUESTION_DIFFICULTY_COLUMN){
+          more=await take(`${extraIds} AND lower(coalesce(q."${QUESTION_DIFFICULTY_COLUMN}"::text,'')) !~ $${usedIds.length?6:5}`,remaining,[...(usedIds.length?[usedIds]:[]),'(normal|moderate|சாதாரணம்|மிதமானது)']);
+        }else{
+          more=await take(extraIds,remaining,usedIds.length?[usedIds]:[]);
+        }
+        rows.push(...more);
+        if(rows.length<effectiveLimit){
+          const have=rows.map(x=>Number(x.id));
+          const fill=await take(`AND NOT (q.id = ANY($5::bigint[]))`,effectiveLimit-rows.length,[have]);
+          rows.push(...fill);
+        }
       }
 
-      const selectedIds=rows.map(x=>Number(x.id));
-      const highFresh=`${fresh} AND q.id<>ALL($5::bigint[]) AND lower(coalesce(q."${QUESTION_DIFFICULTY_COLUMN}"::text,'')) ~ $6`;
-      const highUsed=`${usedByThisUser} AND q.id<>ALL($5::bigint[]) AND lower(coalesce(q."${QUESTION_DIFFICULTY_COLUMN}"::text,'')) ~ $6`;
-      const remaining=limit-normalCount;
-      rows=await fill(rows,limit,highFresh,[selectedIds,highPattern]);
-      if(rows.length<limit) rows=await fill(rows,limit,highUsed,[rows.map(x=>Number(x.id)),highPattern]);
-      if(rows.length<limit){
-        await client.query('ROLLBACK');
-        return sendError(res,409,`${limit} Practice-க்கு தேவையான கடினமான கேள்விகள் கிடைக்கவில்லை.`);
+      /* Keep the post-normal portion varied when difficulty metadata exists. */
+      if(rows.length>normalCount && QUESTION_DIFFICULTY_COLUMN){
+        const head=rows.slice(0,Math.min(normalCount,rows.length));
+        const groups=new Map();
+        for(const q of rows.slice(head.length)){
+          const k=normalizeDifficulty(q.difficulty)||'other';
+          if(!groups.has(k))groups.set(k,[]);
+          groups.get(k).push(q);
+        }
+        for(const g of groups.values()){
+          for(let i=g.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[g[i],g[j]]=[g[j],g[i]];}
+        }
+        const keys=[...groups.keys()].sort((a,b)=>difficultySortKey(a)-difficultySortKey(b));
+        const mixed=[];
+        let guard=0;
+        while(mixed.length<rows.length-head.length && keys.length && guard++<10000){
+          const available=keys.filter(k=>groups.get(k)?.length);
+          if(!available.length)break;
+          const k=available[Math.floor(Math.random()*available.length)];
+          mixed.push(groups.get(k).shift());
+        }
+        rows=[...head,...mixed];
+      }else{
+        for(let i=rows.length-1;i>normalCount;i--){const j=normalCount+Math.floor(Math.random()*(i-normalCount+1));[rows[i],rows[j]]=[rows[j],rows[i]];}
       }
-
-      const head=rows.slice(0,normalCount), tail=rows.slice(normalCount);
-      tail.sort(()=>Math.random()-0.5);
-      rows=[...head,...tail];
-    } else {
-      rows=await query(fresh,limit);
-      if(rows.length<limit) rows=await fill(rows,limit,usedByThisUser);
     }
 
-    // Never duplicate inside one attempt, even if the database contains
-    // duplicate-looking records. Question ID is the authoritative identity.
-    const unique=[]; const seen=new Set();
-    for(const q of rows){
-      const id=String(q.id);
-      if(seen.has(id))continue;
-      seen.add(id); unique.push(q);
-      if(unique.length===limit)break;
-    }
-    if(unique.length<limit){
+    if(rows.length<effectiveLimit){
       await client.query('ROLLBACK');
-      return sendError(res,409,`Practice-க்கு ${limit} தனித்த கேள்விகள் கிடைக்கவில்லை. கிடைத்தது ${unique.length}.`);
+      return sendError(res,409,`Practice-க்கு ${effectiveLimit} தனித்த கேள்விகள் கிடைக்கவில்லை. கிடைத்தது ${rows.length}.`);
     }
 
     const expires=new Date(Date.now()+30*60*1000);
-    await client.query(`INSERT INTO question_reservations(question_id,user_id,mode,scope_key,expires_at)
-      SELECT x,$1,'practice',$2,$3 FROM unnest($4::bigint[]) x
-      ON CONFLICT (question_id,mode) DO NOTHING`,
-      [req.user.id,scopeKey,expires,unique.map(x=>Number(x.id))]);
-
+    await client.query(`INSERT INTO question_reservations(question_id,user_id,mode,scope_key,expires_at)\n      SELECT x,$1,'practice',$2,$3 FROM unnest($4::bigint[]) x\n      ON CONFLICT (question_id,mode) DO NOTHING`,[req.user.id,scopeKey,expires,rows.map(x=>Number(x.id))]);
     await client.query('COMMIT');
-    res.json({questions:unique,count:unique.length,reservation_expires_at:expires.toISOString(),requested:limit});
+    res.json({questions:rows,count:rows.length,reservation_expires_at:expires.toISOString(),requested:limit});
   }catch(e){
     try{await client.query('ROLLBACK');}catch(_){ }
     console.error('Practice allocation error:',e);
@@ -1286,12 +1253,9 @@ api.post('/attempts', requirePasswordReady, async (req,res)=>{
     if(clean.length!==ids.length) return sendError(res,400,'Some questions are not valid for this exam/language.');
     const ins=await pool.query(`INSERT INTO attempts(user_id,exam,subject,mode,language,question_ids) VALUES($1,$2,$3,$4,$5,$6) RETURNING id`,[req.user.id,exam,subject,mode,language,clean]);
 
-    /* Practice/Mock questions are marked as used immediately so the same
-       student cannot receive them again. Their temporary reservation is kept
-       until the attempt is submitted (or the reservation expires), so another
-       student cannot receive the same question during the active session.
-       Question Bank is different: a question becomes 'used' only when the
-       student actually finishes/logs out of that bank session. */
+    /* Normal Practice/Mock questions are reserved immediately.
+       Question Bank is different: a question becomes 'used' only when
+       the student actually finishes/logs out of that bank session. */
     if (mode !== 'bank') {
       await pool.query(
         `INSERT INTO question_history(user_id, question_id, mode)
@@ -1301,7 +1265,7 @@ api.post('/attempts', requirePasswordReady, async (req,res)=>{
          DO NOTHING`,
         [req.user.id, mode, clean]
       );
-      /* Keep the reservation alive until /attempts/:id/submit releases it. */
+      await pool.query(`DELETE FROM question_reservations WHERE user_id=$1 AND mode=$2 AND question_id=ANY($3::bigint[])`,[req.user.id,mode,clean]);
     }
 
     res.json({id:ins.rows[0].id});
