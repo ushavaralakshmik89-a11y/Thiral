@@ -546,7 +546,8 @@ a{
 <button onclick="startPractice(10)">📝 10 கேள்விகள்</button>
 <button onclick="startPractice(20)">📝 20 கேள்விகள்</button>
 <button onclick="startPractice(50)">📝 50 கேள்விகள்</button>
-<button onclick="startPractice(9999)">♾️ Question Bank முழுவதும் / தொடர்ச்சி</button>
+<button onclick="startPractice(100)">📝 100 கேள்விகள் — கடினம்</button>
+<button onclick="startPractice(200)">📝 200 கேள்விகள்</button>
 <button onclick="show('material')">📖 Study Material</button>
 
 </div>
@@ -3907,8 +3908,8 @@ async function loadPracticeQuestions(requested){
 async function startPractice(n){
   stop();
   const requested=Number(n||10);
-  if(![10,20,50,100,200,500,1000,9999].includes(requested)){
-    if($('feedback'))$('feedback').textContent='Practice எண்ணிக்கை 10, 20, 50, 100, 200, 500, 1000 அல்லது “முழுவதும்” மட்டும்.';
+  if(![10,20,50,100,200].includes(requested)){
+    if($('feedback'))$('feedback').textContent='Practice எண்ணிக்கை 10, 20, 50, 100 அல்லது 200 மட்டும்.';
     return;
   }
   T.q=[];T.answers={};T.checks={};T.i=0;T.attempt=null;T.submitted=false;T.busy=false;
