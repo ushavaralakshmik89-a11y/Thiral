@@ -1120,63 +1120,94 @@ api.get('/practice/questions-v2', requirePasswordReady, async (req,res)=>{
       return q.rows;
     };
 
+    /* Difficulty rules for Practice:
+       - 10: Easy only when difficulty metadata exists.
+       - 20: exactly 2 Normal/Moderate, remaining questions are above Normal.
+       - 50: exactly 5 Normal/Moderate, remaining questions are above Normal.
+       - 100: HARD ONLY. Never silently fill with Easy/Normal/Medium.
+       - 200: random mixed difficulty; no balancing rule is imposed.
+       Every SQL selection is by unique question id, and the transaction lock
+       plus active reservations prevents simultaneous allocation collisions. */
     if(effectiveLimit===10 && QUESTION_DIFFICULTY_COLUMN){
-      rows=await take(`AND lower(coalesce(q."${QUESTION_DIFFICULTY_COLUMN}"::text,'')) ~ $5`,1,['(easy|எளிது)'],10);
-      if(rows.length<10){
-        const existing=new Set(rows.map(x=>String(x.id)));
-        const more=await take(`AND NOT (q.id = ANY($5::bigint[]))`,10-rows.length,[rows.map(x=>Number(x.id))]);
-        rows.push(...more.filter(x=>!existing.has(String(x.id))));
-      }
+      rows=await take(`AND lower(coalesce(q."${QUESTION_DIFFICULTY_COLUMN}"::text,'')) ~ $5`,10,['(easy|எளிது)'],10);
     }else if(effectiveLimit===10){
       rows=await take('',10);
-    }else{
+    }else if(effectiveLimit===100 && QUESTION_DIFFICULTY_COLUMN){
+      /* 100-question practice is strictly hard. Include Very Hard/Extreme
+         variants because they are also harder than the requested threshold. */
+      rows=await take(
+        `AND lower(coalesce(q."${QUESTION_DIFFICULTY_COLUMN}"::text,'')) ~ $5`,
+        100,
+        ['(hard|very\\s*hard|extreme|கடினம்|மிகக்\\s*கடினம்|மிகவும்\\s*கடினம்)'],
+        100
+      );
+    }else if(effectiveLimit===100){
+      /* Difficulty metadata is mandatory for the 100-hard rule. Never fall
+         back to random questions if the database has no difficulty column. */
+      rows=[];
+    }else if(effectiveLimit===20 || effectiveLimit===50){
       const normalCount=effectiveLimit===20?2:5;
       if(QUESTION_DIFFICULTY_COLUMN){
-        rows=await take(`AND lower(coalesce(q."${QUESTION_DIFFICULTY_COLUMN}"::text,'')) ~ $5`,normalCount,['(normal|moderate|சாதாரணம்|மிதமானது)'],normalCount);
-      }
-      const usedIds=rows.map(x=>Number(x.id));
-      const remaining=effectiveLimit-rows.length;
-      if(remaining>0){
-        const extraIds=usedIds.length ? `AND NOT (q.id = ANY($5::bigint[]))` : '';
-        let more=[];
-        if(QUESTION_DIFFICULTY_COLUMN){
-          more=await take(`${extraIds} AND lower(coalesce(q."${QUESTION_DIFFICULTY_COLUMN}"::text,'')) !~ $${usedIds.length?6:5}`,remaining,[...(usedIds.length?[usedIds]:[]),'(normal|moderate|சாதாரணம்|மிதமானது)']);
+        /* First reserve exactly the requested Normal/Moderate quota. */
+        rows=await take(
+          `AND lower(coalesce(q."${QUESTION_DIFFICULTY_COLUMN}"::text,'')) ~ $5`,
+          normalCount,
+          ['(normal|moderate|சாதாரணம்|மிதமானது)'],
+          normalCount
+        );
+
+        if(rows.length!==normalCount){
+          rows=[];
         }else{
-          more=await take(extraIds,remaining,usedIds.length?[usedIds]:[]);
+          const usedIds=rows.map(x=>Number(x.id));
+          const remaining=effectiveLimit-rows.length;
+          if(remaining>0){
+          /* The rest must be Medium/Intermediate/Hard/Extreme or their
+             Tamil equivalents. Easy is deliberately excluded. */
+          const highPattern='(medium|intermediate|hard|very\\s*hard|extreme|இடைநிலை|நடுத்தரம்|கடினம்|மிகக்\\s*கடினம்|மிகவும்\\s*கடினம்)';
+          const extraIds=usedIds.length ? `AND NOT (q.id = ANY($5::bigint[]))` : '';
+          const more=await take(
+            `${extraIds} AND lower(coalesce(q."${QUESTION_DIFFICULTY_COLUMN}"::text,'')) ~ $${usedIds.length?6:5}`,
+            remaining,
+            [...(usedIds.length?[usedIds]:[]),highPattern],
+            remaining
+          );
+          rows.push(...more);
+          }
         }
-        rows.push(...more);
-        if(rows.length<effectiveLimit){
-          const have=rows.map(x=>Number(x.id));
-          const fill=await take(`AND NOT (q.id = ANY($5::bigint[]))`,effectiveLimit-rows.length,[have]);
-          rows.push(...fill);
-        }
+      }else{
+        /* Without difficulty metadata, the requested difficulty policy cannot
+           be guaranteed. Do not silently substitute Easy/random questions. */
+        rows=[];
       }
 
-      /* Keep the post-normal portion varied when difficulty metadata exists. */
+      /* Mix the non-normal questions instead of presenting them in one
+         difficulty block. The first 2/5 positions remain the normal quota. */
       if(rows.length>normalCount && QUESTION_DIFFICULTY_COLUMN){
-        const head=rows.slice(0,Math.min(normalCount,rows.length));
+        const head=rows.slice(0,normalCount);
         const groups=new Map();
-        for(const q of rows.slice(head.length)){
+        for(const q of rows.slice(normalCount)){
           const k=normalizeDifficulty(q.difficulty)||'other';
           if(!groups.has(k))groups.set(k,[]);
           groups.get(k).push(q);
         }
-        for(const g of groups.values()){
-          for(let i=g.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[g[i],g[j]]=[g[j],g[i]];}
-        }
-        const keys=[...groups.keys()].sort((a,b)=>difficultySortKey(a)-difficultySortKey(b));
         const mixed=[];
-        let guard=0;
-        while(mixed.length<rows.length-head.length && keys.length && guard++<10000){
-          const available=keys.filter(k=>groups.get(k)?.length);
+        while(mixed.length<rows.length-normalCount){
+          const available=[...groups.keys()].filter(k=>groups.get(k)?.length);
           if(!available.length)break;
           const k=available[Math.floor(Math.random()*available.length)];
           mixed.push(groups.get(k).shift());
         }
         rows=[...head,...mixed];
       }else{
-        for(let i=rows.length-1;i>normalCount;i--){const j=normalCount+Math.floor(Math.random()*(i-normalCount+1));[rows[i],rows[j]]=[rows[j],rows[i]];}
+        for(let i=rows.length-1;i>normalCount;i--){
+          const j=normalCount+Math.floor(Math.random()*(i-normalCount+1));
+          [rows[i],rows[j]]=[rows[j],rows[i]];
+        }
       }
+    }else{
+      /* 200-question practice: random mix, no Easy/Normal/Hard quota. */
+      rows=await take('',effectiveLimit);
     }
 
     if(rows.length<effectiveLimit){
@@ -1253,9 +1284,12 @@ api.post('/attempts', requirePasswordReady, async (req,res)=>{
     if(clean.length!==ids.length) return sendError(res,400,'Some questions are not valid for this exam/language.');
     const ins=await pool.query(`INSERT INTO attempts(user_id,exam,subject,mode,language,question_ids) VALUES($1,$2,$3,$4,$5,$6) RETURNING id`,[req.user.id,exam,subject,mode,language,clean]);
 
-    /* Normal Practice/Mock questions are reserved immediately.
-       Question Bank is different: a question becomes 'used' only when
-       the student actually finishes/logs out of that bank session. */
+    /* Practice/Mock questions are marked as used immediately so the same
+       student cannot receive them again. Their temporary reservation is kept
+       until the attempt is submitted (or the reservation expires), so another
+       student cannot receive the same question during the active session.
+       Question Bank is different: a question becomes 'used' only when the
+       student actually finishes/logs out of that bank session. */
     if (mode !== 'bank') {
       await pool.query(
         `INSERT INTO question_history(user_id, question_id, mode)
@@ -1265,7 +1299,7 @@ api.post('/attempts', requirePasswordReady, async (req,res)=>{
          DO NOTHING`,
         [req.user.id, mode, clean]
       );
-      await pool.query(`DELETE FROM question_reservations WHERE user_id=$1 AND mode=$2 AND question_id=ANY($3::bigint[])`,[req.user.id,mode,clean]);
+      /* Keep the reservation alive until /attempts/:id/submit releases it. */
     }
 
     res.json({id:ins.rows[0].id});
