@@ -693,10 +693,6 @@ a{
 </div>
 <div id="adminSuggestionList"></div>
 <hr>
-<h3>👨‍🎓 Registered Students</h3>
-<p class="small">பதிவு செய்த ஒவ்வொரு மாணவரின் பெயர், Email, தொலைபேசி, பாலினம், பிறந்த தேதி, பதிவு நேரம் மற்றும் கடைசி Login நேரம் இங்கே காட்டப்படும். Password மட்டும் Admin-க்கும் காட்டப்படாது.</p>
-<div id="adminStudentList"></div>
-<hr>
 <h3>📚 Content Management</h3>
 <p>Subjects → Topics → Subtopics → Study Material → Questions ஆகியவற்றை Admin நிர்வகிக்கும் பகுதி.</p>
 <h3>📝 Question Bank</h3>
@@ -707,12 +703,11 @@ a{
 </section>
 
 </div>
-<div id="adminStudentDetailModal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10000;display:flex;align-items:center;justify-content:center;padding:18px">
-<div class="card" style="max-width:1200px;width:100%;max-height:90vh;overflow:auto;position:relative">
-<div class="top"><h2 id="adminStudentDetailTitle">மாணவர் விவரங்கள்</h2><button class="secondary" onclick="closeAdminStudentView()">✕ மூடு</button></div>
-<p class="small">மேலுள்ள Dashboard எண்ணிக்கையில் கிளிக் செய்த மாணவர்களின் விவரங்கள் இங்கே காட்டப்படும். Password எந்த நிலையிலும் காட்டப்படாது.</p>
+<section id="adminStudentView" class="card hidden">
+<div class="top"><h2 id="adminStudentDetailTitle">மாணவர் விவரங்கள்</h2><button class="secondary" onclick="show('admin')">← Dashboard</button></div>
+<p class="small">Dashboard-ல் தேர்ந்தெடுத்த எண்ணிக்கைக்கான மாணவர் விவரங்கள் மட்டும் இங்கே காட்டப்படும். Password எந்த நிலையிலும் காட்டப்படாது.</p>
 <div id="adminStudentDetailBody"></div>
-</div></div>
+</section>
 <div id="languageModal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px">
 <div class="card" style="max-width:480px;width:100%;text-align:center">
 <h2>🌐 தேர்வு மொழியைத் தேர்ந்தெடுக்கவும்</h2>
@@ -3628,11 +3623,7 @@ window.V91_ADV_NUM=V91_ADV_NUM;
       '</td><td>'+escapeHtml138(x.created_at?new Date(x.created_at).toLocaleString():'-')+
       '</td><td>'+escapeHtml138(x.last_login_at?new Date(x.last_login_at).toLocaleString():'-')+
       '</td></tr>';}).join('')+'</table>';
-    if(el('adminStudentDetailModal')){el('adminStudentDetailModal').classList.remove('hidden');el('adminStudentDetailModal').style.display='flex';}
-  };
-
-  window.closeAdminStudentView=function(){
-    if(el('adminStudentDetailModal')){el('adminStudentDetailModal').classList.add('hidden');el('adminStudentDetailModal').style.display='none';}
+    show('adminStudentView');
   };
 
   window.refreshOnlineMonitor=function(){
