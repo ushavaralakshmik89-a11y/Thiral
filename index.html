@@ -3892,125 +3892,40 @@ async function answer(value,timeout=false){
   }
 }
 async function loadPracticeQuestions(requested){
-  const selectedSubtopic=(typeof currentSub!=='undefined'?String(currentSub||'').trim():'');
-  if(!selectedSubtopic) throw new Error('Subtopic தேர்வு செய்யப்படவில்லை.');
   const dbSubject =
     currentSubject==='gs' ? 'பொது அறிவு' :
     currentSubject==='apt' ? 'apt' :
     currentSubject==='tamil' ? 'tamil' : '';
-  let dbSubtopic=selectedSubtopic;
-  /* Group 4 database uses Tamil subtopic keys for GK in both languages,
-     while Aptitude English uses English subtopic keys. */
-  if(currentSubject==='apt' && contentLanguage==='en'){
-    for(const topicKey of Object.keys(EN_LABELS.apt?.topics||{})){
-      const subs=EN_LABELS.apt.topics[topicKey]?.subs||{};
-      if(Object.prototype.hasOwnProperty.call(subs,selectedSubtopic)){ dbSubtopic=subs[selectedSubtopic]; break; }
-      const hit=Object.entries(subs).find(([ta,en])=>en===selectedSubtopic);
-      if(hit){ dbSubtopic=hit[1]; break; }
-    }
-  }
-
-  /* 10/20/50: do NOT download the whole bank. Fetch a small page first.
-     “முழுவதும்” மட்டும் எல்லா pages-ஐ தொடர்ந்து பெறும். */
-  if(requested!==9999){
-    const d=await api('/questions?exam='+encodeURIComponent(String(selectedExam||'group4'))+
-      '&subject='+encodeURIComponent(dbSubject)+
-      '&language='+encodeURIComponent(contentLanguage==='en'?'en':'ta')+
-      '&subtopic='+encodeURIComponent(dbSubtopic)+
-      '&limit=200&offset=0');
-    return Array.isArray(d.questions)?d.questions:[];
-  }
-
-  const out=[];
-  let offset=0;
-  const pageSize=200;
-  while(true){
-    const d=await api('/questions?exam='+encodeURIComponent(String(selectedExam||'group4'))+
-      '&subject='+encodeURIComponent(dbSubject)+
-      '&language='+encodeURIComponent(contentLanguage==='en'?'en':'ta')+
-      '&subtopic='+encodeURIComponent(dbSubtopic)+
-      '&limit='+pageSize+'&offset='+offset);
-    const rows=Array.isArray(d.questions)?d.questions:[];
-    out.push(...rows);
-    if(!d.pagination || !d.pagination.hasMore || rows.length===0) break;
-    offset=Number(d.pagination.nextOffset ?? (offset+rows.length));
-    if(!Number.isFinite(offset)) break;
-  }
-  const seen=new Set(),unique=[];
-  for(const q of out){
-    const k=String(q.id||'')||practiceQuestionKey(q);
-    if(seen.has(k))continue;
-    seen.add(k);unique.push(q);
-  }
-  return unique;
-}
-
-function practiceHistoryKey(){
-  const st=(typeof currentSub!=='undefined'?String(currentSub||'').trim():'');
-  return 'thiral_practice_used_v2_'+String(selectedExam||'group4')+'|'+(contentLanguage==='en'?'en':'ta')+'|'+String(currentSubject||'')+'|'+st;
-}
-function getPracticeHistory(){
-  try{
-    const x=JSON.parse(localStorage.getItem(practiceHistoryKey())||'[]');
-    return Array.isArray(x)?x:[];
-  }catch(_){return []}
-}
-function savePracticeHistory(keys,bankSize){
-  const valid=new Set(keys);
-  const old=getPracticeHistory().filter(k=>valid.has(k));
-  localStorage.setItem(practiceHistoryKey(),JSON.stringify([...new Set(old)].slice(-bankSize)));
+  if(!dbSubject) throw new Error('Subject தேர்வு செய்யப்படவில்லை.');
+  const d=await api('/practice/questions-v2?exam='+encodeURIComponent(String(selectedExam||'group4'))+
+    '&subject='+encodeURIComponent(dbSubject)+
+    '&language='+encodeURIComponent(contentLanguage==='en'?'en':'ta')+
+    '&limit='+encodeURIComponent(String(requested)));
+  return Array.isArray(d.questions)?d.questions:[];
 }
 
 async function startPractice(n){
   stop();
   const requested=Number(n||10);
-  if(![10,20,50,9999].includes(requested)){
-    if($('feedback'))$('feedback').textContent='Practice எண்ணிக்கை 10, 20, 50 அல்லது “முழுவதும்” மட்டும்.';
+  if(![10,20,50,100,200,500,1000,9999].includes(requested)){
+    if($('feedback'))$('feedback').textContent='Practice எண்ணிக்கை 10, 20, 50, 100, 200, 500, 1000 அல்லது “முழுவதும்” மட்டும்.';
     return;
   }
   T.q=[];T.answers={};T.checks={};T.i=0;T.attempt=null;T.submitted=false;T.busy=false;
-  if($('feedback'))$('feedback').innerHTML='<b>தேர்ந்தெடுத்த Subtopic-ன் முழு Question Bank சரிபார்க்கப்படுகிறது...</b>';
+  if($('feedback'))$('feedback').innerHTML='<b>முழு Subject Question Bank-லிருந்து புதிய கேள்விகள் தேர்வு செய்யப்படுகிறது...</b>';
   try{
-    const bank=await loadPracticeQuestions(requested);
-    if(!bank.length)throw new Error('இந்த Subtopic-ல் கேள்விகள் இல்லை.');
-
-    const used=new Set(getPracticeHistory());
-    let fresh=bank.filter(q=>!used.has(String(q.id)));
-    fresh.sort(()=>Math.random()-0.5);
-
-    let selected;
-    if(requested===9999){
-      /* “முழுவதும்”: இந்த Subtopic-ல் இதுவரை பயன்படுத்தாத அனைத்து கேள்விகளும்.
-         முழு cycle முடிந்தால் புதிய shuffled cycle தொடங்கும். */
-      if(!fresh.length){
-        fresh=bank.slice().sort(()=>Math.random()-0.5);
-        localStorage.removeItem(practiceHistoryKey());
-        used.clear();
-      }
-      selected=fresh.slice();
-    }else{
-      const target=requested;
-      if(fresh.length<target){
-        /* பழைய கேள்விகளை மீண்டும் எடுப்பது, முழு bank cycle முடிந்த பிறகே. */
-        const freshKeys=new Set(fresh.map(q=>String(q.id)));
-        const recycle=bank.filter(q=>!freshKeys.has(String(q.id))).sort(()=>Math.random()-0.5);
-        selected=[...fresh,...recycle].slice(0,target);
-      }else{
-        selected=fresh.slice(0,target);
-      }
-    }
-
-    if(selected.length<requested && requested!==9999)
-      throw new Error('தேவையான கேள்விகள் கிடைக்கவில்லை. கிடைத்தது: '+selected.length);
+    const selected=await loadPracticeQuestions(requested);
+    if(!selected.length)throw new Error('இந்த Subject-ல் தற்போது கேள்விகள் இல்லை.');
+    if(requested!==9999 && selected.length<requested)throw new Error('தேவையான கேள்விகள் கிடைக்கவில்லை. கிடைத்தது: '+selected.length);
 
     T.q=selected;
-    const historyKeys=[...used,...selected.map(q=>String(q.id))];
-    savePracticeHistory(historyKeys,bank.length);
-
     const a=await api('/attempts',{
       method:'POST',
       body:JSON.stringify({
-        exam:String(selectedExam||'group4'),subject:(currentSubject==='gs'?'பொது அறிவு':currentSubject==='apt'?'apt':'tamil'),mode:'practice',language:(contentLanguage==='en'?'en':'ta'),
+        exam:String(selectedExam||'group4'),
+        subject:(currentSubject==='gs'?'பொது அறிவு':currentSubject==='apt'?'apt':'tamil'),
+        mode:'practice',
+        language:(contentLanguage==='en'?'en':'ta'),
         questionIds:T.q.map(q=>Number(q.id))
       })
     });
@@ -4024,6 +3939,7 @@ async function startPractice(n){
     if($('feedback'))$('feedback').innerHTML='<b>Practice தொடங்க முடியவில்லை.</b><br>'+esc(e.message);
   }
 }
+
 async function next(){
   if(T.busy||T.submitted)return;
   const q=T.q[T.i]; if(!q||!T.checks[String(q.id)])return;
@@ -4090,19 +4006,13 @@ async function startMock(){
   if(M.timer)clearInterval(M.timer);
   M.q=[];M.a={};M.i=0;M.attempt=null;M.submitted=false;
   try{
-    const subjects=['gs','apt'];
-    const all=[];
-    for(const s of subjects){
-      const dbSubject=(s==='gs'?'பொது அறிவு':'apt');
-      const d=await api('/questions?exam='+encodeURIComponent(String(selectedExam||'group4'))+
-        '&subject='+encodeURIComponent(dbSubject)+'&language='+encodeURIComponent(lang())+'&limit=200');
-      (d.questions||[]).forEach(q=>{if(!all.some(x=>String(x.id)===String(q.id)))all.push(q);});
-    }
-    if(all.length<200)throw new Error('3 மணி நேர Mock Test-க்கு 200 கேள்விகள் கிடைக்கவில்லை. கிடைத்தது: '+all.length);
-    for(let i=all.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[all[i],all[j]]=[all[j],all[i]];}
+    const d=await api('/mock/questions-v2?exam='+encodeURIComponent(String(selectedExam||'group4'))+
+      '&language='+encodeURIComponent(lang()==='en'?'en':'ta'));
+    const all=Array.isArray(d.questions)?d.questions:[];
+    if(all.length<200)throw new Error('பொதுவான Mock Test-க்கு 200 கேள்விகள் கிடைக்கவில்லை. கிடைத்தது: '+all.length);
     M.q=all.slice(0,200);
     const a=await api('/attempts',{method:'POST',body:JSON.stringify({
-      exam:String(selectedExam||'group4'),subject:'mixed',mode:'mock',language:(contentLanguage==='en'?'en':'ta'),questionIds:M.q.map(q=>Number(q.id))
+      exam:String(selectedExam||'group4'),subject:'mixed',mode:'mock',language:'mixed',questionIds:M.q.map(q=>Number(q.id))
     })});
     M.attempt=a.id;M.end=Date.now()+3*60*60*1000;
     if(typeof show==='function')show('mockTest');
