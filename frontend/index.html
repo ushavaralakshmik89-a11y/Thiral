@@ -531,8 +531,7 @@ a{
 <button onclick="startPractice(10)">📝 10 கேள்விகள்</button>
 <button onclick="startPractice(20)">📝 20 கேள்விகள்</button>
 <button onclick="startPractice(50)">📝 50 கேள்விகள்</button>
-<button onclick="startPractice(100)">📝 100 கேள்விகள்</button>
-<button onclick="startPractice(200)">📝 200 கேள்விகள்</button>
+<button onclick="startPractice(9999)">♾️ Question Bank முழுவதும் / தொடர்ச்சி</button>
 <button onclick="show('material')">📖 Study Material</button>
 
 </div>
@@ -1202,8 +1201,15 @@ function shuffledUniqueQuestions(){
     return selected.map(q=>{const x={...q};delete x._practiceKey;return x;});
   }
 
-  return [];
-
+  // Question Bank / continuation mode: expose every unique question once per
+  // cycle. When exhausted, begin a fresh shuffled cycle.
+  if(fresh.length===0){
+    fresh=pool.slice().sort(()=>Math.random()-0.5);
+    used=[];
+  }
+  localStorage.setItem('thiral_practice_used_'+key,
+    JSON.stringify(fresh.map(q=>q._practiceKey)));
+  return fresh.map(q=>{const x={...q};delete x._practiceKey;return x;});
 }
 
 function startPractice(n){
@@ -1235,7 +1241,7 @@ function startPractice(n){
   document.getElementById('practiceReview').innerHTML='';
   document.getElementById('practiceReview').classList.add('hidden');
   document.getElementById('subTitle').textContent =
-    n>=200?'📌 '+labelForSubject(currentSubject)+' • '+n+' கேள்விகள்':
+    n>=9999?'📌 '+labelForSubject(currentSubject)+' • ♾️ Question Bank தொடர்ச்சி':
     n>=30?'📌 '+labelForSubject(currentSubject)+' • '+n+' கேள்விகள்':
     '📌 '+currentSub+' • '+n+' கேள்விகள்';
   const stopBtn=document.getElementById('stopInfinitePractice');
@@ -3217,7 +3223,7 @@ window.V91_ADV_NUM=V91_ADV_NUM;
     try{
       var subject = (typeof currentSubject !== 'undefined' && currentSubject) || 'gs';
       var lang = currentLang();
-      var count = Number(n || 10);
+      var count = (n === 9999) ? 200 : Number(n || 10);
 
       if(el('feedback')) el('feedback').textContent='கேள்விகள் ஏற்றப்படுகிறது...';
 
@@ -4139,7 +4145,7 @@ async function answer(n,timedOut){
  }catch(e){P.busy=false;delete P.answers[key];lockButtons(false);if($('feedback'))$('feedback').innerHTML='<b>விடை சரிபார்க்க முடியவில்லை.</b><br>'+esc(e.message);if(!timedOut)startTimer();}
 }
 async function start(n){
- stop();let count=Number(n||10);if([10,20,50,100,200].indexOf(count)<0){alert('Practice எண்ணிக்கை 10, 20, 30, 50, 100 மட்டும்.');return;}
+ stop();let count=Number(n||10);if(count===9999)count=200;if([10,20,30,50,100,200].indexOf(count)<0){alert('Practice எண்ணிக்கை 10, 20, 30, 50, 100 அல்லது Question Bank ஆக இருக்க வேண்டும்.');return;}
  const subject=(typeof currentSubject!=='undefined'&&currentSubject)||'gs';const language=(typeof contentLanguage!=='undefined'&&contentLanguage==='en')?'en':'ta';const exam=(typeof selectedExam!=='undefined'&&selectedExam)||'group4';
  P.questions=[];P.answers={};P.checks={};P.index=0;P.attemptId=null;P.submitted=false;P.count=count;P.busy=false;
  if($('feedback'))$('feedback').innerHTML='<b>கேள்விகள் ஏற்றப்படுகின்றன...</b>';
@@ -4251,32 +4257,26 @@ async function answer(value,timeout=false){
 async function loadPracticeQuestions(requested){
   const dbSubject = currentSubject==='gs' ? 'பொது அறிவு' : currentSubject==='apt' ? 'apt' : currentSubject==='tamil' ? 'tamil' : '';
   if(!dbSubject) throw new Error('Subject தேர்வு செய்யப்படவில்லை.');
-  let url='/practice/questions-v2?exam='+encodeURIComponent(String(selectedExam||'group4'))+
+  const d=await api('/practice/questions-v2?exam='+encodeURIComponent(String(selectedExam||'group4'))+
     '&subject='+encodeURIComponent(dbSubject)+
     '&language='+encodeURIComponent(contentLanguage==='en'?'en':'ta')+
-    '&limit='+encodeURIComponent(String(requested));
-  /* 10-question Practice is the selected Subtopic; 20/50/100/200/full
-     intentionally use the entire selected Subject across all Topics. */
-  if(Number(requested)===10 && currentSub){
-    url+='&subtopic='+encodeURIComponent(String(currentSub));
-  }
-  const d=await api(url);
+    '&limit='+encodeURIComponent(String(requested)));
   return Array.isArray(d.questions)?d.questions:[];
 }
 
 async function startPractice(n){
   stop();
   const requested=Number(n||10);
-  if(![10,20,50,100,200].includes(requested)){
-    if($('feedback'))$('feedback').textContent='Practice எண்ணிக்கை 10, 20, 50, 100 அல்லது 200 மட்டும்.';
+  if(![10,20,50,100,200,500,1000,9999].includes(requested)){
+    if($('feedback'))$('feedback').textContent='Practice எண்ணிக்கை 10, 20, 50, 100, 200, 500, 1000 அல்லது “முழுவதும்” மட்டும்.';
     return;
   }
   T.q=[];T.answers={};T.checks={};T.i=0;T.attempt=null;T.submitted=false;T.busy=false;
-  if($('feedback'))$('feedback').innerHTML='<b>புதிய கேள்விகள் தேர்வு செய்யப்படுகிறது...</b>';
+  if($('feedback'))$('feedback').innerHTML='<b>முழு Subject Question Bank-லிருந்து புதிய கேள்விகள் தேர்வு செய்யப்படுகிறது...</b>';
   try{
     const selected=await loadPracticeQuestions(requested);
     if(!selected.length)throw new Error('இந்த Subject-ல் தற்போது கேள்விகள் இல்லை.');
-    if(selected.length<requested)throw new Error('தேவையான கேள்விகள் கிடைக்கவில்லை. கிடைத்தது: '+selected.length);
+    if(requested!==9999 && selected.length<requested)throw new Error('தேவையான கேள்விகள் கிடைக்கவில்லை. கிடைத்தது: '+selected.length);
     T.q=selected;
     const a=await api('/attempts',{method:'POST',body:JSON.stringify({exam:String(selectedExam||'group4'),subject:(currentSubject==='gs'?'பொது அறிவு':currentSubject==='apt'?'apt':'tamil'),mode:'practice',language:(contentLanguage==='en'?'en':'ta'),questionIds:T.q.map(q=>Number(q.id))})});
     T.attempt=a.id;
@@ -4402,7 +4402,7 @@ window.__THIRAL_FINAL_DIRECT_API__='DATABASE-QUESTIONS-ONLY-v1';
 
 <script>
 /* THIRAL GROUP4 SAFE TEST v2: final controller uses current state directly. */
-window.__THIRAL_GROUP4_SAFE_TEST_V2__={exam:'group4',subjects:['gs','apt'],counts:[10,20,50,100,200]};
+window.__THIRAL_GROUP4_SAFE_TEST_V2__={exam:'group4',subjects:['gs','apt'],counts:[10,20,50,9999]};
 </script>
 
 
@@ -4723,123 +4723,4 @@ window.startPractice=async function(n){
   };
 })();
 </script>
-\n<script>
-/* ===== FINAL PRACTICE CONTROLLER: database questions only ===== */
-(function(){
-  'use strict';
-  const counts=[10,20,50,100,200];
-  const originalApi = window.thiralV138Api;
-  function api(){
-    if(typeof originalApi==='function') return originalApi;
-    if(typeof window.thiralV138Api==='function') return window.thiralV138Api;
-    throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
-  }
-  function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-  function qtext(q){return q&&(q.question||q.q||'')||'';}
-  function opts(q){return q?(Array.isArray(q.options)?q.options:(Array.isArray(q.o)?q.o:[])):[];}
-  function el(id){return document.getElementById(id);}
-  function stopTimer(){if(window.__THIRAL_FINAL_TIMER){clearInterval(window.__THIRAL_FINAL_TIMER);window.__THIRAL_FINAL_TIMER=null;}}
-
-  const state={q:[],answers:{},checks:{},i:0,attempt:null,busy:false,submitted:false,seconds:15};
-
-  async function load(count){
-    const subject=currentSubject==='gs'?'பொது அறிவு':currentSubject==='apt'?'apt':currentSubject==='tamil'?'tamil':'';
-    if(!subject) throw new Error('முதலில் பாடத்தைத் தேர்வு செய்யவும்.');
-    const lang=contentLanguage==='en'?'en':'ta';
-    let url='/practice/questions-v2?exam='+encodeURIComponent(String(selectedExam||'group4'))+
-      '&subject='+encodeURIComponent(subject)+
-      '&language='+encodeURIComponent(lang)+
-      '&limit='+encodeURIComponent(String(count));
-    /* 10 = selected subtopic. 20/50/100/200 = entire selected subject, all topics mixed. */
-    if(count===10 && String(currentSub||'').trim()) url+='&subtopic='+encodeURIComponent(String(currentSub).trim());
-    const d=await api()(url);
-    const rows=Array.isArray(d.questions)?d.questions:[];
-    if(rows.length<count) throw new Error('தேவையான '+count+' கேள்விகள் கிடைக்கவில்லை. கிடைத்தது: '+rows.length);
-    return rows.slice(0,count);
-  }
-
-  function render(){
-    const q=state.q[state.i]; if(!q)return;
-    stopTimer();
-    if(el('progress'))el('progress').textContent=(state.i+1)+' / '+state.q.length;
-    if(el('bar'))el('bar').style.width=((state.i+1)/state.q.length*100)+'%';
-    if(el('level'))el('level').textContent=q.difficulty||q.d||'சாதாரணம்';
-    if(el('question'))el('question').textContent=qtext(q);
-    if(el('feedback'))el('feedback').innerHTML='';
-    if(el('options'))el('options').innerHTML=opts(q).map((o,i)=>'<button class="option" type="button" onclick="window.__THIRAL_FINAL_PRACTICE_ANSWER('+i+')">'+String.fromCharCode(65+i)+'. '+esc(o)+'</button>').join('');
-    state.seconds=15; if(el('timer'))el('timer').textContent='15';
-    window.__THIRAL_FINAL_TIMER=setInterval(()=>{
-      state.seconds--; if(el('timer'))el('timer').textContent=String(Math.max(0,state.seconds));
-      if(state.seconds<=0){stopTimer(); answer(-1,true);}
-    },1000);
-  }
-
-  async function answer(value,timedOut){
-    if(state.busy||state.submitted)return;
-    const q=state.q[state.i]; if(!q)return;
-    const key=String(q.id); if(Object.prototype.hasOwnProperty.call(state.checks,key))return;
-    state.busy=true; stopTimer(); state.answers[key]=Number(value);
-    if(el('options'))el('options').querySelectorAll('button').forEach(b=>b.disabled=true);
-    try{
-      const d=await api()('/attempts/'+state.attempt+'/check-answer',{method:'POST',body:JSON.stringify({questionId:Number(q.id),answer:Number(value)})});
-      state.checks[key]=d;
-      const o=opts(q), ci=Number(d.correct_option);
-      if(el('feedback'))el('feedback').innerHTML=(timedOut?'⏱️ நேரம் முடிந்தது':d.correct===true?'✓ சரி':'✗ தவறு')+'<br><b>சரியான பதில்:</b> '+esc(o[ci]||'')+(d.explanation?'<br><b>விளக்கம்:</b> '+esc(d.explanation):'');
-      state.busy=false;
-      setTimeout(next,1000);
-    }catch(e){
-      state.busy=false; delete state.answers[key];
-      if(el('options'))el('options').querySelectorAll('button').forEach(b=>b.disabled=false);
-      if(el('feedback'))el('feedback').innerHTML='<b>விடை சரிபார்க்க முடியவில்லை.</b><br>'+esc(e.message);
-    }
-  }
-
-  function next(){
-    if(state.busy||state.submitted)return;
-    if(state.i<state.q.length-1){state.i++;render();return;}
-    submit();
-  }
-
-  async function submit(){
-    if(state.submitted||!state.attempt)return;
-    state.submitted=true;stopTimer();
-    try{
-      const d=await api()('/attempts/'+state.attempt+'/submit',{method:'POST',body:JSON.stringify({answers:state.answers})});
-      const total=state.q.length, correct=Number(d.correct||0), unanswered=Object.values(state.answers).filter(v=>Number(v)===-1).length;
-      const wrong=Math.max(0,total-correct-unanswered), score=Number(d.score??(correct*100/Math.max(1,total))).toFixed(2);
-      if(el('resultText'))el('resultText').innerHTML='<p><b>வகை:</b> Practice</p><p><b>மொத்த கேள்விகள்:</b> '+total+'</p><p><b>சரி:</b> '+correct+'</p><p><b>தவறு:</b> '+wrong+'</p><p><b>விடையளிக்காதது:</b> '+unanswered+'</p><p><b>மதிப்பெண்:</b> '+score+'%</p>';
-      if(typeof show==='function')show('result');
-    }catch(e){
-      state.submitted=false;
-      if(el('feedback'))el('feedback').innerHTML='<b>Result சேமிக்க முடியவில்லை.</b><br>'+esc(e.message);
-    }
-  }
-
-  window.startPractice=async function(n){
-    const count=Number(n||10);
-    if(!counts.includes(count)){if(el('feedback'))el('feedback').textContent='Practice எண்ணிக்கை 10, 20, 50, 100 அல்லது 200 மட்டும்.';return;}
-    const subject=String(currentSubject||'').trim();
-    if(!['tamil','gs','apt'].includes(subject)){if(el('feedback'))el('feedback').textContent='முதலில் பாடத்தைத் தேர்வு செய்யவும்.';return;}
-    if(!String(currentSub||'').trim()){if(el('feedback'))el('feedback').textContent='முதலில் Subtopic தேர்வு செய்யவும்.';return;}
-    state.q=[];state.answers={};state.checks={};state.i=0;state.attempt=null;state.busy=false;state.submitted=false;
-    if(el('feedback'))el('feedback').innerHTML='<b>கேள்விகள் ஏற்றப்படுகின்றன...</b>';
-    try{
-      const rows=await load(count); state.q=rows;
-      const lang=contentLanguage==='en'?'en':'ta';
-      const subjectDb=subject==='gs'?'பொது அறிவு':subject==='apt'?'apt':'tamil';
-      const a=await api()('/attempts',{method:'POST',body:JSON.stringify({exam:String(selectedExam||'group4'),subject:subjectDb,mode:'practice',language:lang,questionIds:rows.map(q=>Number(q.id))})});
-      if(!a||!a.id)throw new Error('Practice attempt உருவாக்கப்படவில்லை.');
-      state.attempt=a.id;
-      if(el('practiceReview')){el('practiceReview').innerHTML='';el('practiceReview').classList.add('hidden','screen-review');el('practiceReview').style.display='none';}
-      if(typeof show==='function')show('practice');
-      render();
-    }catch(e){
-      stopTimer();
-      if(el('feedback'))el('feedback').innerHTML='<b>Practice தொடங்க முடியவில்லை.</b><br>'+esc(e.message);
-    }
-  };
-  window.__THIRAL_FINAL_PRACTICE_ANSWER=answer;
-  window.__THIRAL_FINAL_PRACTICE_NEXT=next;
-  window.__THIRAL_FINAL_PRACTICE_FIXED__='NO-FULL-BANK';
-})();
-</script>\n</body></html>
+</body></html>
