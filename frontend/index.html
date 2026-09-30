@@ -362,7 +362,10 @@ a{
 })();
 </script>
 
-<style id="thiral-daily-content-v1">
+<style id="thiral-daily-content-v3">
+/* Full-width home layout + single-line navigation. */
+.wrap{max-width:none !important;width:100% !important;margin:0 auto !important;padding:0 16px !important}
+#home.thiral-home-shell{width:100% !important}
 /* Keep the daily-content card separate from the home navigation buttons. */
 #home.thiral-home-shell{
   background:transparent !important;
@@ -375,11 +378,22 @@ a{
 }
 .thiral-home-actions{
   display:flex;
-  flex-wrap:wrap;
-  align-items:center;
-  justify-content:center;
+  flex-wrap:nowrap;
+  align-items:stretch;
+  justify-content:stretch;
   gap:8px;
+  width:100%;
   margin:0 0 24px;
+  overflow:hidden;
+}
+.thiral-home-actions button{
+  flex:1 1 0;
+  min-width:0;
+  margin:0;
+  padding:13px 8px;
+  font-size:15px;
+  white-space:nowrap;
+  line-height:1.25;
 }
 .thiral-daily-content{
   display:grid;grid-template-columns:minmax(0,1.25fr) minmax(260px,.75fr);gap:22px;
@@ -397,6 +411,85 @@ a{
 @media(max-width:760px){
   .thiral-daily-content{grid-template-columns:1fr;gap:14px;padding:18px}
   .thiral-daily-kicker{font-size:18px}.thiral-daily-title{font-size:20px}.thiral-daily-text{font-size:18px}.thiral-daily-explain{font-size:17px}
+  .thiral-home-actions{gap:4px;overflow-x:auto;overflow-y:hidden}
+  .thiral-home-actions button{flex:0 0 auto;font-size:12px;padding:11px 7px}
+}
+</style>
+
+
+<style id="thiral-daily-layout-v4">
+/* V4: compact daily card + full-width single-row navigation */
+#home.thiral-home-shell{
+  width:100vw !important;
+  margin-left:calc(50% - 50vw) !important;
+  margin-right:calc(50% - 50vw) !important;
+  padding:0 !important;
+}
+#home.thiral-home-shell .thiral-daily-content{
+  width:min(880px,84vw) !important;
+  margin:18px auto 22px !important;
+  box-sizing:border-box !important;
+  padding:22px 26px !important;
+  gap:22px !important;
+  align-items:center !important;
+}
+#home.thiral-home-shell .thiral-daily-main,
+#home.thiral-home-shell .thiral-daily-explain{
+  min-width:0 !important;
+}
+#home.thiral-home-shell .thiral-daily-main{
+  padding:2px 8px 2px 2px !important;
+}
+#home.thiral-home-shell .thiral-daily-kicker{
+  margin-bottom:10px !important;
+}
+#home.thiral-home-shell .thiral-daily-title{
+  margin-bottom:5px !important;
+  line-height:1.45 !important;
+}
+#home.thiral-home-shell .thiral-daily-text{
+  line-height:1.55 !important;
+}
+#home.thiral-home-shell .thiral-daily-explain{
+  padding:17px 20px !important;
+  line-height:1.55 !important;
+}
+#home.thiral-home-shell .thiral-home-actions{
+  width:100% !important;
+  box-sizing:border-box !important;
+  padding:0 16px !important;
+  margin:0 0 26px !important;
+  gap:8px !important;
+  display:flex !important;
+  flex-wrap:nowrap !important;
+  overflow:hidden !important;
+}
+#home.thiral-home-shell .thiral-home-actions button{
+  flex:1 1 0 !important;
+  width:auto !important;
+  min-width:0 !important;
+  margin:0 !important;
+  padding:14px 8px !important;
+  font-size:15px !important;
+  white-space:nowrap !important;
+  min-height:52px !important;
+}
+@media(max-width:760px){
+  #home.thiral-home-shell .thiral-daily-content{
+    width:calc(100% - 28px) !important;
+    grid-template-columns:1fr !important;
+    padding:18px !important;
+    gap:12px !important;
+  }
+  #home.thiral-home-shell .thiral-home-actions{
+    overflow-x:auto !important;
+    justify-content:flex-start !important;
+  }
+  #home.thiral-home-shell .thiral-home-actions button{
+    flex:0 0 auto !important;
+    font-size:13px !important;
+    padding:12px 10px !important;
+  }
 }
 </style>
 
