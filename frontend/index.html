@@ -4572,7 +4572,10 @@ window.startPractice=async function(n){
       mockAttemptId=null;
 
       var qe=document.getElementById('mockQuestion');
+      if(typeof show==='function') show('mockTest');
       if(qe) qe.textContent='200 Mock கேள்விகள் ஏற்றப்படுகிறது...';
+      var oe0=document.getElementById('mockOptions');
+      if(oe0) oe0.innerHTML='';
 
       var L=selectedMockLanguage;
       var d=await mockApi('/mock/questions?exam=group4&language='+encodeURIComponent(L));
@@ -4613,7 +4616,11 @@ window.startPractice=async function(n){
         }
       },1000);
     }catch(e){
-      if(qe) qe.textContent='Mock Test தொடங்க முடியவில்லை: '+String(e&&e.message||e);
+      var errMsg='Mock Test தொடங்க முடியவில்லை: '+String(e&&e.message||e);
+      var qeErr=document.getElementById('mockQuestion');
+      var oeErr=document.getElementById('mockOptions');
+      if(qeErr) qeErr.textContent=errMsg;
+      if(oeErr) oeErr.innerHTML='<div class="card" style="margin-top:14px;color:#9b1c1c"><b>'+escMock(errMsg)+'</b></div>';
     }
   };
 
