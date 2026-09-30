@@ -4965,55 +4965,177 @@ window.startPractice=async function(n){
 
 <script id="thiral-group4-mock-history-final">
 /* THIRAL Group 4 Mock final controller.
-   Uses the backend rotation endpoint so previous Mock questions are excluded
-   per student. The existing 200-question / 3-hour UI is preserved. */
+   Server-selected 200 questions + per-student Mock history.
+   Self-contained so it does not depend on variables/functions hidden inside
+   earlier IIFEs. Existing question rows are read only. */
 (function(){
   'use strict';
+
+  var mockAttemptId=null;
+  var mockApi=function(path,init){
+    if(typeof window.thiralV138Api==='function') return window.thiralV138Api(path,init||{});
+    throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
+  };
+
+  function escMock(v){
+    return String(v==null?'':v).replace(/[&<>"']/g,function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+
+  function normalizeMockRows(rows){
+    return rows.map(function(r){
+      return Object.assign({},r,{
+        q:String(r.question||r.q||''),
+        o:Array.isArray(r.options)?r.options:(Array.isArray(r.o)?r.o:[]),
+        e:String(r.explanation||r.e||''),
+        a:-1
+      });
+    });
+  }
+
+  function renderServerMock(){
+    if(!Array.isArray(mockQuestions)||!mockQuestions.length) return;
+    if(mockIndex<0) mockIndex=0;
+    if(mockIndex>=mockQuestions.length) mockIndex=mockQuestions.length-1;
+    var q=mockQuestions[mockIndex];
+    if(!q) return;
+
+    var p=document.getElementById('mockProgress');
+    var qe=document.getElementById('mockQuestion');
+    var oe=document.getElementById('mockOptions');
+    if(p) p.textContent=(mockIndex+1)+' / '+mockQuestions.length;
+    if(qe) qe.textContent=(mockIndex+1)+'. '+String(q.q||'');
+    if(oe){
+      var options=Array.isArray(q.o)?q.o:[];
+      oe.innerHTML=options.map(function(x,i){
+        var selected=mockAnswers[mockIndex]===i;
+        return '<button class="option" type="button" style="'+
+          (selected?'outline:3px solid #123f70;':'')+
+          '" onclick="window.__THIRAL_FINAL_MOCK_ANSWER('+i+')">'+
+          String.fromCharCode(65+i)+'. '+escMock(x)+'</button>';
+      }).join('');
+    }
+  }
+
+  window.renderMock=renderServerMock;
+
+  window.__THIRAL_FINAL_MOCK_ANSWER=function(i){
+    if(mockFinished || !mockQuestions.length) return;
+    mockAnswers[mockIndex]=Number(i);
+    renderServerMock();
+  };
+
+  window.mockNext=function(){
+    if(mockIndex<mockQuestions.length-1){mockIndex++;renderServerMock();}
+  };
+
+  window.mockPrev=function(){
+    if(mockIndex>0){mockIndex--;renderServerMock();}
+  };
+
   window.startMock=async function(){
     try{
       try{ selectedExam='group4'; }catch(_){ }
       try{ localStorage.setItem('tnpsc_selected_exam','group4'); }catch(_){ }
 
-      if(typeof M!=='undefined' && M.timer) clearInterval(M.timer);
-      if(typeof M!=='undefined'){
-        M.q=[]; M.a={}; M.i=0; M.attempt=null; M.submitted=false; M.end=0;
-      }
+      if(typeof mockTimer!=='undefined' && mockTimer) clearInterval(mockTimer);
+      mockQuestions=[];
+      mockAnswers=[];
+      mockIndex=0;
+      mockSeconds=3*60*60;
+      mockFinished=false;
+      mockAttemptId=null;
+
+      var qe=document.getElementById('mockQuestion');
+      if(qe) qe.textContent='200 Mock கேள்விகள் ஏற்றப்படுகிறது...';
 
       var L=(typeof contentLanguage!=='undefined' && contentLanguage==='en')?'en':'ta';
-      if($('mockQuestion')) $('mockQuestion').textContent='200 Mock கேள்விகள் ஏற்றப்படுகிறது...';
-
-      var d=await api('/mock/questions?exam=group4&language='+encodeURIComponent(L));
+      var d=await mockApi('/mock/questions?exam=group4&language='+encodeURIComponent(L));
       var rows=Array.isArray(d.questions)?d.questions:[];
-      if(rows.length!==200) throw new Error('Mock Test-க்கு 200 கேள்விகள் கிடைக்கவில்லை. கிடைத்தது: '+rows.length);
 
-      M.q=rows;
-      M.a={};
-      M.i=0;
-      M.attempt=Number(d.attemptId);
-      M.submitted=false;
-      M.end=Date.now()+3*60*60*1000;
+      if(rows.length!==200){
+        throw new Error('Mock Test-க்கு 200 கேள்விகள் கிடைக்கவில்லை. கிடைத்தது: '+rows.length);
+      }
+
+      mockQuestions=normalizeMockRows(rows);
+      mockAnswers=new Array(mockQuestions.length).fill(-1);
+      mockIndex=0;
+      mockAttemptId=Number(d.attemptId||0);
+      if(!mockAttemptId) throw new Error('Mock attempt உருவாக்கப்படவில்லை.');
+      mockSeconds=3*60*60;
+      mockFinished=false;
+
+      var result=document.getElementById('mockResult');
+      var review=document.getElementById('screenReview');
+      if(result) result.classList.add('hidden');
+      if(review) review.classList.add('screen-review');
+
+      var ex=(typeof EXAMS!=='undefined' && (EXAMS[selectedExam]||EXAMS.group4))||null;
+      var title=ex&&ex.title?ex.title:'Group 4';
+      var h=document.querySelector('#mockTest h2');
+      if(h) h.textContent=title+' – Mock Test • 200 கேள்விகள் • 3 மணி நேரம்';
 
       if(typeof show==='function') show('mockTest');
+      if(typeof renderMockTimer==='function') renderMockTimer();
+      renderServerMock();
 
-      var paint=function(){
-        var s=Math.max(0,Math.ceil((M.end-Date.now())/1000));
-        if($('mockTimer')) $('mockTimer').textContent=
-          String(Math.floor(s/3600)).padStart(2,'0')+':'+
-          String(Math.floor((s%3600)/60)).padStart(2,'0')+':'+
-          String(s%60).padStart(2,'0');
-        if(s<=0){
-          clearInterval(M.timer);
-          submitMock();
+      mockTimer=setInterval(function(){
+        mockSeconds--;
+        if(typeof renderMockTimer==='function') renderMockTimer();
+        if(mockSeconds<=0){
+          clearInterval(mockTimer);
+          window.submitMock(true);
         }
-      };
-      paint();
-      M.timer=setInterval(paint,1000);
-      mockRender();
+      },1000);
     }catch(e){
-      if($('mockQuestion')) $('mockQuestion').textContent='Mock Test தொடங்க முடியவில்லை: '+String(e.message||e);
+      if(qe) qe.textContent='Mock Test தொடங்க முடியவில்லை: '+String(e&&e.message||e);
     }
   };
-  window.__THIRAL_GROUP4_MOCK_HISTORY__={version:'server-rotated-v1',target:200,durationSeconds:10800};
+
+  window.submitMock=async function(auto){
+    if(mockFinished || !mockQuestions.length || !mockAttemptId) return;
+    mockFinished=true;
+    if(typeof mockTimer!=='undefined' && mockTimer) clearInterval(mockTimer);
+
+    try{
+      var answers={};
+      mockQuestions.forEach(function(q,i){
+        answers[String(q.id)]=Number(mockAnswers[i]);
+      });
+
+      var d=await mockApi('/attempts/'+mockAttemptId+'/submit',{
+        method:'POST',
+        body:JSON.stringify({answers:answers})
+      });
+
+      var total=Number(d.total||mockQuestions.length);
+      var correct=Number(d.correct||0);
+      var unanswered=Number(d.unanswered||0);
+      var score=Number(d.score||0);
+      var wrong=Math.max(0,total-correct-unanswered);
+      var summary=document.getElementById('mockSummary');
+      if(summary){
+        summary.innerHTML=
+          '<p><b>மொத்த கேள்விகள்:</b> '+total+'</p>'+
+          '<p><b>சரி:</b> '+correct+'</p>'+
+          '<p><b>தவறு:</b> '+wrong+'</p>'+
+          '<p><b>விடையளிக்காதது:</b> '+unanswered+'</p>'+
+          '<p><b>மதிப்பெண்:</b> '+score+'%</p>';
+      }
+      if(typeof showMockResultScreen==='function') showMockResultScreen();
+      else if(typeof show==='function') show('mockResult');
+    }catch(e){
+      mockFinished=false;
+      var summary2=document.getElementById('mockSummary');
+      if(summary2) summary2.textContent='Mock Result சேமிக்க முடியவில்லை: '+String(e&&e.message||e);
+    }
+  };
+
+  window.__THIRAL_GROUP4_MOCK_HISTORY__={
+    version:'server-rotated-v3',target:200,durationSeconds:10800,
+    source:'database',historyMode:'mock'
+  };
 })();
 </script>
 </body></html>
