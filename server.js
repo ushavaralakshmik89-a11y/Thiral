@@ -1813,10 +1813,18 @@ app.use('/api/admin', async (req, res, next) => {
 
 /* ===== GROUP 4 MOCK ROTATION API =====
    Selects exactly 200 mixed Tamil + General Knowledge + Aptitude questions
-   from the live database, excluding this student's previous Mock questions.
-   Questions are reserved atomically with the attempt so simultaneous Mock
-   starts for the same student cannot receive the same set.
-   Existing question rows are never deleted or rewritten.
+   from the live database.
+
+   Mock-only rules:
+   - Prefer Moderate/Hard questions and avoid Easy questions when enough
+     non-easy questions are available.
+   - Very Hard questions are kept limited.
+   - Duplicate question content is removed even when DB IDs differ.
+   - A student's previous history is excluded regardless of history mode,
+     so a question already seen in Practice/Question Bank/Mock is not picked.
+   - Once selected for Mock, the question is recorded in all three student
+     history modes so it will not return to another section for that student.
+   - Existing question rows are never deleted or rewritten.
 */
 api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
   const exam=String(req.query.exam||'').trim();
@@ -1841,9 +1849,13 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
       {name:'apt',candidates:['apt','திறனறிவு / Aptitude','Aptitude','aptitude'],language:requestedLanguage}
     ];
 
-    const perSubject={};
     const all=[];
 
+    /*
+      Pull a larger random candidate pool. The old LIMIT 200 + ORDER BY id
+      could repeatedly favour the first/easiest-looking part of the bank.
+      We still keep the query bounded for server safety.
+    */
     for(const spec of specs){
       const r=await client.query(
         `SELECT id,exam,subject,subtopic,language,question,options,explanation,
@@ -1857,13 +1869,11 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
               SELECT 1 FROM question_history h
                WHERE h.user_id=$4
                  AND h.question_id=questions.id
-                 AND h.mode='mock'
             )
-          ORDER BY id
-          LIMIT 200`,
+          ORDER BY random()
+          LIMIT 1000`,
         [exam,spec.candidates,spec.language,req.user.id]
       );
-      perSubject[spec.name]=r.rows;
       all.push(...r.rows.map(q=>({...q,_mockSubject:spec.name})));
     }
 
@@ -1872,7 +1882,7 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
     const seen=new Set();
     const unique=[];
     for(const q of all){
-      const options=Array.isArray(q.options)?q.options:q.options==null?[]:q.options;
+      const options=Array.isArray(q.options)?q.options:(q.options==null?[]:[q.options]);
       const key=String(q.question||'').replace(/\s+/g,' ').trim().toLowerCase()+'|'+
         options.map(x=>String(x).replace(/\s+/g,' ').trim().toLowerCase()).join('|');
       if(seen.has(key)) continue;
@@ -1885,72 +1895,177 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
       return sendError(res,409,'இந்த மாணவருக்கான Group 4 Mock-ல் பயன்படுத்தாத கேள்விகள் தற்போது இல்லை.');
     }
 
+    /*
+      Difficulty:
+      1 = Moderate
+      2 = Hard
+      3 = Very Hard
+
+      Prefer a balanced TNPSC-style paper:
+      40% Moderate + 50% Hard + 10% Very Hard.
+      Easy questions are not deliberately selected when enough non-easy
+      questions exist.
+    */
+    function mockDifficultyBucket(q){
+      const raw=String(q.difficulty||'').trim().toLowerCase();
+
+      if(/மிகக் கடினம்|very\s*hard|veryhard/.test(raw)) return 3;
+      if(/கடினம்|hard/.test(raw)) return 2;
+      if(/மிதமானது|சாதாரணம்|moderate|normal|medium/.test(raw)) return 1;
+      if(/எளிது|easy|basic/.test(raw)) return 0;
+
+      /*
+        If the database has no usable difficulty label, use question shape
+        only as a fallback. This does not change the stored question.
+      */
+      const text=String(q.question||'').replace(/\s+/g,' ').trim();
+      const options=Array.isArray(q.options)?q.options:[];
+      let score=1;
+
+      if(text.length>=120) score++;
+      if(/கீழ்கண்டவற்றுள்|பின்வருவனவற்றில்|பொருத்துக|கூற்று|கூற்றுகள்|சரியான இணை|வரிசை|காரணம்|விளைவு|எது சரி|எவை சரி|அதிகபட்சம்|குறைந்தபட்சம்|statement|statements|match|matching|sequence|assertion|reason|application/i.test(text)) score++;
+      if(/சதவீதம்|விகிதம்|சராசரி|இலாபம்|நட்டம்|வட்டி|வேலை|வேகம்|தூரம்|percentage|ratio|average|profit|loss|interest|time and work|speed|distance/i.test(text)) score++;
+      if(options.length>=4) score++;
+
+      return Math.max(1,Math.min(3,score));
+    }
+
+    unique.forEach(q=>{ q._mockDifficulty=mockDifficultyBucket(q); });
+
     const target=200;
     const selected=[];
     const selectedIds=new Set();
-    const totalUnique=unique.length;
 
-    /* Keep all three Group 4 sections represented where data exists. */
-    for(const spec of specs){
-      const rows=unique.filter(q=>q._mockSubject===spec.name);
-      if(!rows.length) continue;
-      const quota=Math.max(1,Math.min(rows.length,Math.floor(target*rows.length/totalUnique)));
-      rows.slice(0,quota).forEach(q=>{
-        if(selected.length<target && !selectedIds.has(String(q.id))){
-          selected.push(q); selectedIds.add(String(q.id));
-        }
-      });
+    function shuffled(rows){
+      const a=rows.slice();
+      for(let i=a.length-1;i>0;i--){
+        const j=Math.floor(Math.random()*(i+1));
+        [a[i],a[j]]=[a[j],a[i]];
+      }
+      return a;
     }
 
-    /* Fill all remaining slots with still-unused fresh questions. */
-    for(const q of unique){
-      if(selected.length>=target) break;
-      if(!selectedIds.has(String(q.id))){
+    function take(rows,count){
+      for(const q of shuffled(rows)){
+        if(selected.length>=target || count<=0) break;
+        const id=String(q.id);
+        if(selectedIds.has(id)) continue;
         selected.push(q);
-        selectedIds.add(String(q.id));
+        selectedIds.add(id);
+        count--;
       }
     }
 
-    /* Only after every fresh question has been used do we recycle. */
+    /*
+      First choose the intended difficulty mix.
+      If one bucket is short, the remaining slots are filled from the
+      other non-easy buckets before Easy is considered.
+    */
+    const moderate=unique.filter(q=>q._mockDifficulty===1);
+    const hard=unique.filter(q=>q._mockDifficulty===2);
+    const veryHard=unique.filter(q=>q._mockDifficulty===3);
+    const nonEasy=unique.filter(q=>q._mockDifficulty>=1);
+
+    if(nonEasy.length>=target){
+      take(moderate,80);
+      take(hard,100);
+      take(veryHard,20);
+
+      /* Fill any shortfall from remaining non-easy questions. */
+      take(nonEasy.filter(q=>!selectedIds.has(String(q.id))),target-selected.length);
+    }else{
+      /*
+        Not enough non-easy questions in the live bank. Use every available
+        non-easy question first, then fill only the unavoidable remainder.
+      */
+      take(nonEasy,target);
+      take(unique.filter(q=>!selectedIds.has(String(q.id))),target-selected.length);
+    }
+
+    /*
+      Keep Tamil + GS + Aptitude represented where data exists, without
+      replacing the difficulty rule. If one subject was absent from the
+      initial random mix, swap in a fresh question from that subject.
+    */
+    for(const spec of specs){
+      if(selected.length>=target) break;
+      const hasSubject=selected.some(q=>q._mockSubject===spec.name);
+      if(hasSubject) continue;
+
+      const replacement=shuffled(unique.filter(q=>
+        q._mockSubject===spec.name &&
+        !selectedIds.has(String(q.id)) &&
+        q._mockDifficulty>=1
+      ))[0];
+
+      if(replacement){
+        /* Replace a question from an over-represented subject. */
+        const idx=selected.findIndex(q=>
+          selected.filter(x=>x._mockSubject===q._mockSubject).length>1
+        );
+        if(idx>=0){
+          selectedIds.delete(String(selected[idx].id));
+          selected[idx]=replacement;
+          selectedIds.add(String(replacement.id));
+        }
+      }
+    }
+
+    /* Final fallback only when the bank itself has fewer than 200 fresh
+       unique questions. Reuse begins only after all fresh unique questions. */
+    if(selected.length<target){
+      const freshUnique=unique.filter(q=>!selectedIds.has(String(q.id)));
+      take(freshUnique,target-selected.length);
+    }
+
     if(selected.length<target){
       let i=0;
-      while(selected.length<target){
-        selected.push(unique[i%unique.length]);
+      const recycle=shuffled(unique);
+      while(selected.length<target && recycle.length){
+        selected.push(recycle[i%recycle.length]);
         i++;
       }
     }
 
-    /* Fisher-Yates shuffle gives each candidate a different order. */
-    for(let i=selected.length-1;i>0;i--){
-      const j=Math.floor(Math.random()*(i+1));
-      [selected[i],selected[j]]=[selected[j],selected[i]];
-    }
-
-    const clean=selected.slice(0,target).map(q=>Number(q.id));
+    /* Remove internal helper fields before returning to the frontend. */
+    const cleanIds=selected.slice(0,target).map(q=>Number(q.id));
 
     const ins=await client.query(
       `INSERT INTO attempts(user_id,exam,subject,mode,language,question_ids)
        VALUES($1,$2,'mixed','mock','mixed',$3)
        RETURNING id`,
-      [req.user.id,exam,clean]
+      [req.user.id,exam,cleanIds]
     );
 
-    await client.query(
-      `INSERT INTO question_history(user_id,question_id,mode)
-       SELECT $1,x,'mock'
-         FROM unnest($2::bigint[]) AS x
-       ON CONFLICT(user_id,question_id,mode) DO NOTHING`,
-      [req.user.id,clean]
-    );
+    /*
+      Mark the Mock questions in every history mode for this student.
+      This lets the existing Practice and Question Bank endpoints exclude
+      questions already used by Mock without changing those endpoints.
+      No question row is deleted or modified.
+    */
+    for(const mode of ['mock','practice','bank']){
+      await client.query(
+        `INSERT INTO question_history(user_id,question_id,mode)
+         SELECT $1,x,$2
+           FROM unnest($3::bigint[]) AS x
+         ON CONFLICT(user_id,question_id,mode) DO NOTHING`,
+        [req.user.id,mode,cleanIds]
+      );
+    }
 
     await client.query('COMMIT');
 
     const byId=new Map(selected.map(q=>[String(q.id),q]));
+    const questions=cleanIds.map(id=>byId.get(String(id))).filter(Boolean).map(q=>{
+      const { _mockSubject, _mockDifficulty, ...clean }=q;
+      return clean;
+    });
+
     res.json({
       attemptId:ins.rows[0].id,
-      questions:clean.map(id=>byId.get(String(id))).filter(Boolean),
-      count:clean.length,
-      recycled:Math.max(0,clean.length-new Set(clean).size)
+      questions,
+      count:questions.length,
+      recycled:Math.max(0,questions.length-new Set(cleanIds).size)
     });
   }catch(e){
     try{await client.query('ROLLBACK');}catch(_){ }
