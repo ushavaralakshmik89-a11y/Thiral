@@ -1044,7 +1044,8 @@ api.get('/practice/questions', requirePasswordReady, async (req, res) => {
         q.language,
         q.question,
         q.options,
-        q.explanation
+        q.explanation,
+        COALESCE(to_jsonb(q)->>'difficulty',to_jsonb(q)->>'level','') AS difficulty
       FROM questions q
       WHERE ${where}
         AND NOT EXISTS (
@@ -1060,14 +1061,8 @@ api.get('/practice/questions', requirePasswordReady, async (req, res) => {
 
     const result = await pool.query(sql, params);
 
-    if (result.rows.length < limit) {
-      return sendError(
-        res,
-        409,
-        `???? ????????? ???????? ????? ????????? ${result.rows.length} ??????? ?????.`
-      );
-    }
-
+    /* Return every currently unseen question available up to the requested
+       page size. Do not recycle or fail merely because fewer remain. */
     res.json({
       questions: result.rows,
       count: result.rows.length
