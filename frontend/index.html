@@ -531,6 +531,7 @@ a{
 <button onclick="startPractice(10)">📝 10 கேள்விகள்</button>
 <button onclick="startPractice(20)">📝 20 கேள்விகள்</button>
 <button onclick="startPractice(50)">📝 50 கேள்விகள்</button>
+<button onclick="startPractice(100)">📝 100 கேள்விகள்</button>
 <button onclick="show('material')">📖 Study Material</button>
 
 </div>
@@ -4284,6 +4285,59 @@ function practiceDifficultyBucket(q){
   return 1;
 }
 
+function practiceQuestionType(q){
+  const raw=String(q.type||q.question_type||q.questionType||'').trim().toLowerCase();
+  if(raw){
+    if(/match|இணை|பொருத்த/.test(raw)) return 'matching';
+    if(/statement|assert|கூற்று|கூற்ற/.test(raw)) return 'statement';
+    if(/sequence|order|வரிச|வரிசைப்படுத்த/.test(raw)) return 'sequence';
+    if(/reason|cause|காரணம்/.test(raw)) return 'reason';
+    if(/application|scenario|case|சூழ்நிலை|நிகழ்வு|பயன்பாடு/.test(raw)) return 'application';
+    if(/analys|data|தரவு|பகுப்பாய்வு/.test(raw)) return 'analysis';
+    if(/concept|கருத்து/.test(raw)) return 'concept';
+    return 'direct';
+  }
+  const text=String(q.question||q.q||'').replace(/\s+/g,' ').trim().toLowerCase();
+  if(/பொருத்துக|பொருத்தவும்|match the|match/.test(text)) return 'matching';
+  if(/கூற்று|கூற்றுகளில்|statement|assertion|conclusion/.test(text)) return 'statement';
+  if(/வரிசைப்படுத்த|வரிசையில்|sequence|arrange|order/.test(text)) return 'sequence';
+  if(/காரணம்|reason|why|because/.test(text)) return 'reason';
+  if(/சூழ்நிலை|நிகழ்வு|பயன்படுத்தி|application|scenario|case study/.test(text)) return 'application';
+  if(/தரவு|அட்டவணை|வரைபடம்|data|graph|table|analyse|analyze/.test(text)) return 'analysis';
+  if(/கருத்து|concept|விளக்க/.test(text)) return 'concept';
+  return 'direct';
+}
+
+function selectPractice100(bank){
+  const pool=bank.map(normalizePracticeDifficulty);
+  const shuffled=pool.slice().sort(()=>Math.random()-0.5);
+  // First 10 are intentionally basic/normal learning questions.
+  const first=shuffled.filter(q=>practiceDifficultyBucket(q)<=2).slice(0,10);
+  const used=new Set(first.map(q=>String(q.id)));
+  if(first.length<10){
+    for(const q of shuffled){ if(first.length>=10) break; const k=String(q.id); if(!used.has(k)){first.push(q);used.add(k);} }
+  }
+  // Remaining 90 are spread across different question formats where the
+  // source text supports that classification. We do not rewrite the question.
+  const types=['matching','statement','sequence','reason','application','analysis','concept','direct'];
+  const remaining=shuffled.filter(q=>!used.has(String(q.id)));
+  const varied=[];
+  for(const type of types){
+    const bucket=remaining.filter(q=>practiceQuestionType(q)===type && !used.has(String(q.id)));
+    bucket.sort(()=>Math.random()-0.5);
+    for(const q of bucket){
+      if(varied.length>=90) break;
+      varied.push(q);used.add(String(q.id));
+    }
+    if(varied.length>=90) break;
+  }
+  if(varied.length<90){
+    const rest=remaining.filter(q=>!used.has(String(q.id))).sort(()=>Math.random()-0.5);
+    varied.push(...rest.slice(0,90-varied.length));
+  }
+  return [...first,...varied].slice(0,100);
+}
+
 function selectPracticeByDifficulty(bank,n){
   const pool=bank.map(normalizePracticeDifficulty);
   if(n===10){
@@ -4396,8 +4450,8 @@ function savePracticeHistory(keys,bankSize){
 async function startPractice(n){
   stop();
   const requested=Number(n||10);
-  if(![10,20,50,9999].includes(requested)){
-    if($('feedback'))$('feedback').textContent='Practice எண்ணிக்கை 10, 20, 50 அல்லது “முழுவதும்” மட்டும்.';
+  if(![10,20,50,100,9999].includes(requested)){
+    if($('feedback'))$('feedback').textContent='Practice எண்ணிக்கை 10, 20, 50, 100 அல்லது “முழுவதும்” மட்டும்.';
     return;
   }
   T.q=[];T.answers={};T.checks={};T.i=0;T.attempt=null;T.submitted=false;T.busy=false;
@@ -4408,7 +4462,7 @@ async function startPractice(n){
 
     const used=new Set(getPracticeHistory());
     let fresh=bank.filter(q=>!used.has(String(q.id)));
-    fresh=selectPracticeByDifficulty(fresh,requested);
+    fresh=(requested===100)?selectPractice100(fresh):selectPracticeByDifficulty(fresh,requested);
 
     let selected;
     if(requested===9999){
