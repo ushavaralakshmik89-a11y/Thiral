@@ -5337,4 +5337,69 @@ window.startPractice=async function(n){
   syncNextButton();
 })();
 </script>
+
+<script id="thiral-mock-submit-hard-final">
+(function(){
+  'use strict';
+  var submitting=false;
+  function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+  function getState(){return window.__THIRAL_MOCK_STATE||null;}
+  function getQs(){var s=getState();return s&&Array.isArray(s.questions)?s.questions:[];}
+  function getAns(){var s=getState();return s&&Array.isArray(s.answers)?s.answers:[];}
+  function showResult(){
+    var result=document.getElementById('mockResult');
+    document.querySelectorAll('section').forEach(function(sec){sec.classList.add('hidden');sec.style.display='none';});
+    if(result){result.classList.remove('hidden');result.style.display='block';}
+    window.scrollTo({top:0,behavior:'instant'});
+  }
+  function renderReview(){
+    var qs=getQs(), ans=getAns(), root=document.getElementById('screenReview'), legacy=document.getElementById('mockReview');
+    if(!qs.length) return;
+    var html=qs.map(function(q,i){
+      var opts=Array.isArray(q.o)?q.o:(Array.isArray(q.options)?q.options:[]);
+      var a=Number(ans[i]);
+      var your=(a>=0&&a<opts.length)?String(opts[a]):'விடையளிக்கவில்லை';
+      var ex=String(q.e||q.explanation||'').trim();
+      return '<div class="card" style="box-shadow:none;border:1px solid #e5e7eb;margin-bottom:12px;">'+
+        '<div><b>'+esc(i+1)+'. '+esc(q.q||q.question||'')+'</b></div>'+
+        '<p>உங்கள் விடை: <b>'+esc(your)+'</b></p>'+
+        (ex?'<p class="small"><b>விளக்கம்:</b> '+esc(ex)+'</p>':'')+'</div>';
+    }).join('');
+    if(legacy) legacy.innerHTML=html;
+    if(root) root.innerHTML='<h3>Mock Test Review – '+qs.length+' கேள்விகள்</h3>'+html;
+  }
+  window.submitMock=async function(auto){
+    if(submitting) return;
+    var qs=getQs(), ans=getAns(), st=getState(), attemptId=Number(st&&st.attemptId||0);
+    if(!qs.length||!attemptId){
+      var no=document.getElementById('mockSummary');
+      if(no) no.innerHTML='<p style="color:#b91c1c"><b>Mock attempt கிடைக்கவில்லை.</b> Mock Test-ஐ மீண்டும் தொடங்கவும்.</p>';
+      return;
+    }
+    submitting=true;
+    var buttons=document.querySelectorAll('#mockTest button');
+    buttons.forEach(function(b){if(/submit/i.test(String(b.textContent||''))){b.disabled=true;b.dataset.oldText=b.textContent;b.textContent='Submitting...';}});
+    try{
+      var answers={};
+      qs.forEach(function(q,i){ if(q&&q.id!=null) answers[String(q.id)]=Number(ans[i]); });
+      var api=window.thiralV138Api;
+      if(typeof api!=='function') throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
+      var d=await api('/attempts/'+encodeURIComponent(attemptId)+'/submit',{method:'POST',body:JSON.stringify({answers:answers})});
+      var total=Number(d.total||qs.length), correct=Number(d.correct||0), unanswered=Number(d.unanswered||0), score=Number(d.score||0), wrong=Math.max(0,total-correct-unanswered);
+      var summary=document.getElementById('mockSummary');
+      if(summary) summary.innerHTML='<p><b>மொத்த கேள்விகள்:</b> '+total+'</p><p><b>சரி:</b> '+correct+'</p><p><b>தவறு:</b> '+wrong+'</p><p><b>விடையளிக்காதது:</b> '+unanswered+'</p><p><b>மதிப்பெண்:</b> '+score+'%</p>';
+      var student=document.getElementById('studentResultSummary');
+      if(student) student.innerHTML='<p><b>Mock Test முடிந்தது.</b></p><p>மொத்தம்: '+total+' | சரி: '+correct+' | தவறு: '+wrong+' | விடையளிக்காதது: '+unanswered+' | மதிப்பெண்: '+score+'%</p>';
+      try{localStorage.setItem('tnpsc_last_result',JSON.stringify({type:'Mock Test',total:total,correct:correct,wrong:wrong,unanswered:unanswered,score:score}));}catch(e){}
+      renderReview();
+      showResult();
+    }catch(e){
+      submitting=false;
+      buttons.forEach(function(b){if(b.dataset.oldText){b.disabled=false;b.textContent=b.dataset.oldText;}});
+      var err=document.getElementById('mockSummary');
+      if(err) err.innerHTML='<p style="color:#b91c1c"><b>Result பெற முடியவில்லை:</b> '+esc(e&&e.message||e)+'</p>';
+    }
+  };
+})();
+</script>
 </body></html>
