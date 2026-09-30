@@ -3709,22 +3709,13 @@ window.V91_ADV_NUM=V91_ADV_NUM;
         var statusText = active ? 'Active / செயல்பாட்டில்' : 'Inactive / முடக்கப்பட்டது';
         var actionText = active ? '🚫 Deactivate' : '♻️ Reactivate';
         var actionClass = active ? '' : 'secondary';
-        return '<tr><td>'+escapeHtml138(x.student_id||'')+'</td>'+
-          '<td>'+escapeHtml138(x.name||'')+'</td>'+
-          '<td>'+escapeHtml138(x.email||'')+'</td>'+
-          '<td>'+escapeHtml138(x.phone||'')+'</td>'+
-          '<td>'+escapeHtml138(x.gender||'')+'</td>'+
-          '<td>'+escapeHtml138(formatAdminDOB138(x.dob))+'</td>'+
-          '<td>'+escapeHtml138(x.last_login_at?new Date(x.last_login_at).toLocaleString():'-')+'</td>'+
-          '<td>'+escapeHtml138(statusText)+'</td>'+
-          '<td><button class="'+actionClass+'" onclick="toggleStudentStatus(\''+escapeHtml138(x.student_id||'')+'\','+(active?'true':'false')+')">'+actionText+'</button>'+
-          (active ? '<button class="secondary" style="margin-left:6px" onclick="setStudentTemporaryPassword(\''+escapeHtml138(x.student_id||'')+'\')">🔑 Set Temporary Password</button>' : '')+
-          '</td></tr>';
+        var sid=String(x.student_id||'');
+        var sidEsc=escapeHtml138(sid);
+        var safeId=sid.replace(/[^a-zA-Z0-9_-]/g,'_');
+        return '<tr><td>'+sidEsc+'</td>'+          '<td>'+escapeHtml138(x.name||'')+'</td>'+          '<td>'+escapeHtml138(x.email||'')+'</td>'+          '<td>'+escapeHtml138(x.phone||'')+'</td>'+          '<td>'+escapeHtml138(x.gender||'')+'</td>'+          '<td>'+escapeHtml138(formatAdminDOB138(x.dob))+'</td>'+          '<td>'+escapeHtml138(x.last_login_at?new Date(x.last_login_at).toLocaleString():'-')+'</td>'+          '<td><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;"><input id="tempPass_'+safeId+'" type="password" minlength="8" autocomplete="new-password" placeholder="Temporary Password" style="min-width:170px;max-width:210px;" '+(!active?'disabled':'')+'><button '+(!active?'disabled ':'')+'class="secondary" onclick="setStudentTemporaryPassword(\''+sidEsc+'\',\'tempPass_'+safeId+'\')">🔑 Reset</button></div></td>'+          '<td><button class="'+actionClass+'" onclick="toggleStudentStatus(\''+sidEsc+'\','+(active?'true':'false')+')">'+actionText+'</button>'+          '<button class="secondary" style="margin-left:6px" onclick="deleteStudentAccount(\''+sidEsc+'\')">🗑️ Delete</button>'+          '</td></tr>';
       }).join('');
       if(el('adminStudentList')) el('adminStudentList').innerHTML=
-        '<p class="small">Deactivate செய்தால் அந்த Student ID-ன் புதிய Login உடனடியாக தடுக்கப்படும்; பழைய Results/Attempts அழிக்கப்படாது.</p>'+
-        '<table><tr><th>Student ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Gender</th><th>DOB</th><th>Last Login</th><th>Status</th><th>Action</th></tr>'+
-        body+'</table>';
+        '<p class="small">Default Password Reset-ல் குறைந்தது 8 characters உள்ள Temporary Password கொடுத்து Reset செய்யலாம். Student அடுத்த Login-ல் புதிய Password அமைக்க வேண்டும். Delete செய்தால் அந்த Student account மற்றும் அதனுடன் தொடர்புடைய student history/attempt records நீக்கப்படும்; Questions/Question Bank அழிக்கப்படாது.</p>'+        '<div style="overflow:auto"><table><tr><th>Student ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Gender</th><th>DOB</th><th>Last Login</th><th>Default Password Reset</th><th>Action</th></tr>'+        body+'</table></div>';
       if(el('students')) el('students').innerHTML=body;
       window.thiralV138Students=students;
       populateAdminExamSubjects138();
@@ -3929,18 +3920,17 @@ window.V91_ADV_NUM=V91_ADV_NUM;
     window.open('/api/admin/exam-results/export?'+p.toString(),'_blank');
   };
 
-  window.setStudentTemporaryPassword = async function(studentId){
-    var temp = window.prompt('Temporary Password / தற்காலிக Password\n\nகுறைந்தது 8 characters உள்ள Password ஒன்றை உள்ளிடுங்கள்.');
-    if(temp === null) return;
-    temp = String(temp);
-    if(temp.length < 8){
-      alert('Temporary Password குறைந்தது 8 characters இருக்க வேண்டும்.');
+  window.setStudentTemporaryPassword = async function(studentId,inputId){
+    var input=inputId ? document.getElementById(inputId) : null;
+    var temp=input ? String(input.value||'').trim() : '';
+    if(!temp){
+      alert('Default Password Reset பகுதியில் Temporary Password உள்ளிடுங்கள்.');
+      if(input) input.focus();
       return;
     }
-    var confirmTemp = window.prompt('Temporary Password-ஐ மீண்டும் உள்ளிடுங்கள்.');
-    if(confirmTemp === null) return;
-    if(temp !== String(confirmTemp)){
-      alert('Password மற்றும் Confirm Password ஒன்றாக இல்லை.');
+    if(temp.length < 8){
+      alert('Temporary Password குறைந்தது 8 characters இருக்க வேண்டும்.');
+      if(input) input.focus();
       return;
     }
     if(!confirm('இந்த Student-க்கு Temporary Password அமைத்து, அடுத்த Login-ல் புதிய Password கட்டாயமாக அமைக்கவா?')) return;
@@ -3949,10 +3939,30 @@ window.V91_ADV_NUM=V91_ADV_NUM;
         method:'PATCH',
         body:JSON.stringify({temporary_password:temp})
       });
+      if(input) input.value='';
       alert('Temporary Password அமைக்கப்பட்டது. மாணவர் அடுத்த Login-ல் புதிய Password அமைக்க வேண்டும்.');
       await loadAdminV138();
     }catch(e){
       alert(e.message || 'Temporary Password அமைக்க முடியவில்லை.');
+    }
+  };
+
+  window.deleteStudentAccount = async function(studentId){
+    var sid=String(studentId||'').trim();
+    if(!sid) return;
+    var ok=confirm('Student ID: '+sid+'\n\nஇந்த Student account-ஐ நிரந்தரமாக Delete செய்யவா?\n\nStudent-ன் login/account மற்றும் தொடர்புடைய attempts/history நீக்கப்படும். Questions / Question Bank அழிக்கப்படாது.');
+    if(!ok) return;
+    var confirmId=window.prompt('Delete உறுதிப்படுத்த Student ID-ஐ மீண்டும் உள்ளிடுங்கள்:');
+    if(confirmId===null || String(confirmId).trim()!==sid){
+      alert('Student ID சரியாக பொருந்தவில்லை. Delete செய்யப்படவில்லை.');
+      return;
+    }
+    try{
+      await api138('/admin/students/'+encodeURIComponent(sid),{method:'DELETE'});
+      alert('Student account Delete செய்யப்பட்டது.');
+      await loadAdminV138();
+    }catch(e){
+      alert(e.message || 'Student account Delete செய்ய முடியவில்லை.');
     }
   };
 
@@ -4007,13 +4017,7 @@ window.V91_ADV_NUM=V91_ADV_NUM;
 
     if(el('adminStudentDetailTitle')) el('adminStudentDetailTitle').textContent=title;
     if(el('adminStudentDetailBody')) el('adminStudentDetailBody').innerHTML=
-      '<table><tr><th>Student ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Gender</th><th>DOB</th><th>Registered</th><th>Last Login</th></tr>'+
-      list.map(function(x){return '<tr><td>'+escapeHtml138(x.student_id||'')+'</td><td>'+escapeHtml138(x.name||'')+
-      '</td><td>'+escapeHtml138(x.email||'')+'</td><td>'+escapeHtml138(x.phone||'')+
-      '</td><td>'+escapeHtml138(x.gender||'')+'</td><td>'+escapeHtml138(formatAdminDOB138(x.dob))+'</td>'+
-      '<td>'+escapeHtml138(x.created_at?new Date(x.created_at).toLocaleString():'-')+
-      '</td><td>'+escapeHtml138(x.last_login_at?new Date(x.last_login_at).toLocaleString():'-')+
-      '</td></tr>';}).join('')+'</table>';
+      '<p class="small">இந்த பிரிக்கப்பட்ட பட்டியலிலும் Default Password Reset மற்றும் Delete வசதிகள் அதேபோல் இருக்கும். Delete செய்தால் அந்த Student account மற்றும் தொடர்புடைய attempts/history நீக்கப்படும்; Questions / Question Bank பாதிக்கப்படாது.</p>'+      '<div style="overflow:auto"><table><tr><th>Student ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Gender</th><th>DOB</th><th>Registered</th><th>Last Login</th><th>Default Password Reset</th><th>Action</th></tr>'+      list.map(function(x){var sid=String(x.student_id||'');var safeId=sid.replace(/[^a-zA-Z0-9_-]/g,'_');var active=x.is_active!==false;return '<tr><td>'+escapeHtml138(sid)+'</td><td>'+escapeHtml138(x.name||'')+      '</td><td>'+escapeHtml138(x.email||'')+'</td><td>'+escapeHtml138(x.phone||'')+      '</td><td>'+escapeHtml138(x.gender||'')+'</td><td>'+escapeHtml138(formatAdminDOB138(x.dob))+'</td>'+      '<td>'+escapeHtml138(x.created_at?new Date(x.created_at).toLocaleString():'-')+      '</td><td>'+escapeHtml138(x.last_login_at?new Date(x.last_login_at).toLocaleString():'-')+      '</td><td><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;"><input id="detailTempPass_'+safeId+'" type="password" minlength="8" autocomplete="new-password" placeholder="Temporary Password" style="min-width:170px;max-width:210px;" '+(!active?'disabled':'')+'><button class="secondary" '+(!active?'disabled':'')+' onclick="setStudentTemporaryPassword(\''+escapeHtml138(sid)+'\',\'detailTempPass_'+safeId+'\')">🔑 Reset</button></div></td>'+      '<td><button class="secondary" onclick="deleteStudentAccount(\''+escapeHtml138(sid)+'\')">🗑️ Delete</button></td></tr>';}).join('')+'</table></div>';
     show('adminStudentView');
   };
 
