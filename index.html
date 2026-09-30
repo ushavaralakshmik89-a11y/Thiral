@@ -4434,4 +4434,58 @@ window.startPractice=async function(n){
   };
 })();
 </script>
+
+<script id="thiral-group4-mock-history-final">
+/* THIRAL Group 4 Mock final controller.
+   Uses the backend rotation endpoint so previous Mock questions are excluded
+   per student. The existing 200-question / 3-hour UI is preserved. */
+(function(){
+  'use strict';
+  window.startMock=async function(){
+    try{
+      try{ selectedExam='group4'; }catch(_){ }
+      try{ localStorage.setItem('tnpsc_selected_exam','group4'); }catch(_){ }
+
+      if(typeof M!=='undefined' && M.timer) clearInterval(M.timer);
+      if(typeof M!=='undefined'){
+        M.q=[]; M.a={}; M.i=0; M.attempt=null; M.submitted=false; M.end=0;
+      }
+
+      var L=(typeof contentLanguage!=='undefined' && contentLanguage==='en')?'en':'ta';
+      if($('mockQuestion')) $('mockQuestion').textContent='200 Mock கேள்விகள் ஏற்றப்படுகிறது...';
+
+      var d=await api('/mock/questions?exam=group4&language='+encodeURIComponent(L));
+      var rows=Array.isArray(d.questions)?d.questions:[];
+      if(rows.length!==200) throw new Error('Mock Test-க்கு 200 கேள்விகள் கிடைக்கவில்லை. கிடைத்தது: '+rows.length);
+
+      M.q=rows;
+      M.a={};
+      M.i=0;
+      M.attempt=Number(d.attemptId);
+      M.submitted=false;
+      M.end=Date.now()+3*60*60*1000;
+
+      if(typeof show==='function') show('mockTest');
+
+      var paint=function(){
+        var s=Math.max(0,Math.ceil((M.end-Date.now())/1000));
+        if($('mockTimer')) $('mockTimer').textContent=
+          String(Math.floor(s/3600)).padStart(2,'0')+':'+
+          String(Math.floor((s%3600)/60)).padStart(2,'0')+':'+
+          String(s%60).padStart(2,'0');
+        if(s<=0){
+          clearInterval(M.timer);
+          submitMock();
+        }
+      };
+      paint();
+      M.timer=setInterval(paint,1000);
+      mockRender();
+    }catch(e){
+      if($('mockQuestion')) $('mockQuestion').textContent='Mock Test தொடங்க முடியவில்லை: '+String(e.message||e);
+    }
+  };
+  window.__THIRAL_GROUP4_MOCK_HISTORY__={version:'server-rotated-v1',target:200,durationSeconds:10800};
+})();
+</script>
 </body></html>
