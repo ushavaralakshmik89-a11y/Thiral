@@ -2001,20 +2001,78 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
       return chosen.slice(0,count);
     };
 
-    const tamilRows=unique.filter(q=>q._mockSubject==='tamil');
-    const gsRows=unique.filter(q=>q._mockSubject==='gs');
-    const aptRows=unique.filter(q=>q._mockSubject==='apt');
+    let tamilRows=unique.filter(q=>q._mockSubject==='tamil');
+    let gsRows=unique.filter(q=>q._mockSubject==='gs');
+    let aptRows=unique.filter(q=>q._mockSubject==='apt');
 
-    if(tamilRows.length<100 || gsRows.length<75 || aptRows.length<25){
-      await client.query('ROLLBACK');
-      return sendError(res,409,
-        `புதிய Mock-க்கு போதுமான தனித்தனி கேள்விகள் இல்லை. தமிழ்: ${tamilRows.length}/100, GS: ${gsRows.length}/75, Aptitude: ${aptRows.length}/25.`
-      );
+    /* If this student has already consumed the fresh pool, do not leave the
+       Mock screen empty. Reuse old Mock questions only after the fresh pool
+       for that subject is exhausted. The current Mock still avoids duplicate
+       content until its unique pool is exhausted. */
+    const need={tamil:100,gs:75,apt:25};
+    const freshCount={tamil:tamilRows.length,gs:gsRows.length,apt:aptRows.length};
+    if(freshCount.tamil<100 || freshCount.gs<75 || freshCount.apt<25){
+      const recycleAll=[];
+      for(const spec of specs){
+        const r=await client.query(
+          `SELECT id,exam,subject,subtopic,language,question,options,explanation,
+                  COALESCE(to_jsonb(questions)->>'difficulty',to_jsonb(questions)->>'level','') AS difficulty
+             FROM questions
+            WHERE exam=$1
+              AND subject=ANY($2::text[])
+              AND language=$3
+              AND is_active=true
+            ORDER BY id
+            LIMIT 5000`,
+          [exam,spec.candidates,spec.language]
+        );
+        recycleAll.push(...r.rows.map(q=>({...q,_mockSubject:spec.name})));
+      }
+
+      const addRecycled=(name,current,required)=>{
+        if(current.length>=required) return current;
+        const localSeen=new Set(current.map(contentKey));
+        for(const q of recycleAll){
+          if(q._mockSubject!==name) continue;
+          const ck=contentKey(q);
+          if(!ck || localSeen.has(ck)) continue;
+          localSeen.add(ck);
+          current.push(q);
+          if(current.length>=required) break;
+        }
+        return current;
+      };
+
+      tamilRows=addRecycled('tamil',tamilRows,100);
+      gsRows=addRecycled('gs',gsRows,75);
+      aptRows=addRecycled('apt',aptRows,25);
     }
 
-    const tamilSelected=selectBest(tamilRows,100,{1:20,2:60,3:20});
-    const gsSelected=selectBest(gsRows,75,{1:15,2:45,3:15});
-    const aptSelected=selectBest(aptRows,25,{1:5,2:15,3:5});
+    /* A Mock must contain 200 slots. If a subject has fewer than its required
+       number of unique questions even after recycling, cycle only after that
+       subject's unique pool is exhausted. This prevents an empty Mock while
+       preserving uniqueness for as long as the database permits. */
+    const cycleTo=(rows,count)=>{
+      if(!rows.length) return [];
+      const out=[];
+      for(let i=0;i<count;i++) out.push(rows[i%rows.length]);
+      return out;
+    };
+
+    const tamilSelected=selectBest(tamilRows,Math.min(100,tamilRows.length),{1:20,2:60,3:20});
+    const gsSelected=selectBest(gsRows,Math.min(75,gsRows.length),{1:15,2:45,3:15});
+    const aptSelected=selectBest(aptRows,Math.min(25,aptRows.length),{1:5,2:15,3:5});
+
+    const tamilFinal=tamilSelected.length>=100?tamilSelected:cycleTo(tamilRows,100);
+    const gsFinal=gsSelected.length>=75?gsSelected:cycleTo(gsRows,75);
+    const aptFinal=aptSelected.length>=25?aptSelected:cycleTo(aptRows,25);
+
+    if(!tamilFinal.length || !gsFinal.length || !aptFinal.length){
+      await client.query('ROLLBACK');
+      return sendError(res,409,
+        `Mock-க்கு தேவையான கேள்விகள் இல்லை. தமிழ்: ${tamilRows.length}, GS: ${gsRows.length}, Aptitude: ${aptRows.length}.` 
+      );
+    }
 
     /* Aptitude gets a second diversity pass across subtopics, without allowing
        a weaker question to displace a much stronger one unnecessarily. */
@@ -2036,13 +2094,13 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
     }
 
     const selected=[
-      ...shuffle(tamilSelected).slice(0,100),
-      ...shuffle([...gsSelected.slice(0,75),...aptMixed.slice(0,25)])
+      ...shuffle(tamilFinal).slice(0,100),
+      ...shuffle([...gsFinal.slice(0,75),...aptMixed.slice(0,25)])
     ];
 
-    if(selected.length!==200 || new Set(selected.map(q=>String(q.id))).size!==200){
+    if(selected.length!==200){
       await client.query('ROLLBACK');
-      return sendError(res,500,'Mock Test-க்கு 200 தனித்தனி கேள்விகளை உருவாக்க முடியவில்லை.');
+      return sendError(res,500,'Mock Test-க்கு 200 கேள்விகளை உருவாக்க முடியவில்லை.');
     }
 
     const clean=selected.map(q=>Number(q.id));
