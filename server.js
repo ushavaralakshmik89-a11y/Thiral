@@ -1762,6 +1762,157 @@ app.use('/api/admin', async (req, res, next) => {
   }
 });
 
+
+/* ===== GROUP 4 MOCK ROTATION API =====
+   Selects exactly 200 mixed Tamil + General Knowledge + Aptitude questions
+   from the live database, excluding this student's previous Mock questions.
+   Questions are reserved atomically with the attempt so simultaneous Mock
+   starts for the same student cannot receive the same set.
+   Existing question rows are never deleted or rewritten.
+*/
+api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
+  const exam=String(req.query.exam||'').trim();
+  const requestedLanguage=String(req.query.language||'ta').trim();
+  if(exam!=='group4' || !['ta','en'].includes(requestedLanguage)){
+    return sendError(res,400,'Invalid Group 4 Mock request.');
+  }
+
+  const client=await pool.connect();
+  try{
+    await client.query('BEGIN');
+
+    /* One student gets one Mock-selection lock at a time. */
+    await client.query(
+      `SELECT pg_advisory_xact_lock(hashtext($1))`,
+      [`thiral-group4-mock:${req.user.id}`]
+    );
+
+    const specs=[
+      {name:'tamil',candidates:['tamil','தமிழ்'],language:'ta'},
+      {name:'gs',candidates:['பொது அறிவு','General Knowledge','general knowledge','பொது அறிவு / General Studies','General Studies','general studies'],language:requestedLanguage},
+      {name:'apt',candidates:['apt','திறனறிவு / Aptitude','Aptitude','aptitude'],language:requestedLanguage}
+    ];
+
+    const perSubject={};
+    const all=[];
+
+    for(const spec of specs){
+      const r=await client.query(
+        `SELECT id,exam,subject,subtopic,language,question,options,explanation,
+                COALESCE(to_jsonb(questions)->>'difficulty',to_jsonb(questions)->>'level','') AS difficulty
+           FROM questions
+          WHERE exam=$1
+            AND subject=ANY($2::text[])
+            AND language=$3
+            AND is_active=true
+            AND NOT EXISTS (
+              SELECT 1 FROM question_history h
+               WHERE h.user_id=$4
+                 AND h.question_id=questions.id
+                 AND h.mode='mock'
+            )
+          ORDER BY id
+          LIMIT 200`,
+        [exam,spec.candidates,spec.language,req.user.id]
+      );
+      perSubject[spec.name]=r.rows;
+      all.push(...r.rows.map(q=>({...q,_mockSubject:spec.name})));
+    }
+
+    /* Remove duplicate question content even if duplicate DB rows have
+       different IDs. */
+    const seen=new Set();
+    const unique=[];
+    for(const q of all){
+      const options=Array.isArray(q.options)?q.options:q.options==null?[]:q.options;
+      const key=String(q.question||'').replace(/\s+/g,' ').trim().toLowerCase()+'|'+
+        options.map(x=>String(x).replace(/\s+/g,' ').trim().toLowerCase()).join('|');
+      if(seen.has(key)) continue;
+      seen.add(key);
+      unique.push(q);
+    }
+
+    if(!unique.length){
+      await client.query('ROLLBACK');
+      return sendError(res,409,'இந்த மாணவருக்கான Group 4 Mock-ல் பயன்படுத்தாத கேள்விகள் தற்போது இல்லை.');
+    }
+
+    const target=200;
+    const selected=[];
+    const selectedIds=new Set();
+    const totalUnique=unique.length;
+
+    /* Keep all three Group 4 sections represented where data exists. */
+    for(const spec of specs){
+      const rows=unique.filter(q=>q._mockSubject===spec.name);
+      if(!rows.length) continue;
+      const quota=Math.max(1,Math.min(rows.length,Math.floor(target*rows.length/totalUnique)));
+      rows.slice(0,quota).forEach(q=>{
+        if(selected.length<target && !selectedIds.has(String(q.id))){
+          selected.push(q); selectedIds.add(String(q.id));
+        }
+      });
+    }
+
+    /* Fill all remaining slots with still-unused fresh questions. */
+    for(const q of unique){
+      if(selected.length>=target) break;
+      if(!selectedIds.has(String(q.id))){
+        selected.push(q);
+        selectedIds.add(String(q.id));
+      }
+    }
+
+    /* Only after every fresh question has been used do we recycle. */
+    if(selected.length<target){
+      let i=0;
+      while(selected.length<target){
+        selected.push(unique[i%unique.length]);
+        i++;
+      }
+    }
+
+    /* Fisher-Yates shuffle gives each candidate a different order. */
+    for(let i=selected.length-1;i>0;i--){
+      const j=Math.floor(Math.random()*(i+1));
+      [selected[i],selected[j]]=[selected[j],selected[i]];
+    }
+
+    const clean=selected.slice(0,target).map(q=>Number(q.id));
+
+    const ins=await client.query(
+      `INSERT INTO attempts(user_id,exam,subject,mode,language,question_ids)
+       VALUES($1,$2,'mixed','mock','mixed',$3)
+       RETURNING id`,
+      [req.user.id,exam,clean]
+    );
+
+    await client.query(
+      `INSERT INTO question_history(user_id,question_id,mode)
+       SELECT $1,x,'mock'
+         FROM unnest($2::bigint[]) AS x
+       ON CONFLICT(user_id,question_id,mode) DO NOTHING`,
+      [req.user.id,clean]
+    );
+
+    await client.query('COMMIT');
+
+    const byId=new Map(selected.map(q=>[String(q.id),q]));
+    res.json({
+      attemptId:ins.rows[0].id,
+      questions:clean.map(id=>byId.get(String(id))).filter(Boolean),
+      count:clean.length,
+      recycled:Math.max(0,clean.length-new Set(clean).size)
+    });
+  }catch(e){
+    try{await client.query('ROLLBACK');}catch(_){ }
+    console.error('Group 4 Mock selection error:',e);
+    sendError(res,500,'Mock question service error.');
+  }finally{
+    client.release();
+  }
+});
+
 app.use('/api', api);
 
 app.use(express.static(path.join(__dirname,'frontend'), { index:'index.html' }));
