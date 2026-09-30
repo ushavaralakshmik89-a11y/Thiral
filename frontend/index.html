@@ -531,7 +531,7 @@ a{
 <button onclick="startPractice(10)">📝 10 கேள்விகள்</button>
 <button onclick="startPractice(20)">📝 20 கேள்விகள்</button>
 <button onclick="startPractice(50)">📝 50 கேள்விகள்</button>
-<button onclick="startPractice(100)">📝 100 கேள்விகள்</button>
+<button onclick="startPractice(9999)">♾️ Question Bank முழுவதும் / தொடர்ச்சி</button>
 <button onclick="show('material')">📖 Study Material</button>
 
 </div>
@@ -4254,129 +4254,6 @@ async function answer(value,timeout=false){
     if(!timeout){T.seconds=15;timer(15);T.timer=setInterval(()=>{T.seconds--;timer(T.seconds);if(T.seconds<=0){stop();answer(-1,true);}},1000);}
   }
 }
-function normalizePracticeDifficulty(q){
-  const x={...q};
-  const raw=String(q.difficulty||q.d||q.level||'').trim().toLowerCase();
-  if(raw){
-    if(/மிகக் கடின|very\s*hard/.test(raw)) x.d='மிகக் கடினம்';
-    else if(/கடின|hard|difficult/.test(raw)) x.d='கடினம்';
-    else if(/மிதமான|சாதாரண|moderate|normal/.test(raw)) x.d='மிதமானது';
-    else if(/எளித|easy/.test(raw)) x.d='எளிது';
-  }
-  if(!x.d){
-    const text=String(q.question||q.q||'').replace(/\s+/g,' ').trim();
-    const opts=Array.isArray(q.options)?q.options.map(String).join(' '):String(q.o||'');
-    const all=(text+' '+opts).toLowerCase();
-    const numbers=(all.match(/\d+(?:\.\d+)?/g)||[]).length;
-    const complex=(all.match(/எத்தனை\s+வழிகள்|வாய்ப்பு|probability|சதவீதம்|வட்டி|வேலை|வேகம்|தூரம்|விகிதம்|கூற்று|assert|statement|conclusion|காரணம்|வரிசை|குறியீடு|application|நிகழ்வு|பகுப்பாய்வு|கணக்கிட|calculate|ratio|average|profit|loss|interest|time|distance/g)||[]).length;
-    if(text.length>=220 || complex>=3 || numbers>=4) x.d='மிகக் கடினம்';
-    else if(text.length>=130 || complex>=1 || numbers>=2) x.d='கடினம்';
-    else if(text.length<=80 && numbers===0 && complex===0) x.d='எளிது';
-    else x.d='மிதமானது';
-  }
-  return x;
-}
-
-function practiceDifficultyBucket(q){
-  const d=String(q.d||q.difficulty||q.level||'').toLowerCase();
-  if(/மிகக் கடின|very\s*hard/.test(d)) return 4;
-  if(/கடின|hard|difficult/.test(d)) return 3;
-  if(/மிதமான|சாதாரண|moderate|normal/.test(d)) return 2;
-  return 1;
-}
-
-function practiceQuestionType(q){
-  const raw=String(q.type||q.question_type||q.questionType||'').trim().toLowerCase();
-  if(raw){
-    if(/match|இணை|பொருத்த/.test(raw)) return 'matching';
-    if(/statement|assert|கூற்று|கூற்ற/.test(raw)) return 'statement';
-    if(/sequence|order|வரிச|வரிசைப்படுத்த/.test(raw)) return 'sequence';
-    if(/reason|cause|காரணம்/.test(raw)) return 'reason';
-    if(/application|scenario|case|சூழ்நிலை|நிகழ்வு|பயன்பாடு/.test(raw)) return 'application';
-    if(/analys|data|தரவு|பகுப்பாய்வு/.test(raw)) return 'analysis';
-    if(/concept|கருத்து/.test(raw)) return 'concept';
-    return 'direct';
-  }
-  const text=String(q.question||q.q||'').replace(/\s+/g,' ').trim().toLowerCase();
-  if(/பொருத்துக|பொருத்தவும்|match the|match/.test(text)) return 'matching';
-  if(/கூற்று|கூற்றுகளில்|statement|assertion|conclusion/.test(text)) return 'statement';
-  if(/வரிசைப்படுத்த|வரிசையில்|sequence|arrange|order/.test(text)) return 'sequence';
-  if(/காரணம்|reason|why|because/.test(text)) return 'reason';
-  if(/சூழ்நிலை|நிகழ்வு|பயன்படுத்தி|application|scenario|case study/.test(text)) return 'application';
-  if(/தரவு|அட்டவணை|வரைபடம்|data|graph|table|analyse|analyze/.test(text)) return 'analysis';
-  if(/கருத்து|concept|விளக்க/.test(text)) return 'concept';
-  return 'direct';
-}
-
-function selectPractice100(bank){
-  const pool=bank.map(normalizePracticeDifficulty);
-  const shuffled=pool.slice().sort(()=>Math.random()-0.5);
-  // First 10 are intentionally basic/normal learning questions.
-  const first=shuffled.filter(q=>practiceDifficultyBucket(q)<=2).slice(0,10);
-  const used=new Set(first.map(q=>String(q.id)));
-  if(first.length<10){
-    for(const q of shuffled){ if(first.length>=10) break; const k=String(q.id); if(!used.has(k)){first.push(q);used.add(k);} }
-  }
-  // Remaining 90 are spread across different question formats where the
-  // source text supports that classification. We do not rewrite the question.
-  const types=['matching','statement','sequence','reason','application','analysis','concept','direct'];
-  const remaining=shuffled.filter(q=>!used.has(String(q.id)));
-  const varied=[];
-  for(const type of types){
-    const bucket=remaining.filter(q=>practiceQuestionType(q)===type && !used.has(String(q.id)));
-    bucket.sort(()=>Math.random()-0.5);
-    for(const q of bucket){
-      if(varied.length>=90) break;
-      varied.push(q);used.add(String(q.id));
-    }
-    if(varied.length>=90) break;
-  }
-  if(varied.length<90){
-    const rest=remaining.filter(q=>!used.has(String(q.id))).sort(()=>Math.random()-0.5);
-    varied.push(...rest.slice(0,90-varied.length));
-  }
-  return [...first,...varied].slice(0,100);
-}
-
-function selectPracticeByDifficulty(bank,n){
-  const pool=bank.map(normalizePracticeDifficulty);
-  if(n===10){
-    const easy=pool.filter(q=>practiceDifficultyBucket(q)<=2);
-    return easy.sort(()=>Math.random()-0.5).slice(0,10);
-  }
-  if(n===20){
-    const easy=pool.filter(q=>practiceDifficultyBucket(q)===1);
-    const moderate=pool.filter(q=>practiceDifficultyBucket(q)===2);
-    const hard=pool.filter(q=>practiceDifficultyBucket(q)===3);
-    const selected=[];
-    const take=(arr,count)=>selected.push(...arr.sort(()=>Math.random()-0.5).slice(0,count));
-    take(easy,Math.min(10,easy.length));
-    take(moderate,Math.min(7,moderate.length));
-    take(hard,Math.min(3,hard.length));
-    if(selected.length<20){
-      const used=new Set(selected.map(q=>String(q.id)));
-      const rest=pool.filter(q=>!used.has(String(q.id))).sort(()=>Math.random()-0.5);
-      selected.push(...rest.slice(0,20-selected.length));
-    }
-    return selected;
-  }
-  if(n===50){
-    const hard=pool.filter(q=>practiceDifficultyBucket(q)===3);
-    const veryHard=pool.filter(q=>practiceDifficultyBucket(q)===4);
-    const selected=[];
-    const take=(arr,count)=>selected.push(...arr.sort(()=>Math.random()-0.5).slice(0,count));
-    take(hard,Math.min(25,hard.length));
-    take(veryHard,Math.min(25,veryHard.length));
-    if(selected.length<50){
-      const used=new Set(selected.map(q=>String(q.id)));
-      const rest=pool.filter(q=>!used.has(String(q.id))).sort(()=>Math.random()-0.5);
-      selected.push(...rest.slice(0,50-selected.length));
-    }
-    return selected;
-  }
-  return pool;
-}
-
 async function loadPracticeQuestions(requested){
   const selectedSubtopic=(typeof currentSub!=='undefined'?String(currentSub||'').trim():'');
   if(!selectedSubtopic) throw new Error('Subtopic தேர்வு செய்யப்படவில்லை.');
@@ -4404,7 +4281,7 @@ async function loadPracticeQuestions(requested){
       '&language='+encodeURIComponent(contentLanguage==='en'?'en':'ta')+
       '&subtopic='+encodeURIComponent(dbSubtopic)+
       '&limit=200&offset=0');
-    return Array.isArray(d.questions)?d.questions.map(normalizePracticeDifficulty):[];
+    return Array.isArray(d.questions)?d.questions:[];
   }
 
   const out=[];
@@ -4417,7 +4294,7 @@ async function loadPracticeQuestions(requested){
       '&subtopic='+encodeURIComponent(dbSubtopic)+
       '&limit='+pageSize+'&offset='+offset);
     const rows=Array.isArray(d.questions)?d.questions:[];
-    out.push(...rows.map(normalizePracticeDifficulty));
+    out.push(...rows);
     if(!d.pagination || !d.pagination.hasMore || rows.length===0) break;
     offset=Number(d.pagination.nextOffset ?? (offset+rows.length));
     if(!Number.isFinite(offset)) break;
@@ -4450,8 +4327,8 @@ function savePracticeHistory(keys,bankSize){
 async function startPractice(n){
   stop();
   const requested=Number(n||10);
-  if(![10,20,50,100,9999].includes(requested)){
-    if($('feedback'))$('feedback').textContent='Practice எண்ணிக்கை 10, 20, 50, 100 அல்லது “முழுவதும்” மட்டும்.';
+  if(![10,20,50,9999].includes(requested)){
+    if($('feedback'))$('feedback').textContent='Practice எண்ணிக்கை 10, 20, 50 அல்லது “முழுவதும்” மட்டும்.';
     return;
   }
   T.q=[];T.answers={};T.checks={};T.i=0;T.attempt=null;T.submitted=false;T.busy=false;
@@ -4462,7 +4339,7 @@ async function startPractice(n){
 
     const used=new Set(getPracticeHistory());
     let fresh=bank.filter(q=>!used.has(String(q.id)));
-    fresh=(requested===100)?selectPractice100(fresh):selectPracticeByDifficulty(fresh,requested);
+    fresh.sort(()=>Math.random()-0.5);
 
     let selected;
     if(requested===9999){
@@ -4576,21 +4453,35 @@ async function startMock(){
   if(M.timer)clearInterval(M.timer);
   M.q=[];M.a={};M.i=0;M.attempt=null;M.submitted=false;
   try{
-    const subjects=['gs','apt'];
-    const all=[];
-    for(const s of subjects){
-      const dbSubject=(s==='gs'?'பொது அறிவு':'apt');
-      const d=await api('/questions?exam='+encodeURIComponent(String(selectedExam||'group4'))+
-        '&subject='+encodeURIComponent(dbSubject)+'&language='+encodeURIComponent(lang())+'&limit=200');
-      (d.questions||[]).forEach(q=>{if(!all.some(x=>String(x.id)===String(q.id)))all.push(q);});
+    const exam=String(selectedExam||'group4');
+    const language=(contentLanguage==='en'?'en':'ta');
+    const d=await api('/mock/questions?exam='+encodeURIComponent(exam)+'&language='+encodeURIComponent(language)+'&limit=200');
+    const questions=Array.isArray(d.questions)?d.questions:[];
+    if(questions.length<200){
+      throw new Error('3 மணி நேர Mock Test-க்கு 200 கேள்விகள் கிடைக்கவில்லை. கிடைத்தது: '+questions.length);
     }
-    if(all.length<200)throw new Error('3 மணி நேர Mock Test-க்கு 200 கேள்விகள் கிடைக்கவில்லை. கிடைத்தது: '+all.length);
-    for(let i=all.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[all[i],all[j]]=[all[j],all[i]];}
-    M.q=all.slice(0,200);
+
+    /* Backend already selected and reserved fresh Mock questions for this
+       student. Only the order is randomized here. The question records are
+       never changed or deleted. */
+    for(let i=questions.length-1;i>0;i--){
+      const j=Math.floor(Math.random()*(i+1));
+      [questions[i],questions[j]]=[questions[j],questions[i]];
+    }
+    M.q=questions.slice(0,200);
+
+    /* Keep the existing attempt/result system. History was reserved by the
+       Mock endpoint, so a second Mock cannot normally receive these IDs. */
     const a=await api('/attempts',{method:'POST',body:JSON.stringify({
-      exam:String(selectedExam||'group4'),subject:'mixed',mode:'mock',language:(contentLanguage==='en'?'en':'ta'),questionIds:M.q.map(q=>Number(q.id))
+      exam:exam,
+      subject:'mixed',
+      mode:'mock',
+      language:language,
+      questionIds:M.q.map(q=>Number(q.id))
     })});
-    M.attempt=a.id;M.end=Date.now()+3*60*60*1000;
+    M.attempt=a.id;
+    M.end=Date.now()+3*60*60*1000;
+
     if(typeof show==='function')show('mockTest');
     const paint=()=>{
       const s=Math.max(0,Math.ceil((M.end-Date.now())/1000));
@@ -4600,8 +4491,12 @@ async function startMock(){
         String(s%60).padStart(2,'0');
       if(s<=0){clearInterval(M.timer);submitMock();}
     };
-    paint();M.timer=setInterval(paint,1000);mockRender();
-  }catch(e){if($('mockQuestion'))$('mockQuestion').textContent='Mock Test தொடங்க முடியவில்லை: '+e.message;}
+    paint();
+    M.timer=setInterval(paint,1000);
+    mockRender();
+  }catch(e){
+    if($('mockQuestion'))$('mockQuestion').textContent='Mock Test தொடங்க முடியவில்லை: '+e.message;
+  }
 }
 function mockAnswer(v){if(M.submitted)return;M.a[String(M.q[M.i].id)]=v;mockRender();}
 function mockNext(){if(M.i<M.q.length-1){M.i++;mockRender();}}
