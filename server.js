@@ -1860,7 +1860,7 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
                  AND h.mode='mock'
             )
           ORDER BY id
-          LIMIT 200`,
+          LIMIT ${spec.name==='apt' ? 2000 : 200}`,
         [exam,spec.candidates,spec.language,req.user.id]
       );
       perSubject[spec.name]=r.rows;
@@ -1921,10 +1921,43 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
     /* First 100 are Tamil. */
     const tamilSelected=shuffleRows(tamilRows).slice(0,100);
 
-    /* Last 100 are mixed: 75 GS + 25 Aptitude. */
+    /*
+       Last 100 are mixed: 75 GS + 25 Aptitude.
+       Aptitude is deliberately distributed across available subtopics instead
+       of taking the first 25 rows, so a database whose early IDs are all basic
+       arithmetic does not make the Mock look like an addition/subtraction test.
+    */
+    const diverseAptitudeRows=(rows,count)=>{
+      const groups=new Map();
+      shuffleRows(rows).forEach(q=>{
+        const key=String(q.subtopic||'').trim() || '__no_subtopic__';
+        if(!groups.has(key)) groups.set(key,[]);
+        groups.get(key).push(q);
+      });
+      const buckets=Array.from(groups.values());
+      const out=[];
+      let cursor=0;
+      while(out.length<count && buckets.length){
+        let progressed=false;
+        for(let i=0;i<buckets.length && out.length<count;i++){
+          const b=buckets[(cursor+i)%buckets.length];
+          if(b.length){ out.push(b.shift()); progressed=true; }
+        }
+        if(!progressed) break;
+        cursor=(cursor+1)%buckets.length;
+      }
+      return out;
+    };
+
+    const aptSelected=diverseAptitudeRows(aptRows,25);
+    if(aptSelected.length<25){
+      await client.query('ROLLBACK');
+      return sendError(res,409,`இந்த மாணவருக்கான Aptitude Mock கேள்விகள் போதவில்லை: ${aptSelected.length}/25.`);
+    }
+
     const restSelected=[
       ...shuffleRows(gsRows).slice(0,75),
-      ...shuffleRows(aptRows).slice(0,25)
+      ...aptSelected
     ];
     const selected=[...tamilSelected, ...shuffleRows(restSelected)];
     const selectedIds=new Set(selected.map(q=>String(q.id)));
