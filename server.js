@@ -976,7 +976,8 @@ api.get('/questions', requirePasswordReady, async (req, res) => {
 
     const dataParams = [...params, limit, offset];
     const q = await pool.query(
-      `SELECT id,exam,subject,subtopic,language,question,options,explanation
+      `SELECT id,exam,subject,subtopic,language,question,options,explanation,
+              COALESCE(to_jsonb(questions)->>'difficulty',to_jsonb(questions)->>'level','') AS difficulty
        FROM questions
        WHERE ${where.join(' AND ')}
        ORDER BY id LIMIT $${n} OFFSET $${n+1}`, dataParams
@@ -1074,114 +1075,6 @@ api.get('/practice/questions', requirePasswordReady, async (req, res) => {
   } catch (e) {
     console.error('Practice question error:', e);
     sendError(res, 500, 'Practice question service error.');
-  }
-});
-
-/* ===== MOCK FRESH-QUESTION ENGINE =====
-   Mock Test uses the existing questions table only.
-   Nothing is deleted or rewritten. Previously used Mock question IDs are
-   excluded per student through the existing question_history table.
-   When fresh questions are exhausted, recycling is allowed only as a last resort.
-*/
-api.get('/mock/questions', requirePasswordReady, async (req,res) => {
-  try {
-    const exam = String(req.query.exam || '').trim();
-    const language = String(req.query.language || 'ta').trim();
-    const requested = Math.min(Math.max(parseInt(req.query.limit || '200',10) || 200,1),200);
-    if(!exam || !['ta','en'].includes(language)) {
-      return sendError(res,400,'Invalid Mock question request.');
-    }
-
-    /* Group 4 = Tamil + General Knowledge + Aptitude. Other exams fall back
-       to all subjects belonging to that exam so this endpoint remains reusable. */
-    const group4Subjects = ['tamil','Tamil','பொது அறிவு','General Knowledge','general knowledge','பொது அறிவு / General Studies','General Studies','general studies','திறனறிவு / Aptitude','Aptitude','aptitude'];
-    const subjectClause = String(exam).toLowerCase()==='group4'
-      ? `AND q.subject = ANY($4::text[])`
-      : '';
-    const params = [req.user.id, exam, language];
-    if(subjectClause) params.push(group4Subjects);
-
-    /* First take only questions this student has never seen in Mock mode.
-       DISTINCT ON removes identical question+options records without deleting
-       either database row. */
-    const freshSql = `
-      WITH fresh AS (
-        SELECT DISTINCT ON (lower(trim(q.question)), q.options::text)
-          q.id,q.exam,q.subject,q.subtopic,q.language,q.question,q.options,q.explanation
-        FROM questions q
-        WHERE q.exam=$2
-          AND q.language=$3
-          AND q.is_active=true
-          ${subjectClause}
-          AND NOT EXISTS (
-            SELECT 1 FROM question_history h
-            WHERE h.user_id=$1
-              AND h.question_id=q.id
-              AND h.mode='mock'
-          )
-        ORDER BY lower(trim(q.question)), q.options::text, random()
-      )
-      SELECT * FROM fresh ORDER BY random() LIMIT $${params.length+1}
-    `;
-    params.push(requested);
-    const fresh = await pool.query(freshSql,params);
-    let rows = fresh.rows;
-
-    /* If fewer than requested fresh questions remain, fill only the shortage
-       from old Mock questions. This preserves the exact 200-question UI while
-       making repetition a last resort rather than normal behaviour. */
-    if(rows.length < requested){
-      const shortage = requested - rows.length;
-      const selected = new Set(rows.map(r=>String(r.id)));
-      const oldParams = [req.user.id, exam, language];
-      if(subjectClause) oldParams.push(group4Subjects);
-      oldParams.push(shortage);
-      const oldSql = `
-        WITH oldq AS (
-          SELECT DISTINCT ON (lower(trim(q.question)), q.options::text)
-            q.id,q.exam,q.subject,q.subtopic,q.language,q.question,q.options,q.explanation
-          FROM questions q
-          WHERE q.exam=$2
-            AND q.language=$3
-            AND q.is_active=true
-            ${subjectClause}
-            AND EXISTS (
-              SELECT 1 FROM question_history h
-              WHERE h.user_id=$1
-                AND h.question_id=q.id
-                AND h.mode='mock'
-            )
-          ORDER BY lower(trim(q.question)), q.options::text, random()
-        )
-        SELECT * FROM oldq ORDER BY random() LIMIT $${oldParams.length}
-      `;
-      const old = await pool.query(oldSql,oldParams);
-      for(const q of old.rows){
-        if(!selected.has(String(q.id)) && rows.length<requested){
-          rows.push(q); selected.add(String(q.id));
-        }
-      }
-    }
-
-    if(rows.length < requested){
-      return sendError(res,409,`Mock Test-க்கு ${requested} தனித்த கேள்விகள் கிடைக்கவில்லை. கிடைத்தது: ${rows.length}.`);
-    }
-
-    /* Reserve the selected Mock questions for this student immediately.
-       The existing PRIMARY KEY makes this idempotent and does not alter the
-       questions table. */
-    await pool.query(
-      `INSERT INTO question_history(user_id, question_id, mode)
-       SELECT $1, x, 'mock'
-       FROM unnest($2::bigint[]) AS x
-       ON CONFLICT (user_id, question_id, mode) DO NOTHING`,
-      [req.user.id, rows.map(q=>Number(q.id))]
-    );
-
-    res.json({questions:rows,count:rows.length,freshCount:Math.min(fresh.rows.length,requested)});
-  }catch(e){
-    console.error('Mock fresh question error:',e);
-    sendError(res,500,'Mock question service error.');
   }
 });
 
@@ -1404,8 +1297,8 @@ api.get('/admin/exam-results', requireAdmin, async (req,res)=>{
       WHEN a.total_count=50 THEN '50 Questions'
       ELSE 'Practice'
     END`;
-    if(type && ['model','mock','practice','bank','10','20','50'].includes(type)){
-      const typeExpr=type==='model' ? `lower(a.exam) LIKE '%model%'` : type==='mock' ? `a.mode='mock'` : type==='bank' ? `a.mode='bank'` : type==='10' ? `a.total_count=10` : type==='20' ? `a.total_count=20` : type==='50' ? `a.total_count=50` : `(a.mode='practice' AND lower(a.exam) NOT LIKE '%model%' AND a.total_count NOT IN (10,20,50))`;
+    if(type && ['model','mock','practice','bank','10','20','50','100'].includes(type)){
+      const typeExpr=type==='model' ? `lower(a.exam) LIKE '%model%'` : type==='mock' ? `a.mode='mock'` : type==='bank' ? `a.mode='bank'` : type==='10' ? `a.total_count=10` : type==='20' ? `a.total_count=20` : type==='50' ? `a.total_count=50` : type==='100' ? `a.total_count=100` : `(a.mode='practice' AND lower(a.exam) NOT LIKE '%model%' AND a.total_count NOT IN (10,20,50,100))`;
       where.push(typeExpr);
     }
 
@@ -1458,11 +1351,11 @@ api.get('/admin/exam-results/export', requireAdmin, async (req,res)=>{
     }
     where.push(`COALESCE(a.score,0) >= $${params.length+1}`);params.push(minPct);
     where.push(`COALESCE(a.score,0) <= $${params.length+1}`);params.push(maxPct);
-    if(type && ['model','mock','practice','bank','10','20','50'].includes(type)){
-      where.push(type==='model'?`lower(a.exam) LIKE '%model%'`:type==='mock'?`a.mode='mock'`:type==='bank'?`a.mode='bank'`:type==='10'?`a.total_count=10`:type==='20'?`a.total_count=20`:type==='50'?`a.total_count=50`:`(a.mode='practice' AND lower(a.exam) NOT LIKE '%model%' AND a.total_count NOT IN (10,20,50))`);
+    if(type && ['model','mock','practice','bank','10','20','50','100'].includes(type)){
+      where.push(type==='model'?`lower(a.exam) LIKE '%model%'`:type==='mock'?`a.mode='mock'`:type==='bank'?`a.mode='bank'`:type==='10'?`a.total_count=10`:type==='20'?`a.total_count=20`:type==='50'?`a.total_count=50`:type==='100'?`a.total_count=100`:`(a.mode='practice' AND lower(a.exam) NOT LIKE '%model%' AND a.total_count NOT IN (10,20,50,100))`);
     }
 
-    const typeSql=`CASE WHEN lower(a.exam) LIKE '%model%' THEN 'Model Exam' WHEN a.mode='mock' THEN 'Mock Test' WHEN a.mode='bank' THEN 'Question Bank' WHEN a.total_count=10 THEN '10 Questions' WHEN a.total_count=20 THEN '20 Questions' WHEN a.total_count=50 THEN '50 Questions' ELSE 'Practice' END`;
+    const typeSql=`CASE WHEN lower(a.exam) LIKE '%model%' THEN 'Model Exam' WHEN a.mode='mock' THEN 'Mock Test' WHEN a.mode='bank' THEN 'Question Bank' WHEN a.total_count=10 THEN '10 Questions' WHEN a.total_count=20 THEN '20 Questions' WHEN a.total_count=50 THEN '50 Questions' WHEN a.total_count=100 THEN '100 Questions' ELSE 'Practice' END`;
     const q=await pool.query(`SELECT a.id AS attempt_id,u.name,u.email,a.exam,${typeSql} AS exam_type,to_char(COALESCE(a.submitted_at,a.started_at),'DD-MM-YYYY HH24:MI') AS date,COALESCE(a.total_count,0)::int AS questions,COALESCE(a.correct_count,0)::int AS marks,COALESCE(a.total_count,0)::int AS total_marks,COALESCE(a.score,0)::numeric(10,2) AS percentage,COALESCE((SELECT string_agg(DISTINCT qq.subtopic, ' | ' ORDER BY qq.subtopic) FROM unnest(a.question_ids) AS aqid JOIN questions qq ON qq.id=aqid),'') AS subtopics FROM attempts a JOIN users u ON u.id=a.user_id WHERE ${where.join(' AND ')} ORDER BY COALESCE(a.submitted_at,a.started_at) DESC,a.id DESC`,params);
 
     const escXml=v=>String(v??'')
@@ -1554,7 +1447,7 @@ api.get('/admin/exam-results/:attemptId', requireAdmin, async (req,res)=>{
   try{
     const id=Number(req.params.attemptId);
     if(!Number.isInteger(id) || id<1) return sendError(res,400,'Invalid attempt ID.');
-    const typeSql=`CASE WHEN lower(a.exam) LIKE '%model%' THEN 'Model Exam' WHEN a.mode='mock' THEN 'Mock Test' WHEN a.mode='bank' THEN 'Question Bank' WHEN a.total_count=10 THEN '10 Questions' WHEN a.total_count=20 THEN '20 Questions' WHEN a.total_count=50 THEN '50 Questions' ELSE 'Practice' END`;
+    const typeSql=`CASE WHEN lower(a.exam) LIKE '%model%' THEN 'Model Exam' WHEN a.mode='mock' THEN 'Mock Test' WHEN a.mode='bank' THEN 'Question Bank' WHEN a.total_count=10 THEN '10 Questions' WHEN a.total_count=20 THEN '20 Questions' WHEN a.total_count=50 THEN '50 Questions' WHEN a.total_count=100 THEN '100 Questions' ELSE 'Practice' END`;
     const q=await pool.query(`SELECT a.id AS attempt_id,u.name,u.email,a.exam,${typeSql} AS exam_type,to_char(COALESCE(a.submitted_at,a.started_at),'DD-MM-YYYY HH24:MI') AS date,COALESCE(a.total_count,0)::int AS questions,COALESCE(a.correct_count,0)::int AS correct,COALESCE(a.score,0)::numeric(10,2) AS percentage FROM attempts a JOIN users u ON u.id=a.user_id WHERE a.id=$1 AND a.status='SUBMITTED' LIMIT 1`,[id]);
     if(!q.rowCount) return sendError(res,404,'Result not found.');
     const r=q.rows[0];
