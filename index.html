@@ -4506,8 +4506,43 @@ window.startPractice=async function(n){
     if(mockIndex>0){mockIndex--;renderServerMock();}
   };
 
+  function chooseMockLanguage(){
+    return new Promise(function(resolve){
+      var old=document.getElementById('thiralMockLanguagePicker');
+      if(old) old.remove();
+
+      var defaultLang=(typeof contentLanguage!=='undefined' && contentLanguage==='en')?'en':'ta';
+      var wrap=document.createElement('div');
+      wrap.id='thiralMockLanguagePicker';
+      wrap.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+      wrap.innerHTML=''
+        +'<div style="width:min(430px,94vw);background:#fff;border-radius:18px;padding:26px;box-shadow:0 18px 50px rgba(0,0,0,.25);text-align:center;">'
+        +'<h3 style="margin:0 0 8px;font-size:24px;color:#123f70;">Mock Test மொழி</h3>'
+        +'<p style="margin:0 0 20px;color:#555;">தேர்வு எழுதும் மொழியைத் தேர்வு செய்யவும்</p>'
+        +'<button type="button" data-lang="ta" style="display:block;width:100%;padding:14px;margin:10px 0;border:1px solid #cbd5e1;border-radius:12px;background:'+(defaultLang==='ta'?'#eaf2ff':'#fff')+';font-size:18px;font-weight:700;cursor:pointer;">தமிழ்</button>'
+        +'<button type="button" data-lang="en" style="display:block;width:100%;padding:14px;margin:10px 0;border:1px solid #cbd5e1;border-radius:12px;background:'+(defaultLang==='en'?'#eaf2ff':'#fff')+';font-size:18px;font-weight:700;cursor:pointer;">English</button>'
+        +'<button type="button" data-cancel="1" style="margin-top:8px;border:0;background:transparent;color:#666;font-size:15px;cursor:pointer;">Cancel</button>'
+        +'</div>';
+      document.body.appendChild(wrap);
+
+      wrap.querySelectorAll('[data-lang]').forEach(function(btn){
+        btn.addEventListener('click',function(){
+          var L=btn.getAttribute('data-lang');
+          try{ contentLanguage=L; }catch(_){ }
+          try{ localStorage.setItem('tnpsc_content_language',L); }catch(_){ }
+          wrap.remove();
+          resolve(L);
+        });
+      });
+      var cancel=wrap.querySelector('[data-cancel]');
+      if(cancel) cancel.addEventListener('click',function(){wrap.remove();resolve(null);});
+    });
+  }
+
   window.startMock=async function(){
     try{
+      var selectedMockLanguage=await chooseMockLanguage();
+      if(!selectedMockLanguage) return;
       try{ selectedExam='group4'; }catch(_){ }
       try{ localStorage.setItem('tnpsc_selected_exam','group4'); }catch(_){ }
 
@@ -4522,7 +4557,7 @@ window.startPractice=async function(n){
       var qe=document.getElementById('mockQuestion');
       if(qe) qe.textContent='200 Mock கேள்விகள் ஏற்றப்படுகிறது...';
 
-      var L=(typeof contentLanguage!=='undefined' && contentLanguage==='en')?'en':'ta';
+      var L=selectedMockLanguage;
       var d=await mockApi('/mock/questions?exam=group4&language='+encodeURIComponent(L));
       var rows=Array.isArray(d.questions)?d.questions:[];
 
