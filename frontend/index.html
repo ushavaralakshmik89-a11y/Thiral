@@ -4682,4 +4682,38 @@ window.startPractice=async function(n){
   };
 })();
 </script>
+
+<script id="thiral-exam-lock-final">
+/* THIRAL FINAL EXAM LOCK
+   Keep all exam buttons visible on the dashboard, but only Group 4 is active.
+   Other exam buttons intentionally do nothing until their own content/database
+   is ready. This is frontend-only and does not delete or hide those choices.
+*/
+(function(){
+  'use strict';
+  window.__THIRAL_ACTIVE_EXAM_ONLY__='group4';
+
+  try{
+    selectedExam='group4';
+    localStorage.setItem('tnpsc_selected_exam','group4');
+  }catch(_){ }
+
+  window.openExam=function(id){
+    if(String(id||'')!=='group4') return false;
+    try{
+      selectedExam='group4';
+      localStorage.setItem('tnpsc_selected_exam','group4');
+    }catch(_){ }
+    if(typeof renderExamHome==='function') renderExamHome();
+    if(typeof show==='function') show('examHome');
+    return true;
+  };
+
+  window.startSelectedMock=function(){
+    if(String(typeof selectedExam!=='undefined'?selectedExam:'group4')!=='group4') return false;
+    return window.startMock();
+  };
+})();
+</script>
+
 </body></html>
