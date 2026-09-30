@@ -4033,15 +4033,14 @@ async function loadPracticeQuestions(requested){
     }
   }
 
-  /* Practice rotation: never limit the search to the first 200 records.
-     The server filters this student's practice history first, so a 20,000+
-     question bank can rotate continuously without recycling early pages. */
+  /* 10/20/50: do NOT download the whole bank. Fetch a small page first.
+     “முழுவதும்” மட்டும் எல்லா pages-ஐ தொடர்ந்து பெறும். */
   if(requested!==9999){
-    const d=await api('/practice/questions?exam='+encodeURIComponent(String(selectedExam||'group4'))+
+    const d=await api('/questions?exam='+encodeURIComponent(String(selectedExam||'group4'))+
       '&subject='+encodeURIComponent(dbSubject)+
       '&language='+encodeURIComponent(contentLanguage==='en'?'en':'ta')+
       '&subtopic='+encodeURIComponent(dbSubtopic)+
-      '&limit=200');
+      '&limit=200&offset=0');
     return Array.isArray(d.questions)?d.questions.map(normalizePracticeDifficulty):[];
   }
 
@@ -4099,13 +4098,7 @@ async function startPractice(n){
     if(!bank.length)throw new Error('இந்த Subtopic-ல் கேள்விகள் இல்லை.');
 
     const used=new Set(getPracticeHistory());
-    /* For fixed-size Practice, the server is the authoritative history source.
-       It already excludes this student's previously used practice question IDs
-       across the entire database, not just the first 200 rows. The browser
-       history remains only as a local compatibility/fallback record. */
-    let fresh = requested===9999
-      ? bank.filter(q=>!used.has(String(q.id)))
-      : bank.slice();
+    let fresh=bank.filter(q=>!used.has(String(q.id)));
     fresh=(requested===100)?selectPractice100(fresh):selectPracticeByDifficulty(fresh,requested);
 
     let selected;
@@ -4120,11 +4113,14 @@ async function startPractice(n){
       selected=fresh.slice();
     }else{
       const target=requested;
-      /* Never recycle an old question merely because the first server page
-         did not contain enough candidates. The server searches the full
-         database for unseen questions. If fewer than target exist, stop with
-         the real count instead of silently repeating questions. */
-      selected=fresh.slice(0,target);
+      if(fresh.length<target){
+        /* பழைய கேள்விகளை மீண்டும் எடுப்பது, முழு bank cycle முடிந்த பிறகே. */
+        const freshKeys=new Set(fresh.map(q=>String(q.id)));
+        const recycle=bank.filter(q=>!freshKeys.has(String(q.id))).sort(()=>Math.random()-0.5);
+        selected=[...fresh,...recycle].slice(0,target);
+      }else{
+        selected=fresh.slice(0,target);
+      }
     }
 
     if(selected.length<requested && requested!==9999)
