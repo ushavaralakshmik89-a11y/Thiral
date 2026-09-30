@@ -5200,10 +5200,12 @@ window.startPractice=async function(n){
 </script>
 
 <script id="thiral-group4-mock-review-200-final">
-/* Final frontend-only fixes:
-   1) Hide Next on the last Mock question.
-   2) Render the complete 200-question Mock review.
-   The server remains unchanged.
+/* Final Mock-only frontend fix:
+   1) Hide Next on 200/200.
+   2) Submit through the existing server attempt endpoint.
+   3) Always open the Mock Result screen after a successful submit.
+   4) Render all 200 questions in Review.
+   Practice/Admin/server logic is not changed here.
 */
 (function(){
   'use strict';
@@ -5214,34 +5216,43 @@ window.startPractice=async function(n){
     });
   }
 
-  function syncNextButton(){
-    var btn=document.getElementById('mockNextBtn');
-    if(!btn) return;
-    var total=Array.isArray(window.mockQuestions)?window.mockQuestions.length:0;
-    var index=Number(window.mockIndex||0);
-    btn.style.display=(total && index < total-1)?'inline-block':'none';
+  function getQuestions(){
+    return Array.isArray(window.mockQuestions)?window.mockQuestions:[];
+  }
+  function getAnswers(){
+    return Array.isArray(window.mockAnswers)?window.mockAnswers:[];
   }
 
-  var oldRender=window.renderMock;
-  window.renderMock=function(){
-    if(typeof oldRender==='function') oldRender.apply(this,arguments);
-    syncNextButton();
-  };
+  function syncNextButton(){
+    var btn=document.getElementById('mockNextBtn');
+    if(!btn){
+      var buttons=document.querySelectorAll('#mockTest button');
+      for(var i=0;i<buttons.length;i++){
+        if(String(buttons[i].textContent||'').trim().toLowerCase().indexOf('next')===0){
+          btn=buttons[i];
+          break;
+        }
+      }
+    }
+    if(!btn) return;
+    var qs=getQuestions();
+    var idx=Number(window.mockIndex||0);
+    btn.style.display=(qs.length && idx<qs.length-1)?'inline-block':'none';
+  }
 
   function buildFullReview(){
-    var qs=Array.isArray(window.mockQuestions)?window.mockQuestions:[];
-    var ans=Array.isArray(window.mockAnswers)?window.mockAnswers:[];
+    var qs=getQuestions(), ans=getAnswers();
     var root=document.getElementById('screenReview');
     var legacy=document.getElementById('mockReview');
     if(!qs.length) return;
 
     var html=qs.map(function(q,i){
-      var opts=Array.isArray(q.o)?q.o:[];
+      var opts=Array.isArray(q.o)?q.o:(Array.isArray(q.options)?q.options:[]);
       var a=Number(ans[i]);
       var your=(a>=0 && a<opts.length)?String(opts[a]):'விடையளிக்கவில்லை';
-      var explanation=String(q.e||'').trim();
+      var explanation=String(q.e||q.explanation||'').trim();
       return '<div class="card" style="box-shadow:none;border:1px solid #e5e7eb;margin-bottom:12px;">'
-        +'<div><b>'+String(i+1)+'. '+esc(q.q||'')+'</b></div>'
+        +'<div><b>'+esc(i+1)+'. '+esc(q.q||q.question||'')+'</b></div>'
         +'<p>உங்கள் விடை: <b>'+esc(your)+'</b></p>'
         +(explanation?'<p class="small"><b>விளக்கம்:</b> '+esc(explanation)+'</p>':'')
         +'</div>';
@@ -5254,14 +5265,81 @@ window.startPractice=async function(n){
     }
   }
 
-  var oldSubmit=window.submitMock;
-  window.submitMock=async function(auto){
-    if(!Array.isArray(window.mockQuestions) || !window.mockQuestions.length) return;
-    buildFullReview();
-    if(typeof oldSubmit==='function') await oldSubmit.apply(this,arguments);
-    /* Older submit handlers can overwrite the review, so restore all 200. */
-    buildFullReview();
+  function openResult(){
+    var result=document.getElementById('mockResult');
+    document.querySelectorAll('section').forEach(function(sec){
+      sec.classList.add('hidden');
+      sec.style.display='none';
+    });
+    if(result){
+      result.classList.remove('hidden');
+      result.style.display='block';
+    }
+    var review=document.getElementById('screenReview');
+    if(review) review.classList.add('screen-review');
+    window.scrollTo({top:0,behavior:'instant'});
+  }
+
+  var oldRender=window.renderMock;
+  window.renderMock=function(){
+    if(typeof oldRender==='function') oldRender.apply(this,arguments);
     syncNextButton();
+  };
+
+  window.submitMock=async function(auto){
+    var qs=getQuestions(), ans=getAnswers();
+    var attemptId=Number(window.mockAttemptId||0);
+    if(!qs.length || !attemptId) return;
+
+    var timer=window.mockTimer;
+    if(timer) clearInterval(timer);
+
+    var btns=document.querySelectorAll('#mockTest button');
+    btns.forEach(function(b){
+      if(String(b.textContent||'').trim().toLowerCase().indexOf('submit')===0){
+        b.disabled=true;
+      }
+    });
+
+    var answers={};
+    qs.forEach(function(q,i){
+      answers[String(q.id)]=Number(ans[i]);
+    });
+
+    try{
+      var d=await mockApi('/attempts/'+attemptId+'/submit',{
+        method:'POST',
+        body:JSON.stringify({answers:answers})
+      });
+
+      var total=Number(d.total||qs.length);
+      var correct=Number(d.correct||0);
+      var unanswered=Number(d.unanswered||0);
+      var score=Number(d.score||0);
+      var wrong=Math.max(0,total-correct-unanswered);
+
+      var summary=document.getElementById('mockSummary');
+      if(summary){
+        summary.innerHTML=
+          '<p><b>மொத்த கேள்விகள்:</b> '+total+'</p>'+
+          '<p><b>சரி:</b> '+correct+'</p>'+
+          '<p><b>தவறு:</b> '+wrong+'</p>'+
+          '<p><b>விடையளிக்காதது:</b> '+unanswered+'</p>'+
+          '<p><b>மதிப்பெண்:</b> '+score+'%</p>';
+      }
+
+      window.mockFinished=true;
+      buildFullReview();
+      openResult();
+    }catch(e){
+      window.mockFinished=false;
+      btns.forEach(function(b){ b.disabled=false; });
+      var summary2=document.getElementById('mockSummary');
+      if(summary2){
+        summary2.innerHTML='<p style="color:#b91c1c;"><b>Result பெற முடியவில்லை:</b> '+esc(e&&e.message||e)+'</p>';
+      }
+      /* Keep the student on the Mock screen so the test is not silently lost. */
+    }
   };
 
   syncNextButton();
