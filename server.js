@@ -215,6 +215,98 @@ function clearSessionCookie(res) {
   res.clearCookie('thiral_session', { httpOnly: true, secure: isProd, sameSite: 'strict', path: '/' });
 }
 
+/* ===== ONE-STUDENT / ONE-DEVICE ACCOUNT BINDING =====
+   Student credentials alone are not enough to move an account to another
+   browser/device. The first successful student registration/login binds the
+   account to a random httpOnly device cookie. A different device is rejected
+   server-side. Admin accounts are intentionally excluded from this rule.
+*/
+const DEVICE_COOKIE_NAME = 'thiral_device';
+
+function deviceBindingSecret(){
+  return String(
+    process.env.THIRAL_DEVICE_BINDING_SECRET ||
+    process.env.THIRAL_API_KEY ||
+    process.env.DATABASE_URL ||
+    'thiral-device-binding-dev-only'
+  );
+}
+
+function newDeviceId(){
+  return crypto.randomBytes(32).toString('hex');
+}
+
+function hashDeviceId(deviceId){
+  return crypto.createHmac('sha256', deviceBindingSecret())
+    .update(String(deviceId || ''))
+    .digest('hex');
+}
+
+function getOrCreateDeviceId(req, res){
+  const existing=String(req.cookies?.[DEVICE_COOKIE_NAME] || '').trim();
+  if(existing) return { id:existing, isNew:false };
+  const id=newDeviceId();
+  res.cookie(DEVICE_COOKIE_NAME,id,{
+    httpOnly:true,
+    secure:isProd,
+    sameSite:'strict',
+    maxAge:365*24*60*60*1000,
+    path:'/'
+  });
+  return { id, isNew:true };
+}
+
+function setDeviceCookie(res, deviceId){
+  res.cookie(DEVICE_COOKIE_NAME,String(deviceId||''),{
+    httpOnly:true,
+    secure:isProd,
+    sameSite:'strict',
+    maxAge:365*24*60*60*1000,
+    path:'/'
+  });
+}
+
+async function enforceStudentDeviceBinding({req,res,user}){
+  if(!user || user.role !== 'STUDENT') return {ok:true};
+
+  const device=String(req.cookies?.[DEVICE_COOKIE_NAME] || '').trim();
+  if(!device){
+    const created=newDeviceId();
+    const boundHash=hashDeviceId(created);
+    const bound=await pool.query(
+      `UPDATE users
+          SET login_device_hash=$1
+        WHERE id=$2 AND role='STUDENT' AND login_device_hash IS NULL
+      RETURNING id`,
+      [boundHash,user.id]
+    );
+    if(bound.rowCount){
+      setDeviceCookie(res,created);
+      return {ok:true};
+    }
+    return {ok:false};
+  }
+
+  const current=await pool.query(
+    `SELECT login_device_hash FROM users WHERE id=$1 AND role='STUDENT' LIMIT 1`,
+    [user.id]
+  );
+  const stored=String(current.rows[0]?.login_device_hash || '').trim();
+
+  if(!stored){
+    const boundHash=hashDeviceId(device);
+    await pool.query(
+      `UPDATE users SET login_device_hash=$1
+       WHERE id=$2 AND role='STUDENT' AND login_device_hash IS NULL`,
+      [boundHash,user.id]
+    );
+    return {ok:true};
+  }
+
+  if(stored !== hashDeviceId(device)) return {ok:false};
+  return {ok:true};
+}
+
 async function getUserFromSession(req) {
   const sid = req.cookies?.thiral_session;
   if (!sid) return null;
@@ -347,6 +439,24 @@ api.post('/auth/login', authLimiter, async (req, res) => {
       await logSecurityEvent({req,eventType:'FAILED_LOGIN',userId:u.id,email:u.email,details:'Invalid password',sendAlert:true});
       return sendError(res, 401, 'Invalid ID/email or password.');
     }
+
+    /* One student account = one registered browser/device. A second device
+       with the same email + password is rejected before a new session is made. */
+    if(u.role === 'STUDENT'){
+      const deviceCheck=await enforceStudentDeviceBinding({req,res,user:u});
+      if(!deviceCheck.ok){
+        await logSecurityEvent({
+          req,
+          eventType:'DEVICE_BINDING_BLOCKED',
+          userId:u.id,
+          email:u.email,
+          details:'Correct password used from an unregistered browser/device',
+          sendAlert:true
+        });
+        return sendError(res,403,'இந்த கணக்கு ஏற்கனவே ஒரு சாதனத்தில் பதிவு செய்யப்பட்டுள்ளது. வேறு சாதனத்தில் இந்த Email ID + Password மூலம் Login செய்ய முடியாது.');
+      }
+    }
+
     const sid = newSessionId();
     await pool.query(`DELETE FROM sessions WHERE expires_at <= now()`);
     await pool.query(`INSERT INTO sessions(id,user_id,expires_at) VALUES($1,$2,now()+interval '30 minutes')`, [sid, u.id]);
@@ -454,12 +564,14 @@ api.post('/auth/register', authLimiter, async (req, res) => {
 
     const studentId = `THR-${String(nextNumber).padStart(6, '0')}`;
     const hash = await argon2.hash(password);
+    const registrationDeviceId=newDeviceId();
+    const registrationDeviceHash=hashDeviceId(registrationDeviceId);
 
     const ins = await client.query(
-      `INSERT INTO users(student_id,name,email,password_hash,phone,dob,gender,role,is_active)
-       VALUES($1,$2,$3,$4,$5,$6,$7,'STUDENT',true)
+      `INSERT INTO users(student_id,name,email,password_hash,phone,dob,gender,role,is_active,login_device_hash)
+       VALUES($1,$2,$3,$4,$5,$6,$7,'STUDENT',true,$8)
        RETURNING id,student_id,name,email,phone,dob,gender,role,is_active,created_at,last_login_at`,
-      [studentId, name, email, hash, phone, dob, gender]
+      [studentId, name, email, hash, phone, dob, gender, registrationDeviceHash]
     );
 
     const u = ins.rows[0];
@@ -472,6 +584,7 @@ api.post('/auth/register', authLimiter, async (req, res) => {
 
     await client.query('COMMIT');
     setSessionCookie(res, sid);
+    setDeviceCookie(res, registrationDeviceId);
     return res.json({ user: u });
   } catch (e) {
     if (client) {
@@ -755,7 +868,7 @@ api.post('/auth/forgot-password/reset', authLimiter, async (req,res)=>{
     await pool.query('BEGIN');
     try{
       await pool.query(
-        `UPDATE users SET password_hash=$1 WHERE id=$2`,
+        `UPDATE users SET password_hash=$1,login_device_hash=NULL WHERE id=$2`,
         [passwordHash,row.user_id]
       );
 
@@ -836,7 +949,7 @@ api.post('/auth/change-password', requireAuth, async (req,res)=>{
     await client.query('BEGIN');
     await client.query(
       `UPDATE users
-       SET password_hash=$1,must_change_password=false
+       SET password_hash=$1,must_change_password=false,login_device_hash=NULL
        WHERE id=$2`,
       [passwordHash,req.user.id]
     );
@@ -884,7 +997,7 @@ api.patch('/admin/students/:studentId/password', requireAdmin, async (req,res)=>
     await client.query('BEGIN');
     await client.query(
       `UPDATE users
-       SET password_hash=$1,must_change_password=true
+       SET password_hash=$1,must_change_password=true,login_device_hash=NULL
        WHERE id=$2`,
       [passwordHash,target.id]
     );
@@ -2172,6 +2285,14 @@ async function ensureMustChangePasswordColumn(){
   `);
 }
 
+
+async function ensureLoginDeviceBindingColumn(){
+  await pool.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS login_device_hash TEXT NULL
+  `);
+}
+
 async function ensurePasswordResetTables() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS password_reset_otps (
@@ -2251,6 +2372,7 @@ async function start(){
     await pool.query('SELECT 1');
     await ensureSecurityEventsTable();
     await ensureMustChangePasswordColumn();
+    await ensureLoginDeviceBindingColumn();
     await ensurePasswordResetTables();
     await ensureQuestionHistory();
     await backfillLastLoginFromAudit();
