@@ -5045,6 +5045,15 @@ window.startPractice=async function(n){
 
   window.renderMock=renderServerMock;
 
+  // Expose the private Mock state so later UI-only wrappers use the same live attempt.
+  window.__THIRAL_MOCK_STATE={
+    get questions(){return mockQuestions;},
+    get answers(){return mockAnswers;},
+    get index(){return mockIndex;},
+    get attemptId(){return mockAttemptId;},
+    get finished(){return mockFinished;}
+  };
+
   window.__THIRAL_FINAL_MOCK_ANSWER=function(i){
     if(mockFinished || !mockQuestions.length) return;
     mockAnswers[mockIndex]=Number(i);
@@ -5192,6 +5201,8 @@ window.startPractice=async function(n){
     }
   };
 
+  window.__THIRAL_SERVER_MOCK_SUBMIT=window.submitMock;
+
   window.__THIRAL_GROUP4_MOCK_HISTORY__={
     version:'server-rotated-v3',target:200,durationSeconds:10800,
     source:'database',historyMode:'mock'
@@ -5216,11 +5227,14 @@ window.startPractice=async function(n){
     });
   }
 
+  function state(){return window.__THIRAL_MOCK_STATE||null;}
   function getQuestions(){
-    return Array.isArray(window.mockQuestions)?window.mockQuestions:[];
+    var st=state();
+    return st && Array.isArray(st.questions)?st.questions:[];
   }
   function getAnswers(){
-    return Array.isArray(window.mockAnswers)?window.mockAnswers:[];
+    var st=state();
+    return st && Array.isArray(st.answers)?st.answers:[];
   }
 
   function syncNextButton(){
@@ -5236,7 +5250,8 @@ window.startPractice=async function(n){
     }
     if(!btn) return;
     var qs=getQuestions();
-    var idx=Number(window.mockIndex||0);
+    var st=state();
+    var idx=Number(st?st.index:0);
     btn.style.display=(qs.length && idx<qs.length-1)?'inline-block':'none';
   }
 
@@ -5287,58 +5302,35 @@ window.startPractice=async function(n){
   };
 
   window.submitMock=async function(auto){
-    var qs=getQuestions(), ans=getAnswers();
-    var attemptId=Number(window.mockAttemptId||0);
-    if(!qs.length || !attemptId) return;
-
-    var timer=window.mockTimer;
-    if(timer) clearInterval(timer);
+    var qs=getQuestions();
+    var st=state();
+    var attemptId=Number(st?st.attemptId:0);
+    if(!qs.length || !attemptId){
+      var s=document.getElementById('mockSummary');
+      if(s) s.innerHTML='<p style="color:#b91c1c;"><b>Mock attempt கிடைக்கவில்லை.</b> தயவுசெய்து Mock Test-ஐ மீண்டும் தொடங்கவும்.</p>';
+      return;
+    }
 
     var btns=document.querySelectorAll('#mockTest button');
     btns.forEach(function(b){
-      if(String(b.textContent||'').trim().toLowerCase().indexOf('submit')===0){
-        b.disabled=true;
-      }
-    });
-
-    var answers={};
-    qs.forEach(function(q,i){
-      answers[String(q.id)]=Number(ans[i]);
+      if(String(b.textContent||'').trim().toLowerCase().indexOf('submit')===0) b.disabled=true;
     });
 
     try{
-      var d=await mockApi('/attempts/'+attemptId+'/submit',{
-        method:'POST',
-        body:JSON.stringify({answers:answers})
-      });
+      // The original Mock controller owns the real attempt id and answer state.
+      // Reuse that controller instead of creating a second submit implementation.
+      var realSubmit=window.__THIRAL_SERVER_MOCK_SUBMIT;
+      if(typeof realSubmit!=='function') throw new Error('Mock submit controller கிடைக்கவில்லை.');
+      await realSubmit(auto);
 
-      var total=Number(d.total||qs.length);
-      var correct=Number(d.correct||0);
-      var unanswered=Number(d.unanswered||0);
-      var score=Number(d.score||0);
-      var wrong=Math.max(0,total-correct-unanswered);
-
-      var summary=document.getElementById('mockSummary');
-      if(summary){
-        summary.innerHTML=
-          '<p><b>மொத்த கேள்விகள்:</b> '+total+'</p>'+
-          '<p><b>சரி:</b> '+correct+'</p>'+
-          '<p><b>தவறு:</b> '+wrong+'</p>'+
-          '<p><b>விடையளிக்காதது:</b> '+unanswered+'</p>'+
-          '<p><b>மதிப்பெண்:</b> '+score+'%</p>';
-      }
-
-      window.mockFinished=true;
       buildFullReview();
       openResult();
     }catch(e){
-      window.mockFinished=false;
       btns.forEach(function(b){ b.disabled=false; });
       var summary2=document.getElementById('mockSummary');
       if(summary2){
         summary2.innerHTML='<p style="color:#b91c1c;"><b>Result பெற முடியவில்லை:</b> '+esc(e&&e.message||e)+'</p>';
       }
-      /* Keep the student on the Mock screen so the test is not silently lost. */
     }
   };
 
