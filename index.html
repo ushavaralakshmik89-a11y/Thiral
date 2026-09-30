@@ -546,7 +546,7 @@ a{
 <button onclick="startPractice(10)">📝 10 கேள்விகள்</button>
 <button onclick="startPractice(20)">📝 20 கேள்விகள்</button>
 <button onclick="startPractice(50)">📝 50 கேள்விகள்</button>
-<button onclick="startPractice(100)">📝 100 கேள்விகள்</button>
+<button onclick="startPractice(9999)">♾️ Question Bank முழுவதும் / தொடர்ச்சி</button>
 <button onclick="show('material')">📖 Study Material</button>
 
 </div>
@@ -2737,56 +2737,71 @@ window.V91_ADV_NUM=V91_ADV_NUM;
     return a;
   }
 
+  function v122Difficulty(q){
+    const d=v122S(q&& (q.d||q.level||q.difficulty)).toLowerCase();
+    if(/மிக\s*கடின|very\s*hard/.test(d)) return 4;
+    if(/கடின|hard|difficult/.test(d)) return 3;
+    if(/மிதமான|சாதாரணம்|moderate|normal/.test(d)) return 2;
+    if(/எளிது|மிக\s*எளிது|easy|basic|simple/.test(d)) return 0;
+    return 2;
+  }
+  function v122Type(q){
+    const t=v122S(q&& (q.type||q.question_type||q.format||q.kind)).toLowerCase();
+    const s=v122S(q&&q.q).toLowerCase();
+    if(/கூற்று|சரியான கூற்று|தவறான கூற்று|assert|statement|conclusion|reason|காரணம்|பொருத்துக|match|வரிசை|chronolog|தரவு|data|அட்டவணை|table|சூழ்நிலை|application|நிகழ்வு|case/.test(t+' '+s)) return 3;
+    if(/கருத்து|concept|ஒப்புமை|analogy|வகைப்படுத்த|classification|தொடர்|series|குறியீடு|coding/.test(t+' '+s)) return 2;
+    return 1;
+  }
+  function v122BasicPenalty(q){
+    const s=v122S(q&&q.q).toLowerCase();
+    const o=v122A(q&&q.o);
+    const simpleArithmetic=/^\s*(what is|calculate|find)\s+\d{1,3}\s*[+\-x×÷/]\s*\d{1,3}\s*\??\s*$/i.test(s) || /^\s*\d{1,3}\s*[+\-x×÷/]\s*\d{1,3}\s*=*\s*\??\s*$/i.test(s);
+    if(simpleArithmetic) return 5;
+    if(o.length===4 && o.every(x=>/^\s*\d+\s*$/.test(String(x))) && /^\s*(what is|calculate|find)\b/i.test(s)) return 3;
+    return 0;
+  }
+  function v122QualityScore(q){
+    const d=v122Difficulty(q), t=v122Type(q), penalty=v122BasicPenalty(q);
+    if(d===0) return -100-penalty;
+    return d*10+t*3-penalty;
+  }
+  function v122Pick(arr,n){
+    const clean=arr.filter(q=>v122Difficulty(q)!==0 && v122BasicPenalty(q)<5);
+    const source=(clean.length>=n?clean:arr.filter(q=>v122Difficulty(q)!==0));
+    source.sort((a,b)=>v122QualityScore(b)-v122QualityScore(a) || Math.random()-0.5);
+    const buckets={2:[],3:[],4:[]};
+    source.forEach(q=>{const d=v122Difficulty(q);(buckets[d]||buckets[2]).push(q);});
+    Object.values(buckets).forEach(a=>a.sort(()=>Math.random()-0.5));
+    const picked=[],seen=new Set();
+    const add=q=>{const k=v122S(q&&q._v122Key)||v122S(q&&q.id)||v122S(q&&q.q);if(!seen.has(k)){seen.add(k);picked.push(q);}};
+    const desired4=Math.min(Math.max(3,Math.floor(n*0.10)),buckets[4].length);
+    const desired3=Math.min(Math.max(Math.floor(n*0.35),1),buckets[3].length);
+    const desired2=Math.min(n-desired4-desired3,buckets[2].length);
+    buckets[3].slice(0,desired3).forEach(add);
+    buckets[2].slice(0,desired2).forEach(add);
+    buckets[4].slice(0,desired4).forEach(add);
+    source.forEach(add);
+    return picked.slice(0,n);
+  }
   function v122Select200(){
     const pool=v122BuildPool();
     const target=200;
     if(!pool.all.length) return {pool,selected:[]};
-
-    /*
-      First pass: proportional allocation where possible. This gives each
-      subject representation without assuming a fixed Group-4-only structure.
-    */
-    const selected=[], selectedKeys=new Set();
-    const subjectsWithData=pool.subjects.filter(s=>pool.perSubject[s]&&pool.perSubject[s].length);
-
-    subjectsWithData.forEach(subject=>{
-      const arr=v122Shuffle(pool.perSubject[subject]);
-      const quota=Math.max(
-        1,
-        Math.min(arr.length, Math.floor(target*arr.length/pool.all.length))
-      );
-      arr.slice(0,quota).forEach(q=>{
-        if(selected.length<target && !selectedKeys.has(q._v122Key)){
-          selected.push(q); selectedKeys.add(q._v122Key);
-        }
+    const desired={tamil:100,gs:75,apt:25};
+    const selected=[],selectedKeys=new Set();
+    pool.subjects.forEach(subject=>{
+      const n=desired[subject]||0;
+      if(!n)return;
+      v122Pick(pool.perSubject[subject]||[],n).forEach(q=>{
+        const k=q._v122Key;if(!selectedKeys.has(k)){selectedKeys.add(k);selected.push(q);}
       });
     });
-
-    /*
-      Fill remaining slots from the entire unique pool. No question is
-      repeated until every unique question has appeared once.
-    */
-    const remaining=v122Shuffle(pool.all.filter(q=>!selectedKeys.has(q._v122Key)));
-    remaining.forEach(q=>{
-      if(selected.length<target){
-        selected.push(q); selectedKeys.add(q._v122Key);
-      }
-    });
-
-    /*
-      If the normalized bank contains <200 unique questions, controlled
-      recycling begins only now. Every unique question has already appeared.
-    */
     if(selected.length<target){
-      let cycle=v122Shuffle(pool.all);
-      let i=0;
-      while(selected.length<target){
-        selected.push(cycle[i%cycle.length]);
-        i++;
-        if(i%cycle.length===0) cycle=v122Shuffle(pool.all);
-      }
+      const rest=pool.all.filter(q=>!selectedKeys.has(q._v122Key)&&v122Difficulty(q)!==0&&v122BasicPenalty(q)<5);
+      rest.sort((a,b)=>v122QualityScore(b)-v122QualityScore(a)||Math.random()-0.5);
+      for(const q of rest){if(selected.length>=target)break;selectedKeys.add(q._v122Key);selected.push(q);}
     }
-
+    if(selected.length<target)return {pool,selected:[],error:'competitive_bank_insufficient',available:selected.length};
     return {pool,selected:v122Shuffle(selected.slice(0,target))};
   }
 
@@ -2798,7 +2813,8 @@ window.V91_ADV_NUM=V91_ADV_NUM;
 
     if(!built.selected.length){
       const lang=built.pool.lang==='en'?'English':'தமிழ்';
-      alert('Mock Test-க்கு '+lang+' கேள்விகள் கிடைக்கவில்லை. Exam/Subject Question Index-ல் data இல்லை.');
+      if(built.error==='competitive_bank_insufficient') alert('இந்த Mock-க்கு தேவையான தரமான '+target+' கேள்விகள் தற்போதைய Question Bank-ல் போதுமான அளவில் இல்லை. மிக எளிய கேள்விகளை நிரப்பி Mock-ஐ உருவாக்காமல் நிறுத்தப்பட்டுள்ளது.');
+      else alert('Mock Test-க்கு '+lang+' கேள்விகள் கிடைக்கவில்லை. Exam/Subject Question Index-ல் data இல்லை.');
       return;
     }
 
@@ -3891,129 +3907,6 @@ async function answer(value,timeout=false){
     if(!timeout){T.seconds=15;timer(15);T.timer=setInterval(()=>{T.seconds--;timer(T.seconds);if(T.seconds<=0){stop();answer(-1,true);}},1000);}
   }
 }
-function normalizePracticeDifficulty(q){
-  const x={...q};
-  const raw=String(q.difficulty||q.d||q.level||'').trim().toLowerCase();
-  if(raw){
-    if(/மிகக் கடின|very\s*hard/.test(raw)) x.d='மிகக் கடினம்';
-    else if(/கடின|hard|difficult/.test(raw)) x.d='கடினம்';
-    else if(/மிதமான|சாதாரண|moderate|normal/.test(raw)) x.d='மிதமானது';
-    else if(/எளித|easy/.test(raw)) x.d='எளிது';
-  }
-  if(!x.d){
-    const text=String(q.question||q.q||'').replace(/\s+/g,' ').trim();
-    const opts=Array.isArray(q.options)?q.options.map(String).join(' '):String(q.o||'');
-    const all=(text+' '+opts).toLowerCase();
-    const numbers=(all.match(/\d+(?:\.\d+)?/g)||[]).length;
-    const complex=(all.match(/எத்தனை\s+வழிகள்|வாய்ப்பு|probability|சதவீதம்|வட்டி|வேலை|வேகம்|தூரம்|விகிதம்|கூற்று|assert|statement|conclusion|காரணம்|வரிசை|குறியீடு|application|நிகழ்வு|பகுப்பாய்வு|கணக்கிட|calculate|ratio|average|profit|loss|interest|time|distance/g)||[]).length;
-    if(text.length>=220 || complex>=3 || numbers>=4) x.d='மிகக் கடினம்';
-    else if(text.length>=130 || complex>=1 || numbers>=2) x.d='கடினம்';
-    else if(text.length<=80 && numbers===0 && complex===0) x.d='எளிது';
-    else x.d='மிதமானது';
-  }
-  return x;
-}
-
-function practiceDifficultyBucket(q){
-  const d=String(q.d||q.difficulty||q.level||'').toLowerCase();
-  if(/மிகக் கடின|very\s*hard/.test(d)) return 4;
-  if(/கடின|hard|difficult/.test(d)) return 3;
-  if(/மிதமான|சாதாரண|moderate|normal/.test(d)) return 2;
-  return 1;
-}
-
-function practiceQuestionType(q){
-  const raw=String(q.type||q.question_type||q.questionType||'').trim().toLowerCase();
-  if(raw){
-    if(/match|இணை|பொருத்த/.test(raw)) return 'matching';
-    if(/statement|assert|கூற்று|கூற்ற/.test(raw)) return 'statement';
-    if(/sequence|order|வரிச|வரிசைப்படுத்த/.test(raw)) return 'sequence';
-    if(/reason|cause|காரணம்/.test(raw)) return 'reason';
-    if(/application|scenario|case|சூழ்நிலை|நிகழ்வு|பயன்பாடு/.test(raw)) return 'application';
-    if(/analys|data|தரவு|பகுப்பாய்வு/.test(raw)) return 'analysis';
-    if(/concept|கருத்து/.test(raw)) return 'concept';
-    return 'direct';
-  }
-  const text=String(q.question||q.q||'').replace(/\s+/g,' ').trim().toLowerCase();
-  if(/பொருத்துக|பொருத்தவும்|match the|match/.test(text)) return 'matching';
-  if(/கூற்று|கூற்றுகளில்|statement|assertion|conclusion/.test(text)) return 'statement';
-  if(/வரிசைப்படுத்த|வரிசையில்|sequence|arrange|order/.test(text)) return 'sequence';
-  if(/காரணம்|reason|why|because/.test(text)) return 'reason';
-  if(/சூழ்நிலை|நிகழ்வு|பயன்படுத்தி|application|scenario|case study/.test(text)) return 'application';
-  if(/தரவு|அட்டவணை|வரைபடம்|data|graph|table|analyse|analyze/.test(text)) return 'analysis';
-  if(/கருத்து|concept|விளக்க/.test(text)) return 'concept';
-  return 'direct';
-}
-
-function selectPractice100(bank){
-  const pool=bank.map(normalizePracticeDifficulty);
-  const shuffled=pool.slice().sort(()=>Math.random()-0.5);
-  // First 10 are intentionally basic/normal learning questions.
-  const first=shuffled.filter(q=>practiceDifficultyBucket(q)<=2).slice(0,10);
-  const used=new Set(first.map(q=>String(q.id)));
-  if(first.length<10){
-    for(const q of shuffled){ if(first.length>=10) break; const k=String(q.id); if(!used.has(k)){first.push(q);used.add(k);} }
-  }
-  // Remaining 90 are spread across different question formats where the
-  // source text supports that classification. We do not rewrite the question.
-  const types=['matching','statement','sequence','reason','application','analysis','concept','direct'];
-  const remaining=shuffled.filter(q=>!used.has(String(q.id)));
-  const varied=[];
-  for(const type of types){
-    const bucket=remaining.filter(q=>practiceQuestionType(q)===type && !used.has(String(q.id)));
-    bucket.sort(()=>Math.random()-0.5);
-    for(const q of bucket){
-      if(varied.length>=90) break;
-      varied.push(q);used.add(String(q.id));
-    }
-    if(varied.length>=90) break;
-  }
-  if(varied.length<90){
-    const rest=remaining.filter(q=>!used.has(String(q.id))).sort(()=>Math.random()-0.5);
-    varied.push(...rest.slice(0,90-varied.length));
-  }
-  return [...first,...varied].slice(0,100);
-}
-
-function selectPracticeByDifficulty(bank,n){
-  const pool=bank.map(normalizePracticeDifficulty);
-  if(n===10){
-    const easy=pool.filter(q=>practiceDifficultyBucket(q)<=2);
-    return easy.sort(()=>Math.random()-0.5).slice(0,10);
-  }
-  if(n===20){
-    const easy=pool.filter(q=>practiceDifficultyBucket(q)===1);
-    const moderate=pool.filter(q=>practiceDifficultyBucket(q)===2);
-    const hard=pool.filter(q=>practiceDifficultyBucket(q)===3);
-    const selected=[];
-    const take=(arr,count)=>selected.push(...arr.sort(()=>Math.random()-0.5).slice(0,count));
-    take(easy,Math.min(10,easy.length));
-    take(moderate,Math.min(7,moderate.length));
-    take(hard,Math.min(3,hard.length));
-    if(selected.length<20){
-      const used=new Set(selected.map(q=>String(q.id)));
-      const rest=pool.filter(q=>!used.has(String(q.id))).sort(()=>Math.random()-0.5);
-      selected.push(...rest.slice(0,20-selected.length));
-    }
-    return selected;
-  }
-  if(n===50){
-    const hard=pool.filter(q=>practiceDifficultyBucket(q)===3);
-    const veryHard=pool.filter(q=>practiceDifficultyBucket(q)===4);
-    const selected=[];
-    const take=(arr,count)=>selected.push(...arr.sort(()=>Math.random()-0.5).slice(0,count));
-    take(hard,Math.min(25,hard.length));
-    take(veryHard,Math.min(25,veryHard.length));
-    if(selected.length<50){
-      const used=new Set(selected.map(q=>String(q.id)));
-      const rest=pool.filter(q=>!used.has(String(q.id))).sort(()=>Math.random()-0.5);
-      selected.push(...rest.slice(0,50-selected.length));
-    }
-    return selected;
-  }
-  return pool;
-}
-
 async function loadPracticeQuestions(requested){
   const selectedSubtopic=(typeof currentSub!=='undefined'?String(currentSub||'').trim():'');
   if(!selectedSubtopic) throw new Error('Subtopic தேர்வு செய்யப்படவில்லை.');
@@ -4041,7 +3934,7 @@ async function loadPracticeQuestions(requested){
       '&language='+encodeURIComponent(contentLanguage==='en'?'en':'ta')+
       '&subtopic='+encodeURIComponent(dbSubtopic)+
       '&limit=200&offset=0');
-    return Array.isArray(d.questions)?d.questions.map(normalizePracticeDifficulty):[];
+    return Array.isArray(d.questions)?d.questions:[];
   }
 
   const out=[];
@@ -4054,7 +3947,7 @@ async function loadPracticeQuestions(requested){
       '&subtopic='+encodeURIComponent(dbSubtopic)+
       '&limit='+pageSize+'&offset='+offset);
     const rows=Array.isArray(d.questions)?d.questions:[];
-    out.push(...rows.map(normalizePracticeDifficulty));
+    out.push(...rows);
     if(!d.pagination || !d.pagination.hasMore || rows.length===0) break;
     offset=Number(d.pagination.nextOffset ?? (offset+rows.length));
     if(!Number.isFinite(offset)) break;
@@ -4087,8 +3980,8 @@ function savePracticeHistory(keys,bankSize){
 async function startPractice(n){
   stop();
   const requested=Number(n||10);
-  if(![10,20,50,100,9999].includes(requested)){
-    if($('feedback'))$('feedback').textContent='Practice எண்ணிக்கை 10, 20, 50, 100 அல்லது “முழுவதும்” மட்டும்.';
+  if(![10,20,50,9999].includes(requested)){
+    if($('feedback'))$('feedback').textContent='Practice எண்ணிக்கை 10, 20, 50 அல்லது “முழுவதும்” மட்டும்.';
     return;
   }
   T.q=[];T.answers={};T.checks={};T.i=0;T.attempt=null;T.submitted=false;T.busy=false;
@@ -4099,7 +3992,7 @@ async function startPractice(n){
 
     const used=new Set(getPracticeHistory());
     let fresh=bank.filter(q=>!used.has(String(q.id)));
-    fresh=(requested===100)?selectPractice100(fresh):selectPracticeByDifficulty(fresh,requested);
+    fresh.sort(()=>Math.random()-0.5);
 
     let selected;
     if(requested===9999){
@@ -4213,21 +4106,35 @@ async function startMock(){
   if(M.timer)clearInterval(M.timer);
   M.q=[];M.a={};M.i=0;M.attempt=null;M.submitted=false;
   try{
-    const subjects=['gs','apt'];
-    const all=[];
-    for(const s of subjects){
-      const dbSubject=(s==='gs'?'பொது அறிவு':'apt');
-      const d=await api('/questions?exam='+encodeURIComponent(String(selectedExam||'group4'))+
-        '&subject='+encodeURIComponent(dbSubject)+'&language='+encodeURIComponent(lang())+'&limit=200');
-      (d.questions||[]).forEach(q=>{if(!all.some(x=>String(x.id)===String(q.id)))all.push(q);});
+    const exam=String(selectedExam||'group4');
+    const language=(contentLanguage==='en'?'en':'ta');
+    const d=await api('/mock/questions?exam='+encodeURIComponent(exam)+'&language='+encodeURIComponent(language)+'&limit=200');
+    const questions=Array.isArray(d.questions)?d.questions:[];
+    if(questions.length<200){
+      throw new Error('3 மணி நேர Mock Test-க்கு 200 கேள்விகள் கிடைக்கவில்லை. கிடைத்தது: '+questions.length);
     }
-    if(all.length<200)throw new Error('3 மணி நேர Mock Test-க்கு 200 கேள்விகள் கிடைக்கவில்லை. கிடைத்தது: '+all.length);
-    for(let i=all.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[all[i],all[j]]=[all[j],all[i]];}
-    M.q=all.slice(0,200);
+
+    /* Backend already selected and reserved fresh Mock questions for this
+       student. Only the order is randomized here. The question records are
+       never changed or deleted. */
+    for(let i=questions.length-1;i>0;i--){
+      const j=Math.floor(Math.random()*(i+1));
+      [questions[i],questions[j]]=[questions[j],questions[i]];
+    }
+    M.q=questions.slice(0,200);
+
+    /* Keep the existing attempt/result system. History was reserved by the
+       Mock endpoint, so a second Mock cannot normally receive these IDs. */
     const a=await api('/attempts',{method:'POST',body:JSON.stringify({
-      exam:String(selectedExam||'group4'),subject:'mixed',mode:'mock',language:(contentLanguage==='en'?'en':'ta'),questionIds:M.q.map(q=>Number(q.id))
+      exam:exam,
+      subject:'mixed',
+      mode:'mock',
+      language:language,
+      questionIds:M.q.map(q=>Number(q.id))
     })});
-    M.attempt=a.id;M.end=Date.now()+3*60*60*1000;
+    M.attempt=a.id;
+    M.end=Date.now()+3*60*60*1000;
+
     if(typeof show==='function')show('mockTest');
     const paint=()=>{
       const s=Math.max(0,Math.ceil((M.end-Date.now())/1000));
@@ -4237,8 +4144,12 @@ async function startMock(){
         String(s%60).padStart(2,'0');
       if(s<=0){clearInterval(M.timer);submitMock();}
     };
-    paint();M.timer=setInterval(paint,1000);mockRender();
-  }catch(e){if($('mockQuestion'))$('mockQuestion').textContent='Mock Test தொடங்க முடியவில்லை: '+e.message;}
+    paint();
+    M.timer=setInterval(paint,1000);
+    mockRender();
+  }catch(e){
+    if($('mockQuestion'))$('mockQuestion').textContent='Mock Test தொடங்க முடியவில்லை: '+e.message;
+  }
 }
 function mockAnswer(v){if(M.submitted)return;M.a[String(M.q[M.i].id)]=v;mockRender();}
 function mockNext(){if(M.i<M.q.length-1){M.i++;mockRender();}}
@@ -4431,217 +4342,6 @@ window.startPractice=async function(n){
     api: '/api',
     exam: 'group4',
     dbSubjects: { tamil:'tamil', gs:'பொது அறிவு', apt:'apt' }
-  };
-})();
-</script>
-
-<script id="thiral-group4-mock-history-final">
-/* THIRAL Group 4 Mock final controller.
-   Server-selected 200 questions + per-student Mock history.
-   Self-contained so it does not depend on variables/functions hidden inside
-   earlier IIFEs. Existing question rows are read only. */
-(function(){
-  'use strict';
-
-  var mockAttemptId=null;
-  var mockApi=function(path,init){
-    if(typeof window.thiralV138Api==='function') return window.thiralV138Api(path,init||{});
-    throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
-  };
-
-  function escMock(v){
-    return String(v==null?'':v).replace(/[&<>"']/g,function(c){
-      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
-    });
-  }
-
-  function normalizeMockRows(rows){
-    return rows.map(function(r){
-      return Object.assign({},r,{
-        q:String(r.question||r.q||''),
-        o:Array.isArray(r.options)?r.options:(Array.isArray(r.o)?r.o:[]),
-        e:String(r.explanation||r.e||''),
-        a:-1
-      });
-    });
-  }
-
-  function renderServerMock(){
-    if(!Array.isArray(mockQuestions)||!mockQuestions.length) return;
-    if(mockIndex<0) mockIndex=0;
-    if(mockIndex>=mockQuestions.length) mockIndex=mockQuestions.length-1;
-    var q=mockQuestions[mockIndex];
-    if(!q) return;
-
-    var p=document.getElementById('mockProgress');
-    var qe=document.getElementById('mockQuestion');
-    var oe=document.getElementById('mockOptions');
-    if(p) p.textContent=(mockIndex+1)+' / '+mockQuestions.length;
-    if(qe) qe.textContent=(mockIndex+1)+'. '+String(q.q||'');
-    if(oe){
-      var options=Array.isArray(q.o)?q.o:[];
-      oe.innerHTML=options.map(function(x,i){
-        var selected=mockAnswers[mockIndex]===i;
-        return '<button class="option" type="button" style="'+
-          (selected?'outline:3px solid #123f70;':'')+
-          '" onclick="window.__THIRAL_FINAL_MOCK_ANSWER('+i+')">'+
-          String.fromCharCode(65+i)+'. '+escMock(x)+'</button>';
-      }).join('');
-    }
-  }
-
-  window.renderMock=renderServerMock;
-
-  window.__THIRAL_FINAL_MOCK_ANSWER=function(i){
-    if(mockFinished || !mockQuestions.length) return;
-    mockAnswers[mockIndex]=Number(i);
-    renderServerMock();
-  };
-
-  window.mockNext=function(){
-    if(mockIndex<mockQuestions.length-1){mockIndex++;renderServerMock();}
-  };
-
-  window.mockPrev=function(){
-    if(mockIndex>0){mockIndex--;renderServerMock();}
-  };
-
-  function chooseMockLanguage(){
-    return new Promise(function(resolve){
-      var old=document.getElementById('thiralMockLanguagePicker');
-      if(old) old.remove();
-
-      var defaultLang=(typeof contentLanguage!=='undefined' && contentLanguage==='en')?'en':'ta';
-      var wrap=document.createElement('div');
-      wrap.id='thiralMockLanguagePicker';
-      wrap.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
-      wrap.innerHTML=''
-        +'<div style="width:min(430px,94vw);background:#fff;border-radius:18px;padding:26px;box-shadow:0 18px 50px rgba(0,0,0,.25);text-align:center;">'
-        +'<h3 style="margin:0 0 8px;font-size:24px;color:#123f70;">Mock Test மொழி</h3>'
-        +'<p style="margin:0 0 20px;color:#555;">தேர்வு எழுதும் மொழியைத் தேர்வு செய்யவும்</p>'
-        +'<button type="button" data-lang="ta" style="display:block;width:100%;padding:14px;margin:10px 0;border:1px solid #cbd5e1;border-radius:12px;background:'+(defaultLang==='ta'?'#eaf2ff':'#fff')+';font-size:18px;font-weight:700;color:#123f70;cursor:pointer;">தமிழ்</button>'
-        +'<button type="button" data-lang="en" style="display:block;width:100%;padding:14px;margin:10px 0;border:1px solid #cbd5e1;border-radius:12px;background:'+(defaultLang==='en'?'#eaf2ff':'#fff')+';font-size:18px;font-weight:700;color:#123f70;cursor:pointer;">English</button>'
-        +'<button type="button" data-cancel="1" style="margin-top:8px;border:0;background:transparent;color:#666;font-size:15px;cursor:pointer;">Cancel</button>'
-        +'</div>';
-      document.body.appendChild(wrap);
-
-      wrap.querySelectorAll('[data-lang]').forEach(function(btn){
-        btn.addEventListener('click',function(){
-          var L=btn.getAttribute('data-lang');
-          try{ contentLanguage=L; }catch(_){ }
-          try{ localStorage.setItem('tnpsc_content_language',L); }catch(_){ }
-          wrap.remove();
-          resolve(L);
-        });
-      });
-      var cancel=wrap.querySelector('[data-cancel]');
-      if(cancel) cancel.addEventListener('click',function(){wrap.remove();resolve(null);});
-    });
-  }
-
-  window.startMock=async function(){
-    try{
-      var selectedMockLanguage=await chooseMockLanguage();
-      if(!selectedMockLanguage) return;
-      try{ selectedExam='group4'; }catch(_){ }
-      try{ localStorage.setItem('tnpsc_selected_exam','group4'); }catch(_){ }
-
-      if(typeof mockTimer!=='undefined' && mockTimer) clearInterval(mockTimer);
-      mockQuestions=[];
-      mockAnswers=[];
-      mockIndex=0;
-      mockSeconds=3*60*60;
-      mockFinished=false;
-      mockAttemptId=null;
-
-      var qe=document.getElementById('mockQuestion');
-      if(qe) qe.textContent='200 Mock கேள்விகள் ஏற்றப்படுகிறது...';
-
-      var L=selectedMockLanguage;
-      var d=await mockApi('/mock/questions?exam=group4&language='+encodeURIComponent(L));
-      var rows=Array.isArray(d.questions)?d.questions:[];
-
-      if(rows.length!==200){
-        throw new Error('Mock Test-க்கு 200 கேள்விகள் கிடைக்கவில்லை. கிடைத்தது: '+rows.length);
-      }
-
-      mockQuestions=normalizeMockRows(rows);
-      mockAnswers=new Array(mockQuestions.length).fill(-1);
-      mockIndex=0;
-      mockAttemptId=Number(d.attemptId||0);
-      if(!mockAttemptId) throw new Error('Mock attempt உருவாக்கப்படவில்லை.');
-      mockSeconds=3*60*60;
-      mockFinished=false;
-
-      var result=document.getElementById('mockResult');
-      var review=document.getElementById('screenReview');
-      if(result) result.classList.add('hidden');
-      if(review) review.classList.add('screen-review');
-
-      var ex=(typeof EXAMS!=='undefined' && (EXAMS[selectedExam]||EXAMS.group4))||null;
-      var title=ex&&ex.title?ex.title:'Group 4';
-      var h=document.querySelector('#mockTest h2');
-      if(h) h.textContent=title+' – Mock Test • 200 கேள்விகள் • 3 மணி நேரம்';
-
-      if(typeof show==='function') show('mockTest');
-      if(typeof renderMockTimer==='function') renderMockTimer();
-      renderServerMock();
-
-      mockTimer=setInterval(function(){
-        mockSeconds--;
-        if(typeof renderMockTimer==='function') renderMockTimer();
-        if(mockSeconds<=0){
-          clearInterval(mockTimer);
-          window.submitMock(true);
-        }
-      },1000);
-    }catch(e){
-      if(qe) qe.textContent='Mock Test தொடங்க முடியவில்லை: '+String(e&&e.message||e);
-    }
-  };
-
-  window.submitMock=async function(auto){
-    if(mockFinished || !mockQuestions.length || !mockAttemptId) return;
-    mockFinished=true;
-    if(typeof mockTimer!=='undefined' && mockTimer) clearInterval(mockTimer);
-
-    try{
-      var answers={};
-      mockQuestions.forEach(function(q,i){
-        answers[String(q.id)]=Number(mockAnswers[i]);
-      });
-
-      var d=await mockApi('/attempts/'+mockAttemptId+'/submit',{
-        method:'POST',
-        body:JSON.stringify({answers:answers})
-      });
-
-      var total=Number(d.total||mockQuestions.length);
-      var correct=Number(d.correct||0);
-      var unanswered=Number(d.unanswered||0);
-      var score=Number(d.score||0);
-      var wrong=Math.max(0,total-correct-unanswered);
-      var summary=document.getElementById('mockSummary');
-      if(summary){
-        summary.innerHTML=
-          '<p><b>மொத்த கேள்விகள்:</b> '+total+'</p>'+
-          '<p><b>சரி:</b> '+correct+'</p>'+
-          '<p><b>தவறு:</b> '+wrong+'</p>'+
-          '<p><b>விடையளிக்காதது:</b> '+unanswered+'</p>'+
-          '<p><b>மதிப்பெண்:</b> '+score+'%</p>';
-      }
-      if(typeof showMockResultScreen==='function') showMockResultScreen();
-      else if(typeof show==='function') show('mockResult');
-    }catch(e){
-      mockFinished=false;
-      var summary2=document.getElementById('mockSummary');
-      if(summary2) summary2.textContent='Mock Result சேமிக்க முடியவில்லை: '+String(e&&e.message||e);
-    }
-  };
-
-  window.__THIRAL_GROUP4_MOCK_HISTORY__={
-    version:'server-rotated-v3',target:200,durationSeconds:10800,
-    source:'database',historyMode:'mock'
   };
 })();
 </script>
