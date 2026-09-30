@@ -682,7 +682,7 @@ a{
 </section>
 
 <section id="practice" class="card hidden">
-<div class="top"><h2>📝 Practice</h2><div class="timer">⏱️ <span id="timer">15</span>s</div></div>
+<div class="top"><h2>📝 Practice</h2><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><div class="timer">⏱️ <span id="timer">15</span>s</div><button type="button" id="practiceLogoutBtn" class="secondary" onclick="window.thiralLogoutFromActivity()">Logout</button></div></div>
 <p><span class="badge" id="level"></span> <span class="badge" id="progress"></span></p>
 <div class="bar"><div id="bar"></div></div>
 <h3 id="question"></h3><div id="options"></div><p id="feedback"></p><button id="stopInfinitePractice" class="secondary hidden" onclick="stopInfinitePractice()">⏹ Practice நிறுத்தி Result பார்க்க</button>
@@ -699,7 +699,7 @@ a{
 
 
 <section id="mockTest" class="card hidden">
-<div class="top"><h2>🎯 TNPSC Group 4 – Full Mock Test</h2><div class="timer">⏱️ <span id="mockTimer">03:00:00</span></div></div>
+<div class="top"><h2>🎯 TNPSC Group 4 – Full Mock Test</h2><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><div class="timer">⏱️ <span id="mockTimer">03:00:00</span></div><button type="button" id="mockLogoutBtn" class="secondary" onclick="window.thiralLogoutFromActivity()">Logout</button></div></div>
 <p><span class="badge" id="mockProgress">1 / 200</span></p>
 <h3 id="mockQuestion"></h3>
 <div id="mockOptions"></div>
@@ -3373,6 +3373,18 @@ window.V91_ADV_NUM=V91_ADV_NUM;
     language:'ta'
   };
 
+  window.__THIRAL_RESET_PRACTICE_SESSION=function(){
+    try{ if(securePractice.timer) clearInterval(securePractice.timer); }catch(e){}
+    securePractice.timer=null;
+    securePractice.questions=[];
+    securePractice.answers={};
+    securePractice.index=0;
+    securePractice.attemptId=null;
+    securePractice.subject='gs';
+    securePractice.language='ta';
+    securePractice.seconds=15;
+  };
+
   window.startPractice = async function(n){
     try{
       var subject = (typeof currentSubject !== 'undefined' && currentSubject) || 'gs';
@@ -5130,6 +5142,18 @@ window.startPractice=async function(n){
   'use strict';
 
   var mockAttemptId=null;
+
+  window.__THIRAL_RESET_MOCK_SESSION=function(){
+    try{ if(typeof mockTimer!=='undefined' && mockTimer) clearInterval(mockTimer); }catch(e){}
+    mockTimer=null;
+    mockQuestions=[];
+    mockAnswers=[];
+    mockIndex=0;
+    mockSeconds=3*60*60;
+    mockFinished=false;
+    mockAttemptId=null;
+  };
+
   var mockApi=function(path,init){
     if(typeof window.thiralV138Api==='function') return window.thiralV138Api(path,init||{});
     throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
@@ -5590,3 +5614,19 @@ window.startPractice=async function(n){
 </script>
 
 </body></html>
+
+
+<script id="thiral-activity-logout-final">
+(function(){
+  'use strict';
+  window.thiralLogoutFromActivity=async function(){
+    try{ if(typeof window.__THIRAL_RESET_PRACTICE_SESSION==='function') window.__THIRAL_RESET_PRACTICE_SESSION(); }catch(e){}
+    try{ if(typeof window.__THIRAL_RESET_MOCK_SESSION==='function') window.__THIRAL_RESET_MOCK_SESSION(); }catch(e){}
+    window.pendingPracticeStart=null;
+    window.pendingMockStart=null;
+    window._practiceReentry=false;
+    try{ var picker=document.getElementById('thiralMockLanguagePicker'); if(picker) picker.remove(); }catch(e){}
+    try{ if(typeof window.logout==='function') await window.logout(); else show('home'); }catch(e){ try{ show('home'); }catch(_){ } }
+  };
+})();
+</script>
