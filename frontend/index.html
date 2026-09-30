@@ -568,7 +568,7 @@ a{
 <div id="mockOptions"></div>
 <div class="top">
 <button class="secondary" onclick="mockPrev()">← Previous</button>
-<button class="secondary" onclick="mockNext()">Next →</button>
+<button class="secondary" id="mockNextBtn" onclick="mockNext()">Next →</button>
 <button type="button" onclick="submitMock(false)">Submit Test</button>
 </div>
 </section>
@@ -5026,6 +5026,10 @@ window.startPractice=async function(n){
     var qe=document.getElementById('mockQuestion');
     var oe=document.getElementById('mockOptions');
     if(p) p.textContent=(mockIndex+1)+' / '+mockQuestions.length;
+    var nextBtn=document.getElementById('mockNextBtn');
+    if(nextBtn){
+      nextBtn.style.display=(mockIndex < mockQuestions.length-1)?'inline-block':'none';
+    }
     if(qe) qe.textContent=(mockIndex+1)+'. '+String(q.q||'');
     if(oe){
       var options=Array.isArray(q.o)?q.o:[];
@@ -5192,6 +5196,75 @@ window.startPractice=async function(n){
     version:'server-rotated-v3',target:200,durationSeconds:10800,
     source:'database',historyMode:'mock'
   };
+})();
+</script>
+
+<script id="thiral-group4-mock-review-200-final">
+/* Final frontend-only fixes:
+   1) Hide Next on the last Mock question.
+   2) Render the complete 200-question Mock review.
+   The server remains unchanged.
+*/
+(function(){
+  'use strict';
+
+  function esc(v){
+    return String(v==null?'':v).replace(/[&<>"']/g,function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+
+  function syncNextButton(){
+    var btn=document.getElementById('mockNextBtn');
+    if(!btn) return;
+    var total=Array.isArray(window.mockQuestions)?window.mockQuestions.length:0;
+    var index=Number(window.mockIndex||0);
+    btn.style.display=(total && index < total-1)?'inline-block':'none';
+  }
+
+  var oldRender=window.renderMock;
+  window.renderMock=function(){
+    if(typeof oldRender==='function') oldRender.apply(this,arguments);
+    syncNextButton();
+  };
+
+  function buildFullReview(){
+    var qs=Array.isArray(window.mockQuestions)?window.mockQuestions:[];
+    var ans=Array.isArray(window.mockAnswers)?window.mockAnswers:[];
+    var root=document.getElementById('screenReview');
+    var legacy=document.getElementById('mockReview');
+    if(!qs.length) return;
+
+    var html=qs.map(function(q,i){
+      var opts=Array.isArray(q.o)?q.o:[];
+      var a=Number(ans[i]);
+      var your=(a>=0 && a<opts.length)?String(opts[a]):'விடையளிக்கவில்லை';
+      var explanation=String(q.e||'').trim();
+      return '<div class="card" style="box-shadow:none;border:1px solid #e5e7eb;margin-bottom:12px;">'
+        +'<div><b>'+String(i+1)+'. '+esc(q.q||'')+'</b></div>'
+        +'<p>உங்கள் விடை: <b>'+esc(your)+'</b></p>'
+        +(explanation?'<p class="small"><b>விளக்கம்:</b> '+esc(explanation)+'</p>':'')
+        +'</div>';
+    }).join('');
+
+    if(legacy) legacy.innerHTML=html;
+    if(root){
+      root.innerHTML='<h3 style="margin-top:0;">Mock Test Review – '+qs.length+' கேள்விகள்</h3>'+html;
+      root.classList.add('screen-review');
+    }
+  }
+
+  var oldSubmit=window.submitMock;
+  window.submitMock=async function(auto){
+    if(!Array.isArray(window.mockQuestions) || !window.mockQuestions.length) return;
+    buildFullReview();
+    if(typeof oldSubmit==='function') await oldSubmit.apply(this,arguments);
+    /* Older submit handlers can overwrite the review, so restore all 200. */
+    buildFullReview();
+    syncNextButton();
+  };
+
+  syncNextButton();
 })();
 </script>
 </body></html>
