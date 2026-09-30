@@ -363,6 +363,24 @@ a{
 </script>
 
 <style id="thiral-daily-content-v1">
+/* Keep the daily-content card separate from the home navigation buttons. */
+#home.thiral-home-shell{
+  background:transparent !important;
+  color:inherit !important;
+  border:0 !important;
+  box-shadow:none !important;
+  backdrop-filter:none !important;
+  padding:0 !important;
+  margin:18px 0 0 !important;
+}
+.thiral-home-actions{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  margin:0 0 24px;
+}
 .thiral-daily-content{
   display:grid;grid-template-columns:minmax(0,1.25fr) minmax(260px,.75fr);gap:22px;
   align-items:stretch;margin:0 0 22px;padding:24px 26px;border-radius:22px;
@@ -399,7 +417,7 @@ a{
 <div class="wrap">
 
 
-<section id="home" class="card">
+<section id="home" class="thiral-home-shell">
 <div class="thiral-daily-content" id="thiralDailyContent">
   <div class="thiral-daily-main">
     <div class="thiral-daily-kicker" id="thiralDailyType">📖 இன்றைய திருக்குறள்</div>
@@ -412,12 +430,14 @@ a{
   </div>
 </div>
 
-<button onclick="show('login')">🔐 Student Login</button>
-<button class="secondary" onclick="show('register')">📝 New Registration</button>
-<button class="secondary" onclick="show('termsPage')">📜 Terms & Conditions</button>
-<button class="secondary" onclick="show('adminLogin')">🛠️ Admin</button>
-<button class="secondary" onclick="show('contactUs')">📞 Contact Us</button>
-<button class="secondary" onclick="show('importantNews')">📢 Important News / முக்கிய அறிவிப்பு</button>
+<div class="thiral-home-actions">
+  <button onclick="show('login')">🔐 Student Login</button>
+  <button class="secondary" onclick="show('register')">📝 New Registration</button>
+  <button class="secondary" onclick="show('termsPage')">📜 Terms & Conditions</button>
+  <button class="secondary" onclick="show('adminLogin')">🛠️ Admin</button>
+  <button class="secondary" onclick="show('contactUs')">📞 Contact Us</button>
+  <button class="secondary" onclick="show('importantNews')">📢 Important News / முக்கிய அறிவிப்பு</button>
+</div>
 </section>
 
 <section id="register" class="card hidden">
