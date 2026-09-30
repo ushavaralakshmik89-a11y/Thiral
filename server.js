@@ -1297,8 +1297,8 @@ api.get('/admin/exam-results', requireAdmin, async (req,res)=>{
       WHEN a.total_count=50 THEN '50 Questions'
       ELSE 'Practice'
     END`;
-    if(type && ['model','mock','practice','bank','10','20','50'].includes(type)){
-      const typeExpr=type==='model' ? `lower(a.exam) LIKE '%model%'` : type==='mock' ? `a.mode='mock'` : type==='bank' ? `a.mode='bank'` : type==='10' ? `a.total_count=10` : type==='20' ? `a.total_count=20` : type==='50' ? `a.total_count=50` : `(a.mode='practice' AND lower(a.exam) NOT LIKE '%model%' AND a.total_count NOT IN (10,20,50))`;
+    if(type && ['model','mock','practice','bank','10','20','50','100'].includes(type)){
+      const typeExpr=type==='model' ? `lower(a.exam) LIKE '%model%'` : type==='mock' ? `a.mode='mock'` : type==='bank' ? `a.mode='bank'` : type==='10' ? `a.total_count=10` : type==='20' ? `a.total_count=20` : type==='50' ? `a.total_count=50` : type==='100' ? `a.total_count=100` : `(a.mode='practice' AND lower(a.exam) NOT LIKE '%model%' AND a.total_count NOT IN (10,20,50,100))`;
       where.push(typeExpr);
     }
 
@@ -1351,11 +1351,11 @@ api.get('/admin/exam-results/export', requireAdmin, async (req,res)=>{
     }
     where.push(`COALESCE(a.score,0) >= $${params.length+1}`);params.push(minPct);
     where.push(`COALESCE(a.score,0) <= $${params.length+1}`);params.push(maxPct);
-    if(type && ['model','mock','practice','bank','10','20','50'].includes(type)){
-      where.push(type==='model'?`lower(a.exam) LIKE '%model%'`:type==='mock'?`a.mode='mock'`:type==='bank'?`a.mode='bank'`:type==='10'?`a.total_count=10`:type==='20'?`a.total_count=20`:type==='50'?`a.total_count=50`:`(a.mode='practice' AND lower(a.exam) NOT LIKE '%model%' AND a.total_count NOT IN (10,20,50))`);
+    if(type && ['model','mock','practice','bank','10','20','50','100'].includes(type)){
+      where.push(type==='model'?`lower(a.exam) LIKE '%model%'`:type==='mock'?`a.mode='mock'`:type==='bank'?`a.mode='bank'`:type==='10'?`a.total_count=10`:type==='20'?`a.total_count=20`:type==='50'?`a.total_count=50`:type==='100'?`a.total_count=100`:`(a.mode='practice' AND lower(a.exam) NOT LIKE '%model%' AND a.total_count NOT IN (10,20,50,100))`);
     }
 
-    const typeSql=`CASE WHEN lower(a.exam) LIKE '%model%' THEN 'Model Exam' WHEN a.mode='mock' THEN 'Mock Test' WHEN a.mode='bank' THEN 'Question Bank' WHEN a.total_count=10 THEN '10 Questions' WHEN a.total_count=20 THEN '20 Questions' WHEN a.total_count=50 THEN '50 Questions' ELSE 'Practice' END`;
+    const typeSql=`CASE WHEN lower(a.exam) LIKE '%model%' THEN 'Model Exam' WHEN a.mode='mock' THEN 'Mock Test' WHEN a.mode='bank' THEN 'Question Bank' WHEN a.total_count=10 THEN '10 Questions' WHEN a.total_count=20 THEN '20 Questions' WHEN a.total_count=50 THEN '50 Questions' WHEN a.total_count=100 THEN '100 Questions' ELSE 'Practice' END`;
     const q=await pool.query(`SELECT a.id AS attempt_id,u.name,u.email,a.exam,${typeSql} AS exam_type,to_char(COALESCE(a.submitted_at,a.started_at),'DD-MM-YYYY HH24:MI') AS date,COALESCE(a.total_count,0)::int AS questions,COALESCE(a.correct_count,0)::int AS marks,COALESCE(a.total_count,0)::int AS total_marks,COALESCE(a.score,0)::numeric(10,2) AS percentage,COALESCE((SELECT string_agg(DISTINCT qq.subtopic, ' | ' ORDER BY qq.subtopic) FROM unnest(a.question_ids) AS aqid JOIN questions qq ON qq.id=aqid),'') AS subtopics FROM attempts a JOIN users u ON u.id=a.user_id WHERE ${where.join(' AND ')} ORDER BY COALESCE(a.submitted_at,a.started_at) DESC,a.id DESC`,params);
 
     const escXml=v=>String(v??'')
@@ -1447,7 +1447,7 @@ api.get('/admin/exam-results/:attemptId', requireAdmin, async (req,res)=>{
   try{
     const id=Number(req.params.attemptId);
     if(!Number.isInteger(id) || id<1) return sendError(res,400,'Invalid attempt ID.');
-    const typeSql=`CASE WHEN lower(a.exam) LIKE '%model%' THEN 'Model Exam' WHEN a.mode='mock' THEN 'Mock Test' WHEN a.mode='bank' THEN 'Question Bank' WHEN a.total_count=10 THEN '10 Questions' WHEN a.total_count=20 THEN '20 Questions' WHEN a.total_count=50 THEN '50 Questions' ELSE 'Practice' END`;
+    const typeSql=`CASE WHEN lower(a.exam) LIKE '%model%' THEN 'Model Exam' WHEN a.mode='mock' THEN 'Mock Test' WHEN a.mode='bank' THEN 'Question Bank' WHEN a.total_count=10 THEN '10 Questions' WHEN a.total_count=20 THEN '20 Questions' WHEN a.total_count=50 THEN '50 Questions' WHEN a.total_count=100 THEN '100 Questions' ELSE 'Practice' END`;
     const q=await pool.query(`SELECT a.id AS attempt_id,u.name,u.email,a.exam,${typeSql} AS exam_type,to_char(COALESCE(a.submitted_at,a.started_at),'DD-MM-YYYY HH24:MI') AS date,COALESCE(a.total_count,0)::int AS questions,COALESCE(a.correct_count,0)::int AS correct,COALESCE(a.score,0)::numeric(10,2) AS percentage FROM attempts a JOIN users u ON u.id=a.user_id WHERE a.id=$1 AND a.status='SUBMITTED' LIMIT 1`,[id]);
     if(!q.rowCount) return sendError(res,404,'Result not found.');
     const r=q.rows[0];
