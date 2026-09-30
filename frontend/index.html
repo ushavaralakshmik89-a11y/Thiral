@@ -361,6 +361,138 @@ a{
   window.formatDOB=formatDOB;
 })();
 </script>
+
+<style id="thiral-daily-content-v3">
+/* Full-width home layout + single-line navigation. */
+.wrap{max-width:none !important;width:100% !important;margin:0 auto !important;padding:0 16px !important}
+#home.thiral-home-shell{width:100% !important}
+/* Keep the daily-content card separate from the home navigation buttons. */
+#home.thiral-home-shell{
+  background:transparent !important;
+  color:inherit !important;
+  border:0 !important;
+  box-shadow:none !important;
+  backdrop-filter:none !important;
+  padding:0 !important;
+  margin:18px 0 0 !important;
+}
+.thiral-home-actions{
+  display:flex;
+  flex-wrap:nowrap;
+  align-items:stretch;
+  justify-content:stretch;
+  gap:8px;
+  width:100%;
+  margin:0 0 24px;
+  overflow:hidden;
+}
+.thiral-home-actions button{
+  flex:1 1 0;
+  min-width:0;
+  margin:0;
+  padding:13px 8px;
+  font-size:15px;
+  white-space:nowrap;
+  line-height:1.25;
+}
+.thiral-daily-content{
+  display:grid;grid-template-columns:minmax(0,1.25fr) minmax(260px,.75fr);gap:22px;
+  align-items:stretch;margin:0 0 22px;padding:24px 26px;border-radius:22px;
+  background:linear-gradient(135deg,#fffdf2,#ffffff);border:1px solid rgba(37,99,235,.10);
+  box-shadow:0 8px 24px rgba(15,23,42,.06);
+}
+.thiral-daily-main{min-width:0;padding:4px 8px 4px 4px}
+.thiral-daily-kicker{display:inline-block;font-weight:800;font-size:21px;line-height:1.35;color:#173b8f;
+  background:#fff0b8;border-radius:12px;padding:8px 14px;margin-bottom:14px}
+.thiral-daily-title{font-size:22px;font-weight:800;line-height:1.65;color:#163b78;margin-bottom:8px}
+.thiral-daily-text{font-size:20px;line-height:1.75;color:#243b64;white-space:pre-line}
+.thiral-daily-explain{background:#eef7ff;border-radius:18px;padding:20px 22px;color:#24456f;font-size:18px;line-height:1.7}
+.thiral-daily-explain-title{font-size:20px;font-weight:800;color:#0d4b91;margin-bottom:8px}
+@media(max-width:760px){
+  .thiral-daily-content{grid-template-columns:1fr;gap:14px;padding:18px}
+  .thiral-daily-kicker{font-size:18px}.thiral-daily-title{font-size:20px}.thiral-daily-text{font-size:18px}.thiral-daily-explain{font-size:17px}
+  .thiral-home-actions{gap:4px;overflow-x:auto;overflow-y:hidden}
+  .thiral-home-actions button{flex:0 0 auto;font-size:12px;padding:11px 7px}
+}
+</style>
+
+
+<style id="thiral-daily-layout-v4">
+/* V4: compact daily card + full-width single-row navigation */
+#home.thiral-home-shell{
+  width:100vw !important;
+  margin-left:calc(50% - 50vw) !important;
+  margin-right:calc(50% - 50vw) !important;
+  padding:0 !important;
+}
+#home.thiral-home-shell .thiral-daily-content{
+  width:min(880px,84vw) !important;
+  margin:18px auto 22px !important;
+  box-sizing:border-box !important;
+  padding:22px 26px !important;
+  gap:22px !important;
+  align-items:center !important;
+}
+#home.thiral-home-shell .thiral-daily-main,
+#home.thiral-home-shell .thiral-daily-explain{
+  min-width:0 !important;
+}
+#home.thiral-home-shell .thiral-daily-main{
+  padding:2px 8px 2px 2px !important;
+}
+#home.thiral-home-shell .thiral-daily-kicker{
+  margin-bottom:10px !important;
+}
+#home.thiral-home-shell .thiral-daily-title{
+  margin-bottom:5px !important;
+  line-height:1.45 !important;
+}
+#home.thiral-home-shell .thiral-daily-text{
+  line-height:1.55 !important;
+}
+#home.thiral-home-shell .thiral-daily-explain{
+  padding:17px 20px !important;
+  line-height:1.55 !important;
+}
+#home.thiral-home-shell .thiral-home-actions{
+  width:100% !important;
+  box-sizing:border-box !important;
+  padding:0 16px !important;
+  margin:0 0 26px !important;
+  gap:8px !important;
+  display:flex !important;
+  flex-wrap:nowrap !important;
+  overflow:hidden !important;
+}
+#home.thiral-home-shell .thiral-home-actions button{
+  flex:1 1 0 !important;
+  width:auto !important;
+  min-width:0 !important;
+  margin:0 !important;
+  padding:14px 8px !important;
+  font-size:15px !important;
+  white-space:nowrap !important;
+  min-height:52px !important;
+}
+@media(max-width:760px){
+  #home.thiral-home-shell .thiral-daily-content{
+    width:calc(100% - 28px) !important;
+    grid-template-columns:1fr !important;
+    padding:18px !important;
+    gap:12px !important;
+  }
+  #home.thiral-home-shell .thiral-home-actions{
+    overflow-x:auto !important;
+    justify-content:flex-start !important;
+  }
+  #home.thiral-home-shell .thiral-home-actions button{
+    flex:0 0 auto !important;
+    font-size:13px !important;
+    padding:12px 10px !important;
+  }
+}
+</style>
+
 </head>
 <body>
 <header class="thiral-final-hero">
@@ -378,22 +510,27 @@ a{
 <div class="wrap">
 
 
-<section id="home" class="card">
-<div class="thiral-home-brand">
-      <span class="thiral-mark">தி</span>
-      <div>
-        <div class="brand-mini">திறல்</div>
-        <div class="brand-mini-sub">கற்றிடு • சிந்தித்திடு • போராடு • முன்னேறு • வெற்றி பெறு</div>
-      </div>
-    </div>
-    </div>
+<section id="home" class="thiral-home-shell">
+<div class="thiral-daily-content" id="thiralDailyContent">
+  <div class="thiral-daily-main">
+    <div class="thiral-daily-kicker" id="thiralDailyType">📖 இன்றைய திருக்குறள்</div>
+    <div class="thiral-daily-title" id="thiralDailyTitle"></div>
+    <div class="thiral-daily-text" id="thiralDailyText"></div>
+  </div>
+  <div class="thiral-daily-explain">
+    <div class="thiral-daily-explain-title" id="thiralDailyExplainTitle">💡 விளக்கம்</div>
+    <div id="thiralDailyExplanation"></div>
+  </div>
+</div>
 
-<button onclick="show('login')">🔐 Student Login</button>
-<button class="secondary" onclick="show('register')">📝 New Registration</button>
-<button class="secondary" onclick="show('termsPage')">📜 Terms & Conditions</button>
-<button class="secondary" onclick="show('adminLogin')">🛠️ Admin</button>
-<button class="secondary" onclick="show('contactUs')">📞 Contact Us</button>
-<button class="secondary" onclick="show('importantNews')">📢 Important News / முக்கிய அறிவிப்பு</button>
+<div class="thiral-home-actions">
+  <button onclick="show('login')">🔐 Student Login</button>
+  <button class="secondary" onclick="show('register')">📝 New Registration</button>
+  <button class="secondary" onclick="show('termsPage')">📜 Terms & Conditions</button>
+  <button class="secondary" onclick="show('adminLogin')">🛠️ Admin</button>
+  <button class="secondary" onclick="show('contactUs')">📞 Contact Us</button>
+  <button class="secondary" onclick="show('importantNews')">📢 Important News / முக்கிய அறிவிப்பு</button>
+</div>
 </section>
 
 <section id="register" class="card hidden">
@@ -545,7 +682,7 @@ a{
 </section>
 
 <section id="practice" class="card hidden">
-<div class="top"><h2>📝 Practice</h2><div class="timer">⏱️ <span id="timer">15</span>s</div></div>
+<div class="top"><h2>📝 Practice</h2><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><div class="timer">⏱️ <span id="timer">15</span>s</div><button type="button" id="practiceLogoutBtn" class="secondary" onclick="window.thiralLogoutFromActivity()">Logout</button></div></div>
 <p><span class="badge" id="level"></span> <span class="badge" id="progress"></span></p>
 <div class="bar"><div id="bar"></div></div>
 <h3 id="question"></h3><div id="options"></div><p id="feedback"></p><button id="stopInfinitePractice" class="secondary hidden" onclick="stopInfinitePractice()">⏹ Practice நிறுத்தி Result பார்க்க</button>
@@ -562,7 +699,7 @@ a{
 
 
 <section id="mockTest" class="card hidden">
-<div class="top"><h2>🎯 TNPSC Group 4 – Full Mock Test</h2><div class="timer">⏱️ <span id="mockTimer">03:00:00</span></div></div>
+<div class="top"><h2>🎯 TNPSC Group 4 – Full Mock Test</h2><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><div class="timer">⏱️ <span id="mockTimer">03:00:00</span></div><button type="button" id="mockLogoutBtn" class="secondary" onclick="window.thiralLogoutFromActivity()">Logout</button></div></div>
 <p><span class="badge" id="mockProgress">1 / 200</span></p>
 <h3 id="mockQuestion"></h3>
 <div id="mockOptions"></div>
@@ -866,8 +1003,6 @@ topics:{
 'இந்திய வரலாறு':['பண்டைய இந்தியா','இடைக்கால இந்தியா','நவீன இந்தியா','சுதந்திரப் போராட்டம்'],
 'தமிழ்நாடு வரலாறு':['சங்க காலம்','சோழர்','பாண்டியர்','பல்லவர்','நாயக்கர்'],
 'இந்திய அரசியல்':['அரசியலமைப்பு','அடிப்படை உரிமைகள்','பாராளுமன்றம்','மாநில அரசு','உள்ளாட்சி'],
-'இந்தியா – ஆட்சி, அரசியல், நீதித்துறை மற்றும் பதவியாளர்கள்':['குடியரசுத் தலைவர்','துணைக் குடியரசுத் தலைவர்','பிரதமர்கள்','மத்திய அமைச்சர்கள் மற்றும் துறைகள்','ஆளுநர்கள்','நாடாளுமன்றம் மற்றும் முக்கிய பதவிகள்','உச்சநீதிமன்றம் மற்றும் நீதிபதிகள்','உயர்நீதிமன்றங்கள் மற்றும் நீதிபதிகள்','சட்டப் பதவிகள்','அரசியலமைப்பு அமைப்புகள்','முக்கிய நிர்வாகப் பதவிகள்','பதவிக்கால வரலாறு மற்றும் காலவரிசை'],
-'தமிழ்நாடு – ஆட்சி, அரசியல், நீதித்துறை மற்றும் பதவியாளர்கள்':['முதலமைச்சர்கள்','தமிழ்நாடு அமைச்சர்கள் மற்றும் துறைகள்','ஆளுநர்கள்','சட்டப்பேரவை மற்றும் முக்கிய பதவிகள்','சென்னை உயர்நீதிமன்றம் மற்றும் நீதிபதிகள்','சட்டப் பதவிகள்','மாநில நிர்வாகப் பதவிகள்','மாநில அமைப்புகள் மற்றும் ஆணையங்கள்','உள்ளாட்சி அமைப்புகள்','பதவிக்கால வரலாறு மற்றும் காலவரிசை'],
 'புவியியல்':['இந்தியா','தமிழ்நாடு','ஆறுகள்','மலைகள்','வளங்கள்'],
 'அறிவியல்':['இயற்பியல்','வேதியியல்','உயிரியல்','சுற்றுச்சூழல்'],
 'பொருளாதாரம்':['அடிப்படை பொருளாதாரம்','இந்திய பொருளாதாரம்','தமிழ்நாடு பொருளாதாரம்']
@@ -889,8 +1024,6 @@ const EN_LABELS={
    'இந்திய வரலாறு':{'en':'Indian History','subs':{'பண்டைய இந்தியா':'Ancient India','இடைக்கால இந்தியா':'Medieval India','நவீன இந்தியா':'Modern India','சுதந்திரப் போராட்டம்':'Indian Freedom Movement'}},
    'தமிழ்நாடு வரலாறு':{'en':'Tamil Nadu History','subs':{'சங்க காலம்':'Sangam Age','சோழர்':'Cholas','பாண்டியர்':'Pandyas','பல்லவர்':'Pallavas','நாயக்கர்':'Nayaks'}},
    'இந்திய அரசியல்':{'en':'Indian Polity','subs':{'அரசியலமைப்பு':'Constitution','அடிப்படை உரிமைகள்':'Fundamental Rights','பாராளுமன்றம்':'Parliament','மாநில அரசு':'State Government','உள்ளாட்சி':'Local Government'}},
-   'இந்தியா – ஆட்சி, அரசியல், நீதித்துறை மற்றும் பதவியாளர்கள்':{'en':'India – Governance, Politics, Judiciary & Office Holders','subs':{'குடியரசுத் தலைவர்':'Presidents','துணைக் குடியரசுத் தலைவர்':'Vice-Presidents','பிரதமர்கள்':'Prime Ministers','மத்திய அமைச்சர்கள் மற்றும் துறைகள்':'Union Ministers & Portfolios','ஆளுநர்கள்':'Governors','நாடாளுமன்றம் மற்றும் முக்கிய பதவிகள்':'Parliament & Key Offices','உச்சநீதிமன்றம் மற்றும் நீதிபதிகள்':'Supreme Court & Judges','உயர்நீதிமன்றங்கள் மற்றும் நீதிபதிகள்':'High Courts & Judges','சட்டப் பதவிகள்':'Legal Offices','அரசியலமைப்பு அமைப்புகள்':'Constitutional Bodies','முக்கிய நிர்வாகப் பதவிகள்':'Key Administrative Offices','பதவிக்கால வரலாறு மற்றும் காலவரிசை':'Tenure History & Timeline'}},
-   'தமிழ்நாடு – ஆட்சி, அரசியல், நீதித்துறை மற்றும் பதவியாளர்கள்':{'en':'Tamil Nadu – Governance, Politics, Judiciary & Office Holders','subs':{'முதலமைச்சர்கள்':'Chief Ministers','தமிழ்நாடு அமைச்சர்கள் மற்றும் துறைகள்':'State Ministers & Portfolios','ஆளுநர்கள்':'Governors','சட்டப்பேரவை மற்றும் முக்கிய பதவிகள்':'Legislative Assembly & Key Offices','சென்னை உயர்நீதிமன்றம் மற்றும் நீதிபதிகள்':'Madras High Court & Judges','சட்டப் பதவிகள்':'Legal Offices','மாநில நிர்வாகப் பதவிகள்':'Key State Administrative Offices','மாநில அமைப்புகள் மற்றும் ஆணையங்கள்':'State Bodies & Commissions','உள்ளாட்சி அமைப்புகள்':'Local Government Bodies','பதவிக்கால வரலாறு மற்றும் காலவரிசை':'Tenure History & Timeline'}},
    'புவியியல்':{'en':'Geography','subs':{'இந்தியா':'India','தமிழ்நாடு':'Tamil Nadu','ஆறுகள்':'Rivers','மலைகள்':'Mountains','வளங்கள்':'Resources'}},
    'அறிவியல்':{'en':'Science','subs':{'இயற்பியல்':'Physics','வேதியியல்':'Chemistry','உயிரியல்':'Biology','சுற்றுச்சூழல்':'Environment'}},
    'பொருளாதாரம்':{'en':'Economics','subs':{'அடிப்படை பொருளாதாரம்':'Basic Economics','இந்திய பொருளாதாரம்':'Indian Economy','தமிழ்நாடு பொருளாதாரம்':'Tamil Nadu Economy'}}
@@ -3240,6 +3373,18 @@ window.V91_ADV_NUM=V91_ADV_NUM;
     language:'ta'
   };
 
+  window.__THIRAL_RESET_PRACTICE_SESSION=function(){
+    try{ if(securePractice.timer) clearInterval(securePractice.timer); }catch(e){}
+    securePractice.timer=null;
+    securePractice.questions=[];
+    securePractice.answers={};
+    securePractice.index=0;
+    securePractice.attemptId=null;
+    securePractice.subject='gs';
+    securePractice.language='ta';
+    securePractice.seconds=15;
+  };
+
   window.startPractice = async function(n){
     try{
       var subject = (typeof currentSubject !== 'undefined' && currentSubject) || 'gs';
@@ -4997,6 +5142,18 @@ window.startPractice=async function(n){
   'use strict';
 
   var mockAttemptId=null;
+
+  window.__THIRAL_RESET_MOCK_SESSION=function(){
+    try{ if(typeof mockTimer!=='undefined' && mockTimer) clearInterval(mockTimer); }catch(e){}
+    mockTimer=null;
+    mockQuestions=[];
+    mockAnswers=[];
+    mockIndex=0;
+    mockSeconds=3*60*60;
+    mockFinished=false;
+    mockAttemptId=null;
+  };
+
   var mockApi=function(path,init){
     if(typeof window.thiralV138Api==='function') return window.thiralV138Api(path,init||{});
     throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
@@ -5406,4 +5563,70 @@ window.startPractice=async function(n){
   };
 })();
 </script>
+
+<script id="thiral-daily-content-script-v1">
+(function(){
+  const items=[
+    {type:'📖 இன்றைய திருக்குறள்',title:'கற்க கசடறக் கற்பவை கற்றபின்',text:'நிற்க அதற்குத் தக.\n— திருக்குறள் 391',explain:'கற்க வேண்டியவற்றைத் தெளிவாகவும் குற்றமின்றியும் கற்று, கற்ற அறிவுக்கு ஏற்றவாறு வாழ்க்கையில் நடந்து கொள்ள வேண்டும்.'},
+    {type:'💭 இன்றைய சிந்தனை',title:'சிறிய முன்னேற்றமும் முன்னேற்றமே',text:'தினமும் நேற்று செய்ததைவிட சிறிதளவு சிறப்பாகச் செய்வதே நீண்ட பயணத்தின் உண்மையான வெற்றி.',explain:'பெரிய மாற்றத்தை ஒரே நாளில் எதிர்பார்ப்பதைவிட, தொடர்ந்து செய்யக்கூடிய சிறிய முன்னேற்றங்களை உருவாக்குவது பயனுள்ளதாக இருக்கும்.'},
+    {type:'🌱 இன்றைய அறிவுரை',title:'ஒரு நேரத்தில் ஒரு இலக்கு',text:'ஒரே நாளில் எல்லாவற்றையும் முடிக்க முயலாதீர்கள். முக்கியமான ஒன்றை முதலில் முடிக்குங்கள்.',explain:'முன்னுரிமையைத் தீர்மானித்து செயல்பட்டால் கவனச்சிதறல் குறைந்து வேலை முடிக்கும் திறன் அதிகரிக்கும்.'},
+    {type:'🧠 இன்றைய அறிவுத் துளி',title:'நினைவில் நிற்கும் ஒரு வழி',text:'படித்ததை புத்தகத்தை மூடி உங்கள் சொந்த வார்த்தைகளில் சொல்லிப் பாருங்கள்.',explain:'நினைவிலிருந்து மீட்டெடுத்து சொல்லும் பயிற்சி, வெறுமனே மீண்டும் வாசிப்பதைவிட கற்றதை உறுதிப்படுத்த உதவும்.'},
+    {type:'❤️ இன்றைய மனிதநேயம்',title:'ஒரு சிறிய உதவி',text:'உங்களால் முடிந்த ஒரு சிறிய உதவியை இன்று எதிர்பார்ப்பில்லாமல் செய்யுங்கள்.',explain:'சிறிய உதவிகளும் ஒருவரின் நாளை மாற்றக்கூடும். நல்ல செயல் அளவில் அல்ல, அதன் நோக்கத்தில் தொடங்குகிறது.'},
+    {type:'💪 இன்றைய ஊக்கவுரை',title:'தொடர்ந்து முயற்சி செய்',text:'மெதுவாகச் சென்றாலும் நின்றுவிடாத பயணம் முன்னேற்றத்தை உருவாக்கும்.',explain:'வேகம் குறைவாக இருப்பது தோல்வி அல்ல. தொடர்ந்து செயல்படுவது தான் இலக்கை அடைவதற்கான முக்கியமான பழக்கம்.'},
+    {type:'🌿 இன்றைய நல்ல பழக்கம்',title:'10 நிமிட மீள்பார்வை',text:'இன்று கற்றதை இரவு 10 நிமிடங்கள் திரும்பப் பாருங்கள்.',explain:'சிறிய இடைவெளியில் மீள்பார்வை செய்வது முக்கியமான தகவல்களை நினைவில் வைத்திருக்க உதவும்.'},
+    {type:'✨ இன்றைய வாழ்க்கைப் பாடம்',title:'ஒப்பிடுவதை குறை',text:'உங்கள் பயணத்தை மற்றவர்களின் பயணத்துடன் ஒப்பிடாமல், நேற்று இருந்த உங்களுடன் ஒப்பிடுங்கள்.',explain:'ஒவ்வொருவருக்கும் தொடக்கநிலையும் சூழலும் வேறுபடும். தனிப்பட்ட முன்னேற்றத்தை அளவிடுவது தெளிவான இலக்கை உருவாக்க உதவும்.'},
+    {type:'📚 இன்றைய கற்றல் குறிப்பு',title:'படித்ததை எழுதிப் பாருங்கள்',text:'ஒரு கருத்தை இரண்டு அல்லது மூன்று வரிகளில் எழுதிப் பாருங்கள்.',explain:'சுருக்கமாக எழுதுவது கருத்தின் முக்கிய அம்சங்களை அடையாளம் காணவும் புரிதலைச் சரிபார்க்கவும் உதவும்.'},
+    {type:'🌟 இன்றைய சிறப்பு சிந்தனை',title:'வாய்ப்பை காத்திருக்க வேண்டாம்',text:'கிடைக்கும் நேரத்தில் சிறிய படியைத் தொடங்குங்கள்.',explain:'சரியான நேரம் வரும் வரை காத்திருப்பதைவிட, கிடைக்கும் வளங்களுடன் தொடங்குவது செயல்பாட்டை உருவாக்கும்.'},
+    {type:'📖 இன்றைய திருக்குறள்',title:'எண்ணித் துணிக கருமம் துணிந்தபின்',text:'எண்ணுவம் என்பது இழுக்கு.\n— திருக்குறள் 467',explain:'ஒரு செயலைத் தொடங்குவதற்கு முன் அதன் விளைவுகளைச் சிந்தித்து முடிவு செய்ய வேண்டும்.'},
+    {type:'💭 இன்றைய சிந்தனை',title:'கவனம் ஒரு வளம்',text:'நேரம் மட்டும் அல்ல, கவனமும் வரம்புடைய வளம்.',explain:'முக்கியமான வேலையின் போது தேவையற்ற அறிவிப்புகள் மற்றும் கவனச்சிதறல்களை குறைப்பது பயனளிக்கும்.'},
+    {type:'🌱 இன்றைய அறிவுரை',title:'கேள்வி கேட்கத் தயங்காதீர்கள்',text:'புரியாததை கேட்பது பலவீனம் அல்ல; புரிந்து கொள்ளும் முயற்சி.',explain:'சந்தேகத்தை தெளிவுபடுத்துவது தவறான புரிதலை நீக்கி கற்றலை வேகப்படுத்தும்.'},
+    {type:'🧠 இன்றைய அறிவுத் துளி',title:'சிறு இடைவெளி உதவும்',text:'நீண்ட நேரம் இடைவிடாமல் படிப்பதைவிட திட்டமிட்ட சிறு இடைவெளிகள் உதவியாக இருக்கலாம்.',explain:'கவனம் குறையும் முன் குறுகிய இடைவெளி எடுத்தால் மீண்டும் பணியில் திரும்புவது எளிதாகும்.'},
+    {type:'❤️ இன்றைய மனிதநேயம்',title:'மரியாதையுடன் பேசுங்கள்',text:'ஒருவரின் நிலைமை தெரியாமல் அவரை மதிப்பிடாதீர்கள்.',explain:'மற்றவர்களின் சூழலை அறியாமல் தீர்ப்பு வழங்குவதைத் தவிர்ப்பது நல்ல உறவுகளுக்கு உதவும்.'},
+    {type:'💪 இன்றைய ஊக்கவுரை',title:'தோல்வி ஒரு தரவு',text:'எது வேலை செய்யவில்லை என்பதை அறிந்தால் அடுத்த முயற்சி சிறப்பாகலாம்.',explain:'தவறை மறைப்பதைவிட அதிலிருந்து காரணத்தை கண்டுபிடித்து முறையை மாற்றுவது முன்னேற்றத்திற்கு உதவும்.'},
+    {type:'🌿 இன்றைய நல்ல பழக்கம்',title:'தினசரி ஒரு பக்கம்',text:'ஒரு நல்ல புத்தகத்தில் தினமும் குறைந்தது ஒரு பக்கம் படியுங்கள்.',explain:'சிறிய அளவில் தொடங்கும் வாசிப்பு பழக்கம் காலப்போக்கில் பெரிய அறிவுத் தொகுப்பாக மாறலாம்.'},
+    {type:'✨ இன்றைய வாழ்க்கைப் பாடம்',title:'சொல்லும் முன் சிந்தி',text:'ஒரு வார்த்தையைச் சொல்ல சில வினாடிகள் போதும்; அதன் தாக்கம் நீண்டதாக இருக்கலாம்.',explain:'கோபம் அல்லது அவசரத்தில் பதிலளிப்பதற்கு முன் சிறிது இடைவெளி கொடுப்பது பயனுள்ளதாக இருக்கும்.'},
+    {type:'📚 இன்றைய கற்றல் குறிப்பு',title:'தெரிந்ததை மற்றொருவருக்குச் சொல்லுங்கள்',text:'ஒரு கருத்தை எளிமையாக விளக்கிப் பாருங்கள்.',explain:'மற்றொருவருக்குப் புரியும்படி விளக்க முயற்சிப்பது உங்கள் சொந்த புரிதலில் உள்ள இடைவெளிகளை கண்டுபிடிக்க உதவும்.'},
+    {type:'🌟 இன்றைய சிறப்பு சிந்தனை',title:'நன்றி சொல்லும் பழக்கம்',text:'இன்று உங்களுக்கு உதவிய ஒருவருக்கு நன்றி சொல்லுங்கள்.',explain:'நன்றியை வெளிப்படுத்துவது உறவுகளில் நேர்மறையான தொடர்பை வளர்க்கும்.'},
+    {type:'📖 இன்றைய திருக்குறள்',title:'வெள்ளத் தனைய மலர்நீட்டம் மாந்தர்தம்',text:'உள்ளத் தனையது உயர்வு.\n— திருக்குறள் 595',explain:'மனிதனின் உயர்வு அவனுடைய உள்ளத்தின் உயர்வோடு தொடர்புடையது என்பதே இந்தக் குறளின் கருத்து.'},
+    {type:'💭 இன்றைய சிந்தனை',title:'நேர்மை எளிமையானது',text:'சரியானதைச் செய்வது எப்போதும் எளிதாக இருக்காது; ஆனால் முடிவில் மன அமைதியைத் தரும்.',explain:'நேர்மையான முடிவுகள் நம்பிக்கையை உருவாக்குகின்றன.'},
+    {type:'🌱 இன்றைய அறிவுரை',title:'திட்டத்தை எழுதுங்கள்',text:'நாளைய முக்கியமான மூன்று பணிகளை இன்றே எழுதிவையுங்கள்.',explain:'எழுதப்பட்ட சிறிய திட்டம் அடுத்த நாள் தொடங்குவதற்கான தயக்கத்தை குறைக்க உதவும்.'},
+    {type:'🧠 இன்றைய அறிவுத் துளி',title:'கற்றதை இடைவெளியில் நினைவுகூருங்கள்',text:'ஒரே நாளில் முழுவதையும் படிப்பதைவிட இடைவெளிகளுடன் மீள்பார்வை செய்வது பயனுள்ளதாக இருக்கும்.',explain:'மீள்பார்வையை பல நாட்களாகப் பிரிப்பது நீண்டகால நினைவாற்றலுக்கு உதவக்கூடும்.'},
+    {type:'❤️ இன்றைய மனிதநேயம்',title:'கேட்பதும் ஒரு உதவி',text:'சில நேரங்களில் ஒருவருக்கு தீர்வு அல்ல, கவனமாகக் கேட்பவரே தேவை.',explain:'அவசரமாக அறிவுரை வழங்காமல் கேட்பது மற்றவரின் உணர்வுகளையும் தேவையையும் புரிந்து கொள்ள உதவும்.'},
+    {type:'💪 இன்றைய ஊக்கவுரை',title:'இன்று தொடங்கு',text:'முழுமையாகத் தயாரான பிறகே தொடங்க வேண்டும் என்ற எண்ணம் பல தொடக்கங்களை தாமதப்படுத்தும்.',explain:'சிறிய அளவில் தொடங்கி அனுபவத்தின் அடிப்படையில் மேம்படுத்துவது பல செயல்களுக்கு நடைமுறை வழியாகும்.'},
+    {type:'🌿 இன்றைய நல்ல பழக்கம்',title:'படிக்கும் இடத்தை ஒழுங்குபடுத்து',text:'படிக்கத் தொடங்கும் முன் மேசையில் தேவையானவற்றை மட்டும் வைத்துக்கொள்ளுங்கள்.',explain:'சுற்றுப்புற ஒழுங்கு கவனச்சிதறலை குறைத்து படிப்பைத் தொடங்க உதவும்.'},
+    {type:'✨ இன்றைய வாழ்க்கைப் பாடம்',title:'பொறுமைக்கு மதிப்பு உண்டு',text:'சில முடிவுகள் நேரம் எடுத்துக்கொள்ளும். உடனடி முடிவு இல்லாததால் முயற்சியை நிறுத்த வேண்டாம்.',explain:'நீண்டகால இலக்குகளுக்கு தொடர்ச்சியான முயற்சியும் பொறுமையும் தேவைப்படலாம்.'},
+    {type:'📚 இன்றைய கற்றல் குறிப்பு',title:'தவறான விடையையும் கவனியுங்கள்',text:'ஒரு தேர்வில் தவறிய கேள்வியை மட்டும் கடந்து செல்லாமல், ஏன் தவறியது என்று கண்டுபிடியுங்கள்.',explain:'தவறின் காரணத்தை அறிந்தால் அதே வகைத் தவறு மீண்டும் நடப்பதை குறைக்க முடியும்.'},
+    {type:'🌟 இன்றைய சிறப்பு சிந்தனை',title:'உங்கள் முயற்சிக்கு மதிப்பு கொடுங்கள்',text:'முடிவை மட்டும் பார்க்காமல், நீங்கள் செய்த ஒழுங்கான முயற்சியையும் கவனியுங்கள்.',explain:'முயற்சியின் தரத்தை மதிப்பிடுவது அடுத்த கட்டத்தை திட்டமிட உதவும்.'}
+  ];
+  function dayIndex(){
+    const now=new Date();
+    const utc=Date.UTC(now.getFullYear(),now.getMonth(),now.getDate());
+    const base=Date.UTC(2026,0,1);
+    return Math.floor((utc-base)/86400000)%items.length;
+  }
+  function render(){
+    const x=items[(dayIndex()+items.length)%items.length];
+    const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+    set('thiralDailyType',x.type);set('thiralDailyTitle',x.title);set('thiralDailyText',x.text);set('thiralDailyExplanation',x.explain);
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',render); else render();
+})();
+</script>
+
 </body></html>
+
+
+<script id="thiral-activity-logout-final">
+(function(){
+  'use strict';
+  window.thiralLogoutFromActivity=async function(){
+    try{ if(typeof window.__THIRAL_RESET_PRACTICE_SESSION==='function') window.__THIRAL_RESET_PRACTICE_SESSION(); }catch(e){}
+    try{ if(typeof window.__THIRAL_RESET_MOCK_SESSION==='function') window.__THIRAL_RESET_MOCK_SESSION(); }catch(e){}
+    window.pendingPracticeStart=null;
+    window.pendingMockStart=null;
+    window._practiceReentry=false;
+    try{ var picker=document.getElementById('thiralMockLanguagePicker'); if(picker) picker.remove(); }catch(e){}
+    try{ if(typeof window.logout==='function') await window.logout(); else show('home'); }catch(e){ try{ show('home'); }catch(_){ } }
+  };
+})();
+</script>
