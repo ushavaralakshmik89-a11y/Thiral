@@ -1764,12 +1764,56 @@ app.use('/api/admin', async (req, res, next) => {
 
 
 /* ===== GROUP 4 MOCK ROTATION API =====
-   Selects exactly 200 mixed Tamil + General Knowledge + Aptitude questions
-   from the live database, excluding this student's previous Mock questions.
-   Questions are reserved atomically with the attempt so simultaneous Mock
-   starts for the same student cannot receive the same set.
+   TNPSC-style Group 4 paper: 100 Tamil + 75 General Studies + 25 Aptitude.
+   The live database remains the only question source. Fresh questions for the
+   student are preferred; obvious basic one-step arithmetic and explicitly easy
+   questions are not used for Mock when enough stronger questions exist.
    Existing question rows are never deleted or rewritten.
 */
+function mockDifficultyScore(value){
+  const d=String(value||'').trim().toLowerCase();
+  if(!d) return 2;
+  if(/மிகக்\s*கடின|very\s*hard/.test(d)) return 5;
+  if(/கடின|hard|difficult/.test(d)) return 4;
+  if(/மிதமான|சாதாரண|moderate|normal/.test(d)) return 3;
+  if(/எளிது|அடிப்படை|easy|basic/.test(d)) return 0;
+  return 2;
+}
+
+function mockTextQualityScore(question){
+  const q=String(question||'').replace(/\s+/g,' ').trim();
+  if(!q) return -10;
+
+  const oneStepArithmetic=/^\s*(?:what\s+is|find\s+the\s+value\s+of|calculate)\s+\d+(?:\.\d+)?\s*[+\-×x*/]\s*\d+(?:\.\d+)?\s*\??\s*$/i.test(q)
+    || /^\s*\d+(?:\.\d+)?\s*[+\-×x*/]\s*\d+(?:\.\d+)?\s*[?؟]?\s*$/.test(q);
+  if(oneStepArithmetic) return -100;
+
+  let score=0;
+  if(/கூற்று|சரியானது|தவறானது|காரணம்|பொருத்துக|வரிசை|விளக்குக|எது\s*சரி|எது\s*தவறு|assert|statement|reason|match|sequence|correct|incorrect|which of the following/i.test(q)) score+=2;
+  if(/ஏன்|எவ்வாறு|why|how|application|சூழ்நிலை|நிகழ்வு|பயன்பாடு/i.test(q)) score+=2;
+  if(/%|சதவீத|விகித|ratio|average|சராசரி|வேலை|work|வேகம்|speed|தூரம்|distance|வட்டி|interest|பின்னம்|fraction/i.test(q)) score+=1;
+  if(q.length>=90) score+=1;
+  return score;
+}
+
+function mockQualityScore(row){
+  const d=mockDifficultyScore(row.difficulty);
+  const t=mockTextQualityScore(row.question);
+  if(t<=-100) return -100;
+  return d*3+t;
+}
+
+function chooseMockQualityRows(rows, target){
+  const ranked=rows
+    .map((q,i)=>({q,score:mockQualityScore(q),i}))
+    .filter(x=>x.score>-100)
+    .sort((a,b)=>b.score-a.score || Math.random()-0.5);
+  const strong=ranked.filter(x=>mockDifficultyScore(x.q.difficulty)>=2);
+  const pool=strong.length>=target ? strong : ranked.filter(x=>mockDifficultyScore(x.q.difficulty)>0);
+  const source=pool.length>=target ? pool : ranked;
+  return source.slice(0,target).map(x=>x.q);
+}
+
 api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
   const exam=String(req.query.exam||'').trim();
   const requestedLanguage=String(req.query.language||'ta').trim();
@@ -1780,21 +1824,19 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
   const client=await pool.connect();
   try{
     await client.query('BEGIN');
-
-    /* One student gets one Mock-selection lock at a time. */
     await client.query(
       `SELECT pg_advisory_xact_lock(hashtext($1))`,
       [`thiral-group4-mock:${req.user.id}`]
     );
 
     const specs=[
-      {name:'tamil',candidates:['tamil','தமிழ்'],language:'ta'},
-      {name:'gs',candidates:['பொது அறிவு','General Knowledge','general knowledge','பொது அறிவு / General Studies','General Studies','general studies'],language:requestedLanguage},
-      {name:'apt',candidates:['apt','திறனறிவு / Aptitude','Aptitude','aptitude'],language:requestedLanguage}
+      {name:'tamil',candidates:['tamil','தமிழ்'],language:'ta',target:100},
+      {name:'gs',candidates:['பொது அறிவு','General Knowledge','general knowledge','பொது அறிவு / General Studies','General Studies','general studies'],language:requestedLanguage,target:75},
+      {name:'apt',candidates:['apt','திறனறிவு / Aptitude','Aptitude','aptitude'],language:requestedLanguage,target:25}
     ];
 
-    const perSubject={};
-    const all=[];
+    const selected=[];
+    const selectedIds=new Set();
 
     for(const spec of specs){
       const r=await client.query(
@@ -1812,74 +1854,40 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
                  AND h.mode='mock'
             )
           ORDER BY id
-          LIMIT 200`,
+          LIMIT 1000`,
         [exam,spec.candidates,spec.language,req.user.id]
       );
-      perSubject[spec.name]=r.rows;
-      all.push(...r.rows.map(q=>({...q,_mockSubject:spec.name})));
-    }
 
-    /* Remove duplicate question content even if duplicate DB rows have
-       different IDs. */
-    const seen=new Set();
-    const unique=[];
-    for(const q of all){
-      const options=Array.isArray(q.options)?q.options:q.options==null?[]:q.options;
-      const key=String(q.question||'').replace(/\s+/g,' ').trim().toLowerCase()+'|'+
-        options.map(x=>String(x).replace(/\s+/g,' ').trim().toLowerCase()).join('|');
-      if(seen.has(key)) continue;
-      seen.add(key);
-      unique.push(q);
-    }
+      const seen=new Set();
+      const unique=r.rows.filter(q=>{
+        const options=Array.isArray(q.options)?q.options:q.options==null?[]:q.options;
+        const key=String(q.question||'').replace(/\s+/g,' ').trim().toLowerCase()+'|'+
+          options.map(x=>String(x).replace(/\s+/g,' ').trim().toLowerCase()).join('|');
+        if(seen.has(key)) return false;
+        seen.add(key); return true;
+      });
 
-    if(!unique.length){
-      await client.query('ROLLBACK');
-      return sendError(res,409,'இந்த மாணவருக்கான Group 4 Mock-ல் பயன்படுத்தாத கேள்விகள் தற்போது இல்லை.');
-    }
+      const chosen=chooseMockQualityRows(unique,spec.target);
+      if(chosen.length<spec.target){
+        await client.query('ROLLBACK');
+        return sendError(res,409,
+          `${spec.name} பகுதியில் தரமான Mock கேள்விகள் போதவில்லை. தேவையானது ${spec.target}; கிடைத்தது ${chosen.length}.`);
+      }
 
-    const target=200;
-    const selected=[];
-    const selectedIds=new Set();
-    const totalUnique=unique.length;
-
-    /* Keep all three Group 4 sections represented where data exists. */
-    for(const spec of specs){
-      const rows=unique.filter(q=>q._mockSubject===spec.name);
-      if(!rows.length) continue;
-      const quota=Math.max(1,Math.min(rows.length,Math.floor(target*rows.length/totalUnique)));
-      rows.slice(0,quota).forEach(q=>{
-        if(selected.length<target && !selectedIds.has(String(q.id))){
-          selected.push(q); selectedIds.add(String(q.id));
+      chosen.forEach(q=>{
+        if(!selectedIds.has(String(q.id))){
+          selected.push({...q,_mockSubject:spec.name});
+          selectedIds.add(String(q.id));
         }
       });
     }
 
-    /* Fill all remaining slots with still-unused fresh questions. */
-    for(const q of unique){
-      if(selected.length>=target) break;
-      if(!selectedIds.has(String(q.id))){
-        selected.push(q);
-        selectedIds.add(String(q.id));
-      }
-    }
-
-    /* Only after every fresh question has been used do we recycle. */
-    if(selected.length<target){
-      let i=0;
-      while(selected.length<target){
-        selected.push(unique[i%unique.length]);
-        i++;
-      }
-    }
-
-    /* Fisher-Yates shuffle gives each candidate a different order. */
     for(let i=selected.length-1;i>0;i--){
       const j=Math.floor(Math.random()*(i+1));
       [selected[i],selected[j]]=[selected[j],selected[i]];
     }
 
-    const clean=selected.slice(0,target).map(q=>Number(q.id));
-
+    const clean=selected.map(q=>Number(q.id));
     const ins=await client.query(
       `INSERT INTO attempts(user_id,exam,subject,mode,language,question_ids)
        VALUES($1,$2,'mixed','mock','mixed',$3)
@@ -1902,7 +1910,8 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
       attemptId:ins.rows[0].id,
       questions:clean.map(id=>byId.get(String(id))).filter(Boolean),
       count:clean.length,
-      recycled:Math.max(0,clean.length-new Set(clean).size)
+      recycled:0,
+      blueprint:{tamil:100,generalStudies:75,aptitude:25}
     });
   }catch(e){
     try{await client.query('ROLLBACK');}catch(_){ }
