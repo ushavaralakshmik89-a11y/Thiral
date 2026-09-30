@@ -958,14 +958,14 @@ api.get('/questions', requirePasswordReady, async (req, res) => {
       where.push(`subtopic = ANY($${n}::text[])`); params.push(subCandidates); n++;
     }
 
-    /* Per-student rotation. Question rows are never deleted.
-       Question Bank and Practice each keep their own history. */
-    if (historyMode === 'bank' || historyMode === 'practice') {
+    /* Question Bank continuation: exclude only questions already used
+       in this user's Question Bank mode. Normal Practice/Mock are unchanged. */
+    if (historyMode === 'bank') {
       where.push(`NOT EXISTS (
         SELECT 1 FROM question_history h
         WHERE h.user_id = ${n}
           AND h.question_id = questions.id
-          AND h.mode = '${historyMode}'
+          AND h.mode = 'bank'
       )`);
       params.push(req.user.id);
       n++;
@@ -992,10 +992,8 @@ api.get('/questions', requirePasswordReady, async (req, res) => {
 });
 
 /* ===== FAST PRACTICE API =====
-   Practice reads the same paginated full-bank path as Question Bank, but
-   excludes this student's Practice history. No question rows are deleted.
-   The frontend can therefore scan the complete subtopic bank instead of
-   being trapped by the first 200 records.
+   Existing /questions API is intentionally left unchanged.
+   Practice gets only the requested number of fresh questions.
 */
 api.get('/practice/questions', requirePasswordReady, async (req, res) => {
   try {
@@ -1005,50 +1003,78 @@ api.get('/practice/questions', requirePasswordReady, async (req, res) => {
     const subjectCandidatesList = subjectCandidates(rawSubject);
     const language = String(req.query.language || 'ta').trim();
     const subtopic = String(req.query.subtopic || '').trim();
-    const limit = Math.min(Math.max(parseInt(req.query.limit || '20',10) || 20,1),200);
-    const offset = Math.max(parseInt(req.query.offset || '0',10) || 0,0);
+    const limit = Math.min(
+      Math.max(parseInt(req.query.limit || '10', 10) || 10, 1),
+      200
+    );
 
-    if (!exam || !subject || !['ta','en'].includes(language)) {
-      return sendError(res,400,'Invalid question request.');
+    if (!exam || !subject || !['ta', 'en'].includes(language)) {
+      return sendError(res, 400, 'Invalid question request.');
     }
 
-    const where = ['q.exam=$1','q.subject = ANY($2::text[])','q.language=$3','q.is_active=true'];
-    const params = [exam, subjectCandidatesList, language];
-    let n = 4;
+    const params = [req.user.id, exam, subjectCandidatesList, language];
+    let n = 5;
+
+    let where = `
+      q.exam = $2
+      AND q.subject = ANY($3::text[])
+      AND q.language = $4
+      AND q.is_active = true
+    `;
+
     const subCandidates = subtopicCandidates(subtopic);
     if (subCandidates.length === 1) {
-      where.push(`q.subtopic=$${n++}`); params.push(subCandidates[0]);
+      where += ` AND q.subtopic = $${n}`;
+      params.push(subCandidates[0]);
+      n++;
     } else if (subCandidates.length > 1) {
-      where.push(`q.subtopic = ANY($${n}::text[])`); params.push(subCandidates); n++;
+      where += ` AND q.subtopic = ANY($${n}::text[])`;
+      params.push(subCandidates);
+      n++;
     }
 
-    where.push(`NOT EXISTS (
-      SELECT 1 FROM question_history h
-      WHERE h.user_id=$${n}
-        AND h.question_id=q.id
-        AND h.mode='practice'
-    )`);
-    params.push(req.user.id);
-    n++;
+    params.push(limit);
 
-    const countQ = await pool.query(`SELECT count(*)::int AS total FROM questions q WHERE ${where.join(' AND ')}`,params);
-    const total = Number(countQ.rows[0]?.total || 0);
-    const dataParams = [...params,limit,offset];
-    const result = await pool.query(
-      `SELECT q.id,q.exam,q.subject,q.subtopic,q.language,q.question,q.options,q.explanation,
-              COALESCE(to_jsonb(q)->>'difficulty',to_jsonb(q)->>'level','') AS difficulty
-         FROM questions q
-        WHERE ${where.join(' AND ')}
-        ORDER BY q.id
-        LIMIT $${n} OFFSET $${n+1}`,
-      dataParams
-    );
-    const nextOffset=offset+result.rows.length;
-    res.json({questions:result.rows,count:result.rows.length,
-      pagination:{limit,offset,returned:result.rows.length,total,hasMore:nextOffset<total,nextOffset}});
-  } catch(e) {
-    console.error('Practice question error:',e);
-    sendError(res,500,'Practice question service error.');
+    const sql = `
+      SELECT
+        q.id,
+        q.exam,
+        q.subject,
+        q.subtopic,
+        q.language,
+        q.question,
+        q.options,
+        q.explanation
+      FROM questions q
+      WHERE ${where}
+        AND NOT EXISTS (
+          SELECT 1
+          FROM question_history h
+          WHERE h.user_id = $1
+            AND h.question_id = q.id
+            AND h.mode = 'practice'
+        )
+      ORDER BY random()
+      LIMIT $${n}
+    `;
+
+    const result = await pool.query(sql, params);
+
+    if (result.rows.length < limit) {
+      return sendError(
+        res,
+        409,
+        `???? ????????? ???????? ????? ????????? ${result.rows.length} ??????? ?????.`
+      );
+    }
+
+    res.json({
+      questions: result.rows,
+      count: result.rows.length
+    });
+  } catch (e) {
+    console.error('Practice question error:', e);
+    sendError(res, 500, 'Practice question service error.');
   }
 });
 
