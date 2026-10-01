@@ -837,13 +837,9 @@ a{
 <section id="importantNews" class="card hidden" style="text-align:center;">
   <div style="font-size:58px;line-height:1;margin-bottom:10px;">📢</div>
   <h2 style="margin-bottom:8px;">முக்கிய அறிவிப்பு / Important News</h2>
-
-  <div id="importantNewsDynamic" style="margin:22px auto;max-width:760px;">
-    <div style="padding:24px 22px;border-radius:18px;background:linear-gradient(135deg,#eef6ff,#f5fbff);border:1px solid rgba(18,63,112,.12);">
-      <p class="small" style="margin:0;">முக்கிய அறிவிப்புகள் ஏற்றப்படுகிறது...</p>
-    </div>
+  <div id="thiralImportantNewsList" style="margin:22px auto;max-width:760px;text-align:left;">
+    <div class="card" style="box-shadow:none;text-align:center;">📢 அறிவிப்புகள் ஏற்றப்படுகிறது...</div>
   </div>
-
   <button class="secondary" onclick="show('home')" style="font-weight:800;">← Back to Home</button>
 </section>
 
@@ -924,107 +920,6 @@ a{
 <div class="card admin-stat-card" role="button" tabindex="0" title="மூன்றாம் பாலின மாணவர்களைப் பார்க்க" onclick="openAdminStudentView('third')" onkeydown="if(event.key==='Enter'||event.key===' ')openAdminStudentView('third')"><h3>⚧️ மூன்றாம் பாலினம்</h3><p id="statThird">0</p><span class="small">மாணவர்கள்</span></div>
 <div class="card admin-stat-card" role="button" tabindex="0" title="கடைசி Login செய்த மாணவரைப் பார்க்க" onclick="openAdminStudentView('lastLogin')" onkeydown="if(event.key==='Enter'||event.key===' ')openAdminStudentView('lastLogin')"><h3>🔑 Last Login</h3><p id="statLogin">-</p><span class="small">கிளிக் செய்து விவரம்</span></div>
 <div class="card admin-stat-card" role="button" tabindex="0" title="Suggestions பகுதிக்குச் செல்ல" onclick="document.getElementById('adminSuggestionList')?.scrollIntoView({behavior:'smooth',block:'start'})"><h3>💡 Suggestions</h3><p id="statSuggestions">0</p><span class="small">Suggestions பட்டியல்</span></div>
-</div>
-
-<div class="grid" style="margin-top:16px">
-  <div class="card" style="border:1px solid #dbeafe">
-    <h3>📢 Important News</h3>
-    <p class="small">மாணவர்களுக்கு காட்ட வேண்டிய முக்கிய அறிவிப்பை Copy / Paste செய்து நிர்வகிக்கலாம்.</p>
-    <button type="button" class="secondary" onclick="toggleAdminTool('adminImportantNewsTool')">Open / திறக்க</button>
-  </div>
-
-  <div class="card" style="border:1px solid #dbeafe">
-    <h3>📝 Model Exam Questions</h3>
-    <p class="small">தனி Model Exam-க்கான புதிய கேள்விகளை Upload / Paste செய்து தயாரிக்கலாம்.</p>
-    <button type="button" class="secondary" onclick="toggleAdminTool('adminModelExamTool')">Open / திறக்க</button>
-  </div>
-</div>
-
-<div id="adminImportantNewsTool" class="card hidden" style="margin-top:16px;border:1px solid #dbeafe">
-  <div class="top">
-    <h3>📢 Important News Management</h3>
-    <button type="button" class="secondary" onclick="toggleAdminTool('adminImportantNewsTool')">Close</button>
-  </div>
-  <label>தலைப்பு / Title</label>
-  <input id="adminNewsTitle" type="text" maxlength="200" placeholder="உதா: TNPSC Group 4 – Model Exam அறிவிப்பு">
-  <label>அறிவிப்பு / News</label>
-  <textarea id="adminNewsBody" rows="8" maxlength="10000" placeholder="இங்கே உங்கள் Important News-ஐ Copy / Paste செய்யுங்கள்..."></textarea>
-  <label>நிலை / Status</label>
-  <select id="adminNewsStatus">
-    <option value="draft">Draft / வரைவு</option>
-    <option value="published">Published / வெளியிடு</option>
-  </select>
-  <p class="small">இப்போது இது form மட்டும். Backend/Supabase save அடுத்த கட்டத்தில் இணைக்கப்படும். தற்போதைய Important News data எதுவும் மாற்றப்படாது.</p>
-  <div style="display:flex;gap:10px;flex-wrap:wrap">
-    <button type="button" onclick="previewAdminNews()">👁️ Preview</button>
-    <button type="button" onclick="saveAdminNews()">💾 Save News</button>
-    <button type="button" class="secondary" onclick="clearAdminNewsForm()">Clear</button>
-  </div>
-  <p id="adminNewsSaveMsg" class="small" style="margin-top:10px"></p>
-  <div id="adminNewsPreview" class="card hidden" style="margin-top:14px;background:#f8fbff"></div>
-</div>
-
-<div id="adminModelExamTool" class="card hidden" style="margin-top:16px;border:1px solid #dbeafe">
-  <div class="top">
-    <h3>📝 Model Exam Questions</h3>
-    <button type="button" class="secondary" onclick="toggleAdminTool('adminModelExamTool')">Close</button>
-  </div>
-
-  <label>Model Exam ID</label>
-  <input id="adminModelExamId" type="text" maxlength="100" placeholder="உதா: ME-2026-001">
-
-  <label>Exam Title</label>
-  <input id="adminModelExamTitle" type="text" maxlength="250" placeholder="உதா: TNPSC Group 4 – Model Exam 01">
-
-  <div class="grid">
-    <div>
-      <label>Exam Date</label>
-      <input id="adminModelExamDate" type="date">
-    </div>
-    <div>
-      <label>Start Time</label>
-      <input id="adminModelExamTime" type="time">
-    </div>
-  </div>
-
-  <div class="grid">
-    <div>
-      <label>Availability</label>
-      <input id="adminModelExamAvailability" type="text" value="24 Hours" readonly>
-    </div>
-    <div>
-      <label>Duration</label>
-      <input id="adminModelExamDuration" type="number" value="180" min="1" placeholder="Minutes">
-    </div>
-  </div>
-
-  <label>Question Paper – Copy / Paste</label>
-  <textarea id="adminModelExamQuestions" rows="14" placeholder='இங்கே புதிய Model Exam questions-ஐ paste செய்யலாம்.
-
-உதாரண வடிவம்:
-Q001
-Question: ...
-A. ...
-B. ...
-C. ...
-D. ...
-Correct Answer: A
-Explanation: ...
-
-Q002
-Question: ...'></textarea>
-
-  <label>அல்லது Question File Upload</label>
-  <input id="adminModelExamFile" type="file" accept=".json,.txt,.csv" onchange="previewModelExamFile(this)">
-  <p id="adminModelExamFileMsg" class="small"></p>
-
-  <p class="small">இந்த questions master question bank-ல் சேராது. தனி Model Exam paper-ஆகவே சேமிக்கப்படும். இப்போது form/preview மட்டும்; backend/Supabase save அடுத்த கட்டத்தில் இணைக்கப்படும்.</p>
-
-  <div style="display:flex;gap:10px;flex-wrap:wrap">
-    <button type="button" onclick="previewModelExam()">👁️ Preview</button>
-    <button type="button" class="secondary" onclick="clearModelExamForm()">Clear</button>
-  </div>
-  <div id="adminModelExamPreview" class="card hidden" style="margin-top:14px;background:#f8fbff"></div>
 </div>
 <div class="card" style="margin-top:16px;border:1px solid #dbeafe">
 <h3>📡 Beta Usage Monitor</h3>
@@ -1275,9 +1170,6 @@ function show(id){
     }
   }
   window.scrollTo({top:0,behavior:'instant'});
-  if(id==='importantNews' && typeof window.loadImportantNews==='function'){
-    window.loadImportantNews();
-  }
 }
 function showMockResultScreen(){const el=document.getElementById('mockResult');document.querySelectorAll('section').forEach(sec=>{sec.classList.add('hidden');sec.style.display='none'});el.classList.remove('hidden');el.style.display='block';document.getElementById('screenReview').classList.add('screen-review');window.scrollTo({top:0,behavior:'instant'});}
 let contentLanguage=(localStorage.getItem('tnpsc_content_language')||'ta').toLowerCase()==='en'?'en':'ta';
@@ -5797,133 +5689,44 @@ window.startPractice=async function(n){
 </script>
 
 
-<script id="thiral-admin-model-tools">
-function toggleAdminTool(id){
-  const el=document.getElementById(id);
-  if(!el)return;
-  el.classList.toggle('hidden');
-  if(!el.classList.contains('hidden')){
-    setTimeout(()=>el.scrollIntoView({behavior:'smooth',block:'start'}),30);
-  }
-}
-function clearAdminNewsForm(){
-  ['adminNewsTitle','adminNewsBody'].forEach(id=>{
-    const e=document.getElementById(id); if(e)e.value='';
-  });
-  const s=document.getElementById('adminNewsStatus'); if(s)s.value='draft';
-  const p=document.getElementById('adminNewsPreview'); if(p){p.classList.add('hidden');p.innerHTML='';}
-}
-function previewAdminNews(){
-  const title=(document.getElementById('adminNewsTitle')?.value||'').trim();
-  const body=(document.getElementById('adminNewsBody')?.value||'').trim();
-  const status=document.getElementById('adminNewsStatus')?.value||'draft';
-  const p=document.getElementById('adminNewsPreview');
-  if(!p)return;
-  if(!title && !body){
-    p.classList.remove('hidden');
-    p.innerHTML='<p class="small">முன்னோட்டத்திற்கு Title அல்லது News உள்ளிடுங்கள்.</p>';
-    return;
-  }
-  p.classList.remove('hidden');
-  p.innerHTML='<h3 style="margin-top:0">'+escapeHtmlAdmin(title||'Untitled')+'</h3>'+
-    '<p class="small">Status: '+(status==='published'?'Published / வெளியிடப்பட்டது':'Draft / வரைவு')+'</p>'+
-    '<div style="white-space:pre-wrap;line-height:1.7">'+escapeHtmlAdmin(body)+'</div>';
-}
-function clearModelExamForm(){
-  ['adminModelExamId','adminModelExamTitle','adminModelExamDate','adminModelExamTime','adminModelExamQuestions'].forEach(id=>{
-    const e=document.getElementById(id); if(e)e.value='';
-  });
-  const d=document.getElementById('adminModelExamDuration'); if(d)d.value='180';
-  const f=document.getElementById('adminModelExamFile'); if(f)f.value='';
-  const m=document.getElementById('adminModelExamFileMsg'); if(m)m.textContent='';
-  const p=document.getElementById('adminModelExamPreview'); if(p){p.classList.add('hidden');p.innerHTML='';}
-}
-function previewModelExamFile(input){
-  const msg=document.getElementById('adminModelExamFileMsg');
-  if(!msg)return;
-  const file=input?.files?.[0];
-  if(!file){msg.textContent='';return;}
-  msg.textContent='தேர்ந்தெடுக்கப்பட்ட கோப்பு: '+file.name+' ('+Math.round(file.size/1024)+' KB). இப்போது upload செய்யப்படவில்லை; backend இணைப்பு அடுத்த கட்டத்தில்.';
-}
-function previewModelExam(){
-  const id=(document.getElementById('adminModelExamId')?.value||'').trim();
-  const title=(document.getElementById('adminModelExamTitle')?.value||'').trim();
-  const date=document.getElementById('adminModelExamDate')?.value||'';
-  const time=document.getElementById('adminModelExamTime')?.value||'';
-  const duration=document.getElementById('adminModelExamDuration')?.value||'180';
-  const q=(document.getElementById('adminModelExamQuestions')?.value||'').trim();
-  const p=document.getElementById('adminModelExamPreview');
-  if(!p)return;
-  p.classList.remove('hidden');
-  p.innerHTML='<h3 style="margin-top:0">Model Exam Preview</h3>'+
-    '<p><strong>ID:</strong> '+escapeHtmlAdmin(id||'—')+'</p>'+
-    '<p><strong>Title:</strong> '+escapeHtmlAdmin(title||'—')+'</p>'+
-    '<p><strong>Date:</strong> '+escapeHtmlAdmin(date||'—')+' &nbsp; <strong>Start:</strong> '+escapeHtmlAdmin(time||'—')+'</p>'+
-    '<p><strong>Availability:</strong> 24 Hours &nbsp; <strong>Duration:</strong> '+escapeHtmlAdmin(duration)+' minutes</p>'+
-    '<hr><p><strong>Question data preview:</strong></p>'+
-    '<pre style="white-space:pre-wrap;max-height:360px;overflow:auto">'+escapeHtmlAdmin(q||'Question data இன்னும் உள்ளிடப்படவில்லை.')+'</pre>';
-}
-
-async function saveAdminNews(){
-  const title=(document.getElementById('adminNewsTitle')?.value||'').trim();
-  const content=(document.getElementById('adminNewsBody')?.value||'').trim();
-  const status=document.getElementById('adminNewsStatus')?.value||'draft';
-  const msg=document.getElementById('adminNewsSaveMsg');
-  if(!title || !content){
-    if(msg) msg.textContent='Title மற்றும் News இரண்டும் தேவை.';
-    return;
-  }
-  if(msg) msg.textContent='Saving...';
-  try{
-    if(typeof window.thiralV138Api!=='function'){
-      throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
-    }
-    const result=await window.thiralV138Api('/admin/important-news',{
-      method:'POST',
-      body:JSON.stringify({title,content,status})
-    });
-    if(msg) msg.textContent='✅ Important News சேமிக்கப்பட்டது. ID: '+(result.news?.id ?? '');
-  }catch(e){
-    if(msg) msg.textContent='❌ Save failed: '+(e?.message||e);
-  }
-}
-
-function escapeHtmlAdmin(v){
-  return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-}
-</script>
-
 <script id="thiral-important-news-display">
 (function(){
   'use strict';
-  function esc(v){
-    return String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;').replace(/'/g,'&#39;');
-  }
-  window.loadImportantNews = async function(){
-    const box=document.getElementById('importantNewsDynamic');
+  async function loadImportantNews(){
+    var box=document.getElementById('thiralImportantNewsList');
     if(!box) return;
-    box.innerHTML='<div style="padding:24px 22px;border-radius:18px;background:linear-gradient(135deg,#eef6ff,#f5fbff);border:1px solid rgba(18,63,112,.12);"><p class="small">முக்கிய அறிவிப்புகள் ஏற்றப்படுகிறது...</p></div>';
+    box.innerHTML='<div class="card" style="box-shadow:none;text-align:center;">📢 அறிவிப்புகள் ஏற்றப்படுகிறது...</div>';
     try{
       if(typeof window.thiralV138Api!=='function') throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
-      const d=await window.thiralV138Api('/important-news');
-      const items=Array.isArray(d.news)?d.news:[];
+      var data=await window.thiralV138Api('/important-news');
+      var items=Array.isArray(data.news)?data.news:[];
       if(!items.length){
-        box.innerHTML='<div style="padding:24px 22px;border-radius:18px;background:#f8fbff;border:1px solid rgba(18,63,112,.12);"><p class="small" style="margin:0;">தற்போது முக்கிய அறிவிப்பு எதுவும் இல்லை.</p></div>';
+        box.innerHTML='<div class="card" style="box-shadow:none;text-align:center;"><div style="font-size:36px;">📢</div><b>தற்போது முக்கிய அறிவிப்பு எதுவும் இல்லை.</b></div>';
         return;
       }
       box.innerHTML=items.map(function(n){
-        const dt=n.published_at || n.created_at;
-        const date=dt ? new Date(dt).toLocaleString('ta-IN',{dateStyle:'medium',timeStyle:'short'}) : '';
-        return '<article style="margin-bottom:16px;text-align:left;padding:22px;border-radius:18px;background:linear-gradient(135deg,#eef6ff,#f5fbff);border:1px solid rgba(18,63,112,.12);">'+
-          '<h3 style="margin:0 0 12px;color:#123f70;">'+esc(n.title)+'</h3>'+
-          (date?'<p class="small" style="margin:0 0 12px;color:#667085;">📅 '+esc(date)+'</p>':'')+
-          '<div style="font-size:18px;line-height:1.8;white-space:pre-wrap;">'+esc(n.content)+'</div>'+
-        '</article>';
+        var date='';
+        try{ date=new Date(n.published_at||n.created_at).toLocaleString('ta-IN'); }catch(e){}
+        return '<article class="card" style="box-shadow:none;margin:0 0 16px;text-align:left;background:linear-gradient(135deg,#eef6ff,#f5fbff);border:1px solid rgba(18,63,112,.12);">'
+          +'<h3 style="margin:0 0 12px;color:#123f70;">'+escNews(n.title||'முக்கிய அறிவிப்பு')+'</h3>'
+          +'<div style="font-size:17px;line-height:1.8;white-space:pre-wrap;">'+escNews(n.content||'')+'</div>'
+          +(date?'<p class="small" style="margin:14px 0 0;">📅 '+escNews(date)+'</p>':'')
+          +'</article>';
       }).join('');
     }catch(e){
-      box.innerHTML='<div style="padding:24px 22px;border-radius:18px;background:#fff7ed;border:1px solid #fed7aa;"><p style="margin:0;color:#9a3412;font-weight:700;">முக்கிய அறிவிப்புகளை இப்போது பெற முடியவில்லை.</p><p class="small" style="margin:8px 0 0;">Student Login செய்த பிறகு மீண்டும் Important News-ஐ திறக்கவும்.</p></div>';
+      box.innerHTML='<div class="card" style="box-shadow:none;text-align:center;border:1px solid #f0caca;">❌ முக்கிய அறிவிப்புகளை ஏற்ற முடியவில்லை.<br><span class="small">'+escNews(e&&e.message?e.message:'Unknown error')+'</span><br><button type="button" class="secondary" onclick="window.thiralLoadImportantNews&&window.thiralLoadImportantNews()" style="margin-top:12px;">மீண்டும் முயற்சி</button></div>';
     }
-  };
+  }
+  function escNews(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;').replace(/'/g,'&#39;');}
+  window.thiralLoadImportantNews=loadImportantNews;
+  var oldShow=window.show;
+  if(typeof oldShow==='function'){
+    window.show=function(id){
+      var r=oldShow.apply(this,arguments);
+      if(id==='importantNews') setTimeout(loadImportantNews,50);
+      return r;
+    };
+  }
 })();
 </script>
 </body></html>
