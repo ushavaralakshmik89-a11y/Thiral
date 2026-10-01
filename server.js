@@ -138,8 +138,16 @@ const SUBJECT_ALIASES = {
   'தமிழ்':'tamil','Tamil':'tamil',
   'பொது அறிவு':'gs','General Knowledge':'gs','general knowledge':'gs',
   'பொது அறிவு / General Studies':'gs','General Studies':'gs','general studies':'gs',
-  'திறனறிவு / Aptitude':'apt','Aptitude':'apt','aptitude':'apt'
+  'திறனறிவு / Aptitude':'apt','Aptitude':'apt','aptitude':'apt',
+  'Tamil Nadu Government':'gs','தமிழ்நாடு அரசு':'gs'
 };
+const EXAM_ALIASES = {'group4':'group4','Group 4':'group4','GROUP 4':'group4'};
+function examCandidates(raw){
+  const s=String(raw||'').trim(); if(!s) return [];
+  const canonical=EXAM_ALIASES[s] || s;
+  const aliases=Object.entries(EXAM_ALIASES).filter(([label,key])=>key===canonical).map(([label])=>label);
+  return [...new Set([canonical,s,...aliases].filter(Boolean))];
+}
 const GROUP4_SUBTOPIC_ALIASES = {
   'பண்டைய இந்தியா':'Ancient India','Ancient India':'பண்டைய இந்தியா',
   'இடைக்கால இந்தியா':'Medieval India','Medieval India':'இடைக்கால இந்தியா',
@@ -1051,6 +1059,7 @@ api.post('/auth/logout', async (req, res) => {
 api.get('/questions', requirePasswordReady, async (req, res) => {
   try {
     const exam = String(req.query.exam || '').trim();
+    const examCandidatesList = examCandidates(exam);
     const rawSubject = String(req.query.subject || '').trim();
     const subject = canonicalSubject(rawSubject);
     const subjectCandidatesList = subjectCandidates(rawSubject);
@@ -1061,8 +1070,8 @@ api.get('/questions', requirePasswordReady, async (req, res) => {
     const offset = Math.max(parseInt(req.query.offset || '0',10) || 0,0);
     if (!exam || !subject || !['ta','en'].includes(language)) return sendError(res,400,'Invalid question request.');
 
-    const where = ['exam=$1','subject = ANY($2::text[])','language=$3','is_active=true'];
-    const params = [exam, subjectCandidatesList, language];
+    const where = ['exam = ANY($1::text[])','subject = ANY($2::text[])','language=$3','is_active=true'];
+    const params = [examCandidatesList, subjectCandidatesList, language];
     let n = 4;
     const subCandidates = subtopicCandidates(subtopic);
     if (subCandidates.length === 1) {
@@ -1111,6 +1120,7 @@ api.get('/questions', requirePasswordReady, async (req, res) => {
 api.get('/practice/questions', requirePasswordReady, async (req, res) => {
   try {
     const exam = String(req.query.exam || '').trim();
+    const examCandidatesList = examCandidates(exam);
     const rawSubject = String(req.query.subject || '').trim();
     const subject = canonicalSubject(rawSubject);
     const subjectCandidatesList = subjectCandidates(rawSubject);
@@ -1125,11 +1135,11 @@ api.get('/practice/questions', requirePasswordReady, async (req, res) => {
       return sendError(res, 400, 'Invalid question request.');
     }
 
-    const params = [req.user.id, exam, subjectCandidatesList, language];
+    const params = [req.user.id, examCandidatesList, subjectCandidatesList, language];
     let n = 5;
 
     let where = `
-      q.exam = $2
+      q.exam = ANY($2::text[])
       AND q.subject = ANY($3::text[])
       AND q.language = $4
       AND q.is_active = true
@@ -1197,9 +1207,10 @@ api.post('/attempts', requirePasswordReady, async (req,res)=>{
     if(!exam || !subject || !['practice','mock','bank'].includes(mode) || !['ta','en','mixed'].includes(language) || !Array.isArray(questionIds) || !questionIds.length) return sendError(res,400,'Invalid attempt.');
     const ids=[...new Set(questionIds.map(Number).filter(Number.isInteger))];
     if(!ids.length || ids.length>5000) return sendError(res,400,'Invalid question list.');
+    const examCandidatesList = examCandidates(exam);
     const q = language==='mixed'
-      ? await pool.query(`SELECT id FROM questions WHERE id=ANY($1::bigint[]) AND exam=$2 AND is_active=true`,[ids,exam])
-      : await pool.query(`SELECT id FROM questions WHERE id=ANY($1::bigint[]) AND exam=$2 AND language=$3 AND is_active=true`,[ids,exam,language]);
+      ? await pool.query(`SELECT id FROM questions WHERE id=ANY($1::bigint[]) AND exam=ANY($2::text[]) AND is_active=true`,[ids,examCandidatesList])
+      : await pool.query(`SELECT id FROM questions WHERE id=ANY($1::bigint[]) AND exam=ANY($2::text[]) AND language=$3 AND is_active=true`,[ids,examCandidatesList,language]);
     const valid=new Set(q.rows.map(x=>String(x.id)));
     const clean=ids.filter(id=>valid.has(String(id)));
     if(clean.length!==ids.length) return sendError(res,400,'Some questions are not valid for this exam/language.');
@@ -1889,7 +1900,7 @@ api.get('/group4/question-status', requirePasswordReady, async (req,res)=>{
       SELECT subject,language,count(*)::int AS total,
              count(*) FILTER (WHERE is_active=true)::int AS active
       FROM questions
-      WHERE exam='group4'
+      WHERE exam IN ('group4','Group 4','GROUP 4')
       GROUP BY subject,language
       ORDER BY subject,language`);
     res.json({exam:'group4',rows:rows.rows});
