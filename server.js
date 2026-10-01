@@ -2250,90 +2250,342 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
 });
 
 
-/* ===== IMPORTANT NEWS ===== */
-async function ensureImportantNewsTable(){
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS important_news (
-      id BIGSERIAL PRIMARY KEY,
-      title TEXT NOT NULL,
-      content TEXT NOT NULL,
-      status VARCHAR(20) NOT NULL DEFAULT 'draft'
-        CHECK (status IN ('draft','published')),
-      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-      published_at TIMESTAMPTZ NULL
-    )
-  `);
-  await pool.query(`
-    CREATE INDEX IF NOT EXISTS important_news_status_idx
-    ON important_news(status, created_at DESC)
-  `);
+
+/* ========================= MODEL EXAM MODULE =========================
+   This module is intentionally isolated from the master questions table.
+   It creates its own exams, questions, attempts, answers, results and
+   question backups. Existing practice/mock/question-bank data is untouched.
+*/
+
+function parseModelExamQuestions(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((item, idx) => {
+    const options = Array.isArray(item.options)
+      ? item.options.map(v => String(v ?? '').trim())
+      : [];
+    const correct = String(item.correct_answer ?? item.correct_option ?? '').trim().toUpperCase();
+    return {
+      question_no: Number(item.question_no || item.no || idx + 1),
+      question: String(item.question || '').trim(),
+      options,
+      correct_answer: correct,
+      explanation: String(item.explanation || '').trim(),
+      subject: String(item.subject || '').trim(),
+      topic: String(item.topic || item.subtopic || '').trim(),
+      language: String(item.language || 'ta').trim()
+    };
+  });
 }
 
-api.post('/admin/important-news', requireAdmin, async (req,res)=>{
-  try{
-    const title=String(req.body?.title||'').trim();
-    const content=String(req.body?.content||'').trim();
-    const status=String(req.body?.status||'draft').trim().toLowerCase();
-    if(!title || !content) return sendError(res,400,'Title and content are required.');
-    if(!['draft','published'].includes(status)) return sendError(res,400,'Invalid news status.');
-    const {rows}=await pool.query(`
-      INSERT INTO important_news(title,content,status,published_at)
-      VALUES($1,$2,$3,CASE WHEN $3='published' THEN now() ELSE NULL END)
-      RETURNING id,title,content,status,created_at,updated_at,published_at`,
-      [title,content,status]
-    );
-    res.status(201).json({news:rows[0]});
-  }catch(e){
-    console.error('[IMPORTANT NEWS] save error:',e);
-    sendError(res,500,'Important News save error.');
+function validateModelExamQuestions(rows) {
+  if (!rows.length) return 'At least one Model Exam question is required.';
+  const seenNos = new Set();
+  const seenContent = new Set();
+  for (const q of rows) {
+    if (!Number.isInteger(q.question_no) || q.question_no < 1) return 'Invalid question number.';
+    if (seenNos.has(q.question_no)) return `Duplicate question number: ${q.question_no}`;
+    seenNos.add(q.question_no);
+    if (!q.question) return `Question text is required for Q${String(q.question_no).padStart(3,'0')}.`;
+    if (q.options.length !== 4 || q.options.some(x => !x)) return `Exactly 4 non-empty options are required for Q${String(q.question_no).padStart(3,'0')}.`;
+    if (!['A','B','C','D'].includes(q.correct_answer)) return `Correct Answer must be A/B/C/D for Q${String(q.question_no).padStart(3,'0')}.`;
+    if (!['ta','en'].includes(q.language)) return `Language must be ta or en for Q${String(q.question_no).padStart(3,'0')}.`;
+    const contentKey = crypto.createHash('sha256').update(
+      JSON.stringify([q.question, q.options.map(x => x.trim())])
+    ).digest('hex');
+    if (seenContent.has(contentKey)) return `Duplicate question content detected at Q${q.question_no}.`;
+    seenContent.add(contentKey);
   }
-});
+  return null;
+}
 
-api.delete('/admin/important-news/current', requireAdmin, async (req,res)=>{
-  try{
-    const {rows}=await pool.query(`
-      SELECT id,title
-      FROM important_news
-      WHERE status='published'
-      ORDER BY published_at DESC NULLS LAST, created_at DESC
-      LIMIT 1
+api.get('/admin/model-exams', requireAdmin, async (req,res)=>{
+  try {
+    const q = await pool.query(`
+      SELECT e.exam_id,e.title,e.exam_date,e.start_time,e.availability_hours,
+             e.duration_minutes,e.is_active,e.created_at,e.updated_at,
+             COUNT(q.id)::int AS question_count
+      FROM model_exams e
+      LEFT JOIN model_exam_questions q ON q.exam_id=e.exam_id
+      GROUP BY e.id
+      ORDER BY e.exam_date DESC,e.start_time DESC,e.created_at DESC
+      LIMIT 100
     `);
-    if(!rows.length) return sendError(res,404,'No published Important News found.');
-    const item=rows[0];
-    await pool.query(`DELETE FROM important_news WHERE id=$1`,[item.id]);
-    res.json({deleted:true,news:item});
-  }catch(e){
-    console.error('[IMPORTANT NEWS] delete current error:',e);
-    sendError(res,500,'Important News delete error.');
+    res.json({ok:true,exams:q.rows});
+  } catch(e) {
+    console.error('[MODEL EXAM] admin list error:',e);
+    sendError(res,500,'Model Exam list service error.');
   }
 });
 
-api.get('/admin/important-news', requireAdmin, async (req,res)=>{
-  try{
-    const {rows}=await pool.query(`
-      SELECT id,title,content,status,created_at,updated_at,published_at
-      FROM important_news ORDER BY created_at DESC LIMIT 100`);
-    res.json({news:rows});
-  }catch(e){
-    console.error('[IMPORTANT NEWS] admin list error:',e);
-    sendError(res,500,'Important News list error.');
+api.get('/admin/model-exams/:examId', requireAdmin, async (req,res)=>{
+  try {
+    const examId=String(req.params.examId||'').trim();
+    const exam=await pool.query(`SELECT * FROM model_exams WHERE exam_id=$1 LIMIT 1`,[examId]);
+    if(!exam.rowCount) return sendError(res,404,'Model Exam not found.');
+    const questions=await pool.query(`
+      SELECT question_no,question,options,correct_answer,explanation,subject,topic,language,created_at
+      FROM model_exam_questions WHERE exam_id=$1 ORDER BY question_no
+    `,[examId]);
+    res.json({ok:true,exam:exam.rows[0],questions:questions.rows});
+  } catch(e) {
+    console.error('[MODEL EXAM] admin detail error:',e);
+    sendError(res,500,'Model Exam detail service error.');
   }
 });
 
-/* Public read only: only published announcements are exposed. */
-api.get('/important-news', async (req,res)=>{
-  try{
-    const {rows}=await pool.query(`
-      SELECT id,title,content,published_at,created_at
-      FROM important_news
-      WHERE status='published'
-      ORDER BY published_at DESC NULLS LAST, created_at DESC
-      LIMIT 20`);
-    res.json({news:rows});
-  }catch(e){
-    console.error('[IMPORTANT NEWS] public list error:',e);
-    sendError(res,500,'Important News service error.');
+/* Create a completely new Model Exam. Existing exam IDs are never overwritten. */
+api.post('/admin/model-exams', requireAdmin, async (req,res)=>{
+  const client=await pool.connect();
+  try {
+    const examId=String(req.body?.exam_id||'').trim();
+    const title=String(req.body?.title||'').trim();
+    const examDate=String(req.body?.exam_date||'').trim();
+    const startTime=String(req.body?.start_time||'').trim();
+    const availabilityHours=Number(req.body?.availability_hours ?? 24);
+    const durationMinutes=Number(req.body?.duration_minutes ?? 180);
+    const rows=parseModelExamQuestions(req.body?.questions);
+
+    if(!examId || !title || !examDate || !startTime) return sendError(res,400,'Exam ID, title, date and start time are required.');
+    if(!Number.isInteger(availabilityHours) || availabilityHours < 1 || availabilityHours > 168) return sendError(res,400,'Invalid availability hours.');
+    if(durationMinutes !== 180) return sendError(res,400,'Model Exam duration must be 180 minutes.');
+    const validation=validateModelExamQuestions(rows);
+    if(validation) return sendError(res,400,validation);
+
+    /* A Model Exam is a single immutable question-set container. Never overwrite
+       an existing exam. A new revision gets a new exam_id. */
+    await client.query('BEGIN');
+    const existing=await client.query(`SELECT 1 FROM model_exams WHERE exam_id=$1 LIMIT 1`,[examId]);
+    if(existing.rowCount){
+      await client.query('ROLLBACK');
+      return sendError(res,409,'This Exam ID already exists. Existing Model Exam data is never overwritten. Use a new Exam ID.');
+    }
+
+    await client.query(`
+      INSERT INTO model_exams
+        (exam_id,title,exam_date,start_time,availability_hours,duration_minutes,is_active,created_by)
+      VALUES($1,$2,$3,$4,$5,$6,true,$7)
+    `,[examId,title,examDate,startTime,availabilityHours,durationMinutes,req.user.id]);
+
+    for(const q of rows){
+      await client.query(`
+        INSERT INTO model_exam_questions
+          (exam_id,question_no,question,options,correct_answer,explanation,subject,topic,language)
+        VALUES($1,$2,$3,$4::jsonb,$5,$6,$7,$8,$9)
+      `,[examId,q.question_no,q.question,JSON.stringify(q.options),q.correct_answer,q.explanation,q.subject,q.topic,q.language]);
+    }
+
+    await client.query('COMMIT');
+    res.status(201).json({ok:true,exam_id:examId,question_count:rows.length,message:'Model Exam saved successfully.'});
+  } catch(e) {
+    try{await client.query('ROLLBACK');}catch(_){ }
+    console.error('[MODEL EXAM] save error:',e);
+    sendError(res,500,'Model Exam save service error.');
+  } finally { client.release(); }
+});
+
+/* Student can see only currently available exams. Correct answers are never returned. */
+api.get('/model-exams/available', requirePasswordReady, async (req,res)=>{
+  try {
+    const q=await pool.query(`
+      SELECT e.exam_id,e.title,e.exam_date,e.start_time,e.availability_hours,e.duration_minutes,
+             COUNT(q.id)::int AS question_count
+      FROM model_exams e
+      JOIN model_exam_questions q ON q.exam_id=e.exam_id
+      WHERE e.is_active=true
+        AND now() >= (e.exam_date + e.start_time)
+        AND now() <  (e.exam_date + e.start_time) + make_interval(hours => e.availability_hours)
+      GROUP BY e.id
+      HAVING COUNT(q.id) >= 1
+      ORDER BY e.exam_date,e.start_time
+    `);
+    res.json({ok:true,exams:q.rows});
+  } catch(e) {
+    console.error('[MODEL EXAM] available error:',e);
+    sendError(res,500,'Available Model Exam service error.');
+  }
+});
+
+api.get('/model-exams/:examId/questions', requirePasswordReady, async (req,res)=>{
+  try {
+    const examId=String(req.params.examId||'').trim();
+    const e=await pool.query(`
+      SELECT exam_id,title,exam_date,start_time,availability_hours,duration_minutes
+      FROM model_exams
+      WHERE exam_id=$1 AND is_active=true
+        AND now() >= (exam_date + start_time)
+        AND now() <  (exam_date + start_time) + make_interval(hours => availability_hours)
+      LIMIT 1
+    `,[examId]);
+    if(!e.rowCount) return sendError(res,404,'Model Exam is not currently available.');
+    const q=await pool.query(`
+      SELECT question_no,question,options,subject,topic,language
+      FROM model_exam_questions WHERE exam_id=$1 ORDER BY question_no
+    `,[examId]);
+    res.json({ok:true,exam:e.rows[0],questions:q.rows});
+  } catch(e) {
+    console.error('[MODEL EXAM] question delivery error:',e);
+    sendError(res,500,'Model Exam question service error.');
+  }
+});
+
+api.post('/model-exams/:examId/start', requirePasswordReady, async (req,res)=>{
+  const client=await pool.connect();
+  try {
+    const examId=String(req.params.examId||'').trim();
+    await client.query('BEGIN');
+    const e=await client.query(`
+      SELECT * FROM model_exams
+      WHERE exam_id=$1 AND is_active=true
+        AND now() >= (exam_date + start_time)
+        AND now() < (exam_date + start_time) + make_interval(hours => availability_hours)
+      LIMIT 1 FOR SHARE
+    `,[examId]);
+    if(!e.rowCount){await client.query('ROLLBACK');return sendError(res,404,'Model Exam is not currently available.');}
+
+    const existing=await client.query(`
+      SELECT id,started_at,submitted_at FROM model_exam_attempts
+      WHERE exam_id=$1 AND user_id=$2 ORDER BY started_at DESC LIMIT 1
+    `,[examId,req.user.id]);
+    if(existing.rowCount && !existing.rows[0].submitted_at){
+      await client.query('COMMIT');
+      return res.json({ok:true,attempt_id:existing.rows[0].id,resumed:true,started_at:existing.rows[0].started_at,duration_minutes:e.rows[0].duration_minutes});
+    }
+
+    const ins=await client.query(`
+      INSERT INTO model_exam_attempts(exam_id,user_id,started_at,status)
+      VALUES($1,$2,now(),'in_progress') RETURNING id,started_at
+    `,[examId,req.user.id]);
+    await client.query('COMMIT');
+    res.status(201).json({ok:true,attempt_id:ins.rows[0].id,resumed:false,started_at:ins.rows[0].started_at,duration_minutes:e.rows[0].duration_minutes});
+  } catch(e){
+    try{await client.query('ROLLBACK');}catch(_){ }
+    console.error('[MODEL EXAM] start error:',e);
+    sendError(res,500,'Model Exam start service error.');
+  } finally {client.release();}
+});
+
+api.post('/model-exams/:examId/answer', requirePasswordReady, async (req,res)=>{
+  try {
+    const examId=String(req.params.examId||'').trim();
+    const attemptId=String(req.body?.attempt_id||'').trim();
+    const questionNo=Number(req.body?.question_no);
+    const answer=String(req.body?.answer||'').trim().toUpperCase();
+    if(!attemptId || !Number.isInteger(questionNo) || !['A','B','C','D'].includes(answer)) return sendError(res,400,'Invalid Model Exam answer.');
+    const a=await pool.query(`SELECT id FROM model_exam_attempts WHERE id=$1 AND exam_id=$2 AND user_id=$3 AND submitted_at IS NULL LIMIT 1`,[attemptId,examId,req.user.id]);
+    if(!a.rowCount) return sendError(res,404,'Active Model Exam attempt not found.');
+    const q=await pool.query(`SELECT id FROM model_exam_questions WHERE exam_id=$1 AND question_no=$2 LIMIT 1`,[examId,questionNo]);
+    if(!q.rowCount) return sendError(res,404,'Question not found.');
+    await pool.query(`
+      INSERT INTO model_exam_answers(attempt_id,question_id,answer,updated_at)
+      VALUES($1,$2,$3,now())
+      ON CONFLICT(attempt_id,question_id) DO UPDATE SET answer=EXCLUDED.answer,updated_at=now()
+    `,[attemptId,q.rows[0].id,answer]);
+    res.json({ok:true});
+  } catch(e){
+    console.error('[MODEL EXAM] answer error:',e);
+    sendError(res,500,'Model Exam answer service error.');
+  }
+});
+
+api.post('/model-exams/:examId/submit', requirePasswordReady, async (req,res)=>{
+  const client=await pool.connect();
+  try {
+    const examId=String(req.params.examId||'').trim();
+    const attemptId=String(req.body?.attempt_id||'').trim();
+    if(!attemptId) return sendError(res,400,'Attempt ID is required.');
+    await client.query('BEGIN');
+    const a=await client.query(`
+      SELECT id,started_at,submitted_at FROM model_exam_attempts
+      WHERE id=$1 AND exam_id=$2 AND user_id=$3 LIMIT 1 FOR UPDATE
+    `,[attemptId,examId,req.user.id]);
+    if(!a.rowCount){await client.query('ROLLBACK');return sendError(res,404,'Model Exam attempt not found.');}
+    if(a.rows[0].submitted_at){await client.query('ROLLBACK');return sendError(res,409,'Model Exam already submitted.');}
+
+    const rows=await client.query(`
+      SELECT q.id,q.question_no,q.correct_answer,a.answer
+      FROM model_exam_questions q
+      LEFT JOIN model_exam_answers a ON a.question_id=q.id AND a.attempt_id=$1
+      WHERE q.exam_id=$2 ORDER BY q.question_no
+    `,[attemptId,examId]);
+    const total=rows.rowCount;
+    const attempted=rows.rows.filter(r=>r.answer).length;
+    const correct=rows.rows.filter(r=>r.answer && r.answer===r.correct_answer).length;
+    const notAttempted=total-attempted;
+    const percentage=total ? Number(((correct/total)*100).toFixed(2)) : 0;
+
+    await client.query(`
+      UPDATE model_exam_attempts
+      SET submitted_at=now(),status='submitted',total_questions=$1,attempted=$2,not_attempted=$3,marks=$4,percentage=$5
+      WHERE id=$6
+    `,[total,attempted,notAttempted,correct,percentage,attemptId]);
+    await client.query(`
+      INSERT INTO model_exam_results(attempt_id,exam_id,user_id,total_questions,attempted,not_attempted,marks,percentage,submitted_at)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,now())
+      ON CONFLICT(attempt_id) DO NOTHING
+    `,[attemptId,examId,req.user.id,total,attempted,notAttempted,correct,percentage]);
+    await client.query('COMMIT');
+    res.json({ok:true,total_questions:total,attempted,not_attempted,marks:correct,percentage});
+  } catch(e){
+    try{await client.query('ROLLBACK');}catch(_){ }
+    console.error('[MODEL EXAM] submit error:',e);
+    sendError(res,500,'Model Exam submit service error.');
+  } finally {client.release();}
+});
+
+/* Admin-only question clear. It backs up the questions first and never deletes
+   attempts, answers or results. */
+api.delete('/admin/model-exams/:examId/questions', requireAdmin, async (req,res)=>{
+  const client=await pool.connect();
+  try {
+    const examId=String(req.params.examId||'').trim();
+    await client.query('BEGIN');
+    const q=await client.query(`SELECT * FROM model_exam_questions WHERE exam_id=$1 ORDER BY question_no FOR UPDATE`,[examId]);
+    if(!q.rowCount){await client.query('ROLLBACK');return sendError(res,404,'No Model Exam questions found.');}
+    for(const row of q.rows){
+      await client.query(`
+        INSERT INTO model_exam_question_backups
+          (original_question_id,exam_id,question_no,question,options,correct_answer,explanation,subject,topic,language,deleted_by)
+        VALUES($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10,$11)
+      `,[row.id,row.exam_id,row.question_no,row.question,JSON.stringify(row.options),row.correct_answer,row.explanation,row.subject,row.topic,row.language,req.user.id]);
+    }
+    await client.query(`DELETE FROM model_exam_questions WHERE exam_id=$1`,[examId]);
+    await client.query('COMMIT');
+    res.json({ok:true,deleted_questions:q.rowCount,backup_created:true,message:'Questions deleted. Student attempts, answers and results were preserved.'});
+  } catch(e){
+    try{await client.query('ROLLBACK');}catch(_){ }
+    console.error('[MODEL EXAM] question delete error:',e);
+    sendError(res,500,'Model Exam question delete service error.');
+  } finally {client.release();}
+});
+
+api.get('/admin/model-exams/:examId/question-backups', requireAdmin, async (req,res)=>{
+  try {
+    const examId=String(req.params.examId||'').trim();
+    const q=await pool.query(`
+      SELECT id,original_question_id,exam_id,question_no,question,options,correct_answer,explanation,subject,topic,language,deleted_at
+      FROM model_exam_question_backups WHERE exam_id=$1 ORDER BY deleted_at DESC,question_no
+    `,[examId]);
+    res.json({ok:true,backups:q.rows});
+  } catch(e){
+    console.error('[MODEL EXAM] backup list error:',e);
+    sendError(res,500,'Model Exam backup service error.');
+  }
+});
+
+api.get('/admin/model-exams/:examId/results', requireAdmin, async (req,res)=>{
+  try {
+    const examId=String(req.params.examId||'').trim();
+    const q=await pool.query(`
+      SELECT r.id,r.attempt_id,r.user_id,r.total_questions,r.attempted,r.not_attempted,r.marks,r.percentage,r.submitted_at,
+             u.student_id,u.name,u.email
+      FROM model_exam_results r
+      JOIN users u ON u.id=r.user_id
+      WHERE r.exam_id=$1 ORDER BY r.submitted_at DESC
+    `,[examId]);
+    res.json({ok:true,results:q.rows});
+  } catch(e){
+    console.error('[MODEL EXAM] results error:',e);
+    sendError(res,500,'Model Exam results service error.');
   }
 });
 
@@ -2455,6 +2707,114 @@ async function backfillLastLoginFromAudit(){
   `);
 }
 
+
+
+async function ensureModelExamTables(){
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS model_exams (
+      id BIGSERIAL PRIMARY KEY,
+      exam_id TEXT NOT NULL UNIQUE,
+      title TEXT NOT NULL,
+      exam_date DATE NOT NULL,
+      start_time TIME NOT NULL,
+      availability_hours INTEGER NOT NULL DEFAULT 24 CHECK (availability_hours > 0 AND availability_hours <= 168),
+      duration_minutes INTEGER NOT NULL DEFAULT 180 CHECK (duration_minutes = 180),
+      is_active BOOLEAN NOT NULL DEFAULT true,
+      created_by BIGINT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_model_exams_schedule ON model_exams(exam_date,start_time,is_active)`);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS model_exam_questions (
+      id BIGSERIAL PRIMARY KEY,
+      exam_id TEXT NOT NULL REFERENCES model_exams(exam_id) ON DELETE CASCADE,
+      question_no INTEGER NOT NULL,
+      question TEXT NOT NULL,
+      options JSONB NOT NULL,
+      correct_answer CHAR(1) NOT NULL CHECK (correct_answer IN ('A','B','C','D')),
+      explanation TEXT NOT NULL DEFAULT '',
+      subject TEXT NOT NULL DEFAULT '',
+      topic TEXT NOT NULL DEFAULT '',
+      language CHAR(2) NOT NULL DEFAULT 'ta' CHECK (language IN ('ta','en')),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE(exam_id,question_no)
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_model_exam_questions_exam ON model_exam_questions(exam_id,question_no)`);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS model_exam_question_backups (
+      id BIGSERIAL PRIMARY KEY,
+      original_question_id BIGINT NOT NULL,
+      exam_id TEXT NOT NULL,
+      question_no INTEGER NOT NULL,
+      question TEXT NOT NULL,
+      options JSONB NOT NULL,
+      correct_answer CHAR(1) NOT NULL,
+      explanation TEXT NOT NULL DEFAULT '',
+      subject TEXT NOT NULL DEFAULT '',
+      topic TEXT NOT NULL DEFAULT '',
+      language CHAR(2) NOT NULL DEFAULT 'ta',
+      deleted_by BIGINT NULL,
+      deleted_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_model_exam_question_backups_exam ON model_exam_question_backups(exam_id,deleted_at DESC)`);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS model_exam_attempts (
+      id BIGSERIAL PRIMARY KEY,
+      exam_id TEXT NOT NULL REFERENCES model_exams(exam_id) ON DELETE RESTRICT,
+      user_id BIGINT NOT NULL,
+      started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      submitted_at TIMESTAMPTZ NULL,
+      status VARCHAR(20) NOT NULL DEFAULT 'in_progress' CHECK(status IN ('in_progress','submitted','expired')),
+      total_questions INTEGER NOT NULL DEFAULT 0,
+      attempted INTEGER NOT NULL DEFAULT 0,
+      not_attempted INTEGER NOT NULL DEFAULT 0,
+      marks NUMERIC(10,2) NOT NULL DEFAULT 0,
+      percentage NUMERIC(6,2) NOT NULL DEFAULT 0
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_model_exam_attempts_user_exam ON model_exam_attempts(user_id,exam_id,started_at DESC)`);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS model_exam_answers (
+      id BIGSERIAL PRIMARY KEY,
+      attempt_id BIGINT NOT NULL REFERENCES model_exam_attempts(id) ON DELETE CASCADE,
+      question_id BIGINT NULL REFERENCES model_exam_questions(id) ON DELETE SET NULL,
+      answer CHAR(1) NOT NULL CHECK(answer IN ('A','B','C','D')),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE(attempt_id,question_id)
+    )
+  `);
+  /* Migration safety for a prior Model Exam test schema. Questions may be
+     deleted after backup, so answers must survive with question_id nulled. */
+  await pool.query(`ALTER TABLE model_exam_answers ALTER COLUMN question_id DROP NOT NULL`);
+  await pool.query(`ALTER TABLE model_exam_answers DROP CONSTRAINT IF EXISTS model_exam_answers_question_id_fkey`);
+  await pool.query(`ALTER TABLE model_exam_answers ADD CONSTRAINT model_exam_answers_question_id_fkey FOREIGN KEY(question_id) REFERENCES model_exam_questions(id) ON DELETE SET NULL`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_model_exam_answers_attempt ON model_exam_answers(attempt_id)`);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS model_exam_results (
+      id BIGSERIAL PRIMARY KEY,
+      attempt_id BIGINT NOT NULL UNIQUE REFERENCES model_exam_attempts(id) ON DELETE RESTRICT,
+      exam_id TEXT NOT NULL REFERENCES model_exams(exam_id) ON DELETE RESTRICT,
+      user_id BIGINT NOT NULL,
+      total_questions INTEGER NOT NULL,
+      attempted INTEGER NOT NULL,
+      not_attempted INTEGER NOT NULL,
+      marks NUMERIC(10,2) NOT NULL,
+      percentage NUMERIC(6,2) NOT NULL,
+      submitted_at TIMESTAMPTZ NOT NULL
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_model_exam_results_exam ON model_exam_results(exam_id,submitted_at DESC)`);
+}
+
 async function start(){
   try{
     await pool.query('SELECT 1');
@@ -2463,7 +2823,7 @@ async function start(){
     await ensureLoginDeviceBindingColumn();
     await ensurePasswordResetTables();
     await ensureQuestionHistory();
-    await ensureImportantNewsTable();
+    await ensureModelExamTables();
     await backfillLastLoginFromAudit();
     await ensureAdmin();
     app.listen(PORT,'0.0.0.0',()=>console.log(`Thiral V171 Secure Temporary Password + Gender Summary + Detailed Usage Monitor listening on port ${PORT}`));
