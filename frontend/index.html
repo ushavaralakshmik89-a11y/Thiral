@@ -1028,18 +1028,16 @@ Explanation: ...
 Q002
 Question: ...'></textarea>
 
-  <label>அல்லது Question File Upload (.txt)</label>
-  <input id="adminModelExamFile" type="file" accept=".txt,text/plain" onchange="previewModelExamFile(this)">
+  <label>அல்லது Question File Upload</label>
+  <input id="adminModelExamFile" type="file" accept=".json,.txt,.csv" onchange="previewModelExamFile(this)">
   <p id="adminModelExamFileMsg" class="small"></p>
 
   <p class="small">இந்த questions master question bank-ல் சேராது. தனி Model Exam paper-ஆகவே சேமிக்கப்படும். இப்போது form/preview மட்டும்; backend/Supabase save அடுத்த கட்டத்தில் இணைக்கப்படும்.</p>
 
   <div style="display:flex;gap:10px;flex-wrap:wrap">
     <button type="button" onclick="previewModelExam()">👁️ Preview</button>
-    <button type="button" onclick="saveModelExam()">💾 Save Model Exam</button>
     <button type="button" class="secondary" onclick="clearModelExamForm()">Clear</button>
   </div>
-  <p id="adminModelExamSaveMsg" class="small" style="margin-top:10px"></p>
   <div id="adminModelExamPreview" class="card hidden" style="margin-top:14px;background:#f8fbff"></div>
 </div>
 <div class="card" style="margin-top:16px;border:1px solid #dbeafe">
@@ -5895,47 +5893,6 @@ function previewAdminNews(){
     '<p class="small">Status: '+(status==='published'?'Published / வெளியிடப்பட்டது':'Draft / வரைவு')+'</p>'+
     '<div style="white-space:pre-wrap;line-height:1.7">'+escapeHtmlAdmin(body)+'</div>';
 }
-async function saveModelExam(){
-  const msg=document.getElementById('adminModelExamSaveMsg');
-  const examId=(document.getElementById('adminModelExamId')?.value||'').trim();
-  const title=(document.getElementById('adminModelExamTitle')?.value||'').trim();
-  const examDate=document.getElementById('adminModelExamDate')?.value||'';
-  const examTime=document.getElementById('adminModelExamTime')?.value||'';
-  const duration=Number(document.getElementById('adminModelExamDuration')?.value||180);
-  const textArea=(document.getElementById('adminModelExamQuestions')?.value||'').trim();
-  const file=document.getElementById('adminModelExamFile')?.files?.[0]||null;
-
-  if(!examId || !title || !examDate || !examTime){
-    if(msg) msg.textContent='❌ Model Exam ID, Title, Date, Start Time ஆகியவை தேவை.';
-    return;
-  }
-  if(!Number.isInteger(duration) || duration < 1 || duration > 360){
-    if(msg) msg.textContent='❌ Duration 1 முதல் 360 minutes வரை இருக்க வேண்டும்.';
-    return;
-  }
-
-  if(msg) msg.textContent='Saving...';
-  try{
-    let questionText=textArea;
-    if(!questionText && file){
-      questionText=await file.text();
-    }
-    if(!questionText.trim()){
-      throw new Error('Question Paper காலியாக உள்ளது.');
-    }
-    if(typeof window.thiralV138Api!=='function'){
-      throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
-    }
-    const result=await window.thiralV138Api('/admin/model-exam/save',{
-      method:'POST',
-      body:JSON.stringify({examId,title,examDate,examTime,durationMinutes:duration,questionText})
-    });
-    if(msg) msg.textContent='✅ Model Exam சேமிக்கப்பட்டது. ID: '+(result.exam?.examId||examId)+' | Questions: '+(result.questionCount||0);
-  }catch(e){
-    if(msg) msg.textContent='❌ Save failed: '+(e?.message||e);
-  }
-}
-
 function clearModelExamForm(){
   ['adminModelExamId','adminModelExamTitle','adminModelExamDate','adminModelExamTime','adminModelExamQuestions'].forEach(id=>{
     const e=document.getElementById(id); if(e)e.value='';
@@ -5943,10 +5900,8 @@ function clearModelExamForm(){
   const d=document.getElementById('adminModelExamDuration'); if(d)d.value='180';
   const f=document.getElementById('adminModelExamFile'); if(f)f.value='';
   const m=document.getElementById('adminModelExamFileMsg'); if(m)m.textContent='';
-  const sm=document.getElementById('adminModelExamSaveMsg'); if(sm)sm.textContent='';
   const p=document.getElementById('adminModelExamPreview'); if(p){p.classList.add('hidden');p.innerHTML='';}
 }
-
 function previewModelExamFile(input){
   const msg=document.getElementById('adminModelExamFileMsg');
   if(!msg)return;
