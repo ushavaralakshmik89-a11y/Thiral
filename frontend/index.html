@@ -837,24 +837,11 @@ a{
 <section id="importantNews" class="card hidden" style="text-align:center;">
   <div style="font-size:58px;line-height:1;margin-bottom:10px;">📢</div>
   <h2 style="margin-bottom:8px;">முக்கிய அறிவிப்பு / Important News</h2>
-
-  <div style="margin:22px auto;max-width:760px;padding:24px 22px;border-radius:18px;background:linear-gradient(135deg,#eef6ff,#f5fbff);border:1px solid rgba(18,63,112,.12);">
-    <h3 style="margin:0 0 14px;color:#123f70;">TNPSC Group 4 – Model Exam</h3>
-
-    <p style="font-size:20px;font-weight:800;margin:10px 0;">
-      📅 Model Exam தேதி:
-      <span style="color:#b42318;">தேதி பின்னர் அறிவிக்கப்படும்</span>
-    </p>
-
-    <p style="font-size:18px;line-height:1.7;margin:16px 0;">
-      Thiral-ல் பதிவு செய்த மாணவர்கள் மட்டும் இந்த Model Exam-ல் கலந்து கொள்ள முடியும்.
-    </p>
-
-    <p class="small" style="margin:0;">
-      Registered Student Login மூலம் மட்டுமே Model Exam-ஐ அணுக முடியும்.
-    </p>
+  <div id="importantNewsList" style="margin:22px auto;max-width:760px;text-align:left;">
+    <div class="card" style="text-align:center;">
+      <p class="small">முக்கிய அறிவிப்புகள் ஏற்றப்படுகிறது...</p>
+    </div>
   </div>
-
   <button class="secondary" onclick="show('home')" style="font-weight:800;">← Back to Home</button>
 </section>
 
@@ -936,7 +923,22 @@ a{
 <div class="card admin-stat-card" role="button" tabindex="0" title="கடைசி Login செய்த மாணவரைப் பார்க்க" onclick="openAdminStudentView('lastLogin')" onkeydown="if(event.key==='Enter'||event.key===' ')openAdminStudentView('lastLogin')"><h3>🔑 Last Login</h3><p id="statLogin">-</p><span class="small">கிளிக் செய்து விவரம்</span></div>
 <div class="card admin-stat-card" role="button" tabindex="0" title="Suggestions பகுதிக்குச் செல்ல" onclick="document.getElementById('adminSuggestionList')?.scrollIntoView({behavior:'smooth',block:'start'})"><h3>💡 Suggestions</h3><p id="statSuggestions">0</p><span class="small">Suggestions பட்டியல்</span></div>
 </div>
+<div class="card" style="margin-top:16px;border:1px solid #dbeafe">
+<h3>📡 Beta Usage Monitor</h3>
+<p class="small">Beta Test-ல் தற்போது எத்தனை மாணவர்கள் உள்ளே இருக்கிறார்கள், கடந்த 24 மணி நேர பயன்பாடு மற்றும் Practice/Mock பயன்பாட்டை central activity data மூலம் பார்க்கும் பகுதி. மாணவர்களின் Password ஒருபோதும் அனுப்பப்படாது.</p>
+<div class="grid admin-stat-grid">
+<div class="card admin-stat-card" role="button" tabindex="0" onclick="toggleUsageDetail('onlineStudentList')" onkeydown="if(event.key==='Enter'||event.key===' ')toggleUsageDetail('onlineStudentList')" style="cursor:pointer"><h3>🟢 Currently Online</h3><p id="onlineActiveNow">-</p><span class="small">விவரங்களை காண்க ▾</span></div>
+<div class="card admin-stat-card" role="button" tabindex="0" onclick="toggleUsageDetail('usageLast24Detail')" onkeydown="if(event.key==='Enter'||event.key===' ')toggleUsageDetail('usageLast24Detail')" style="cursor:pointer"><h3>🕐 Last 24 Hours</h3><p id="onlineActive24h">-</p><span class="small">விவரங்களை காண்க ▾</span></div>
+<div class="card admin-stat-card" role="button" tabindex="0" onclick="toggleUsageDetail('usagePracticeDetail')" onkeydown="if(event.key==='Enter'||event.key===' ')toggleUsageDetail('usagePracticeDetail')" style="cursor:pointer"><h3>📝 Practice Sessions</h3><p id="onlinePracticeCount">-</p><span class="small">யார் யார் என்பதை காண்க ▾</span></div>
+<div class="card admin-stat-card" role="button" tabindex="0" onclick="toggleUsageDetail('usageMockDetail')" onkeydown="if(event.key==='Enter'||event.key===' ')toggleUsageDetail('usageMockDetail')" style="cursor:pointer"><h3>🎯 Mock Tests</h3><p id="onlineMockCount">-</p><span class="small">யார் யார் என்பதை காண்க ▾</span></div>
+</div>
+<p id="onlineMonitorMsg" class="small">மேலுள்ள எண்ணிக்கையை அழுத்தினால் அந்த எண்ணிக்கைக்கான முழு விவரங்கள் திறக்கும்.</p>
+<div id="onlineStudentList" class="hidden" style="margin-top:14px"></div>
+<div id="usageLast24Detail" class="hidden" style="margin-top:18px"></div>
+<div id="usagePracticeDetail" class="hidden" style="margin-top:18px"></div>
+<div id="usageMockDetail" class="hidden" style="margin-top:18px"></div>
 
+</div>
 <div class="grid" style="margin-top:16px">
   <div class="card" style="border:1px solid #dbeafe">
     <h3>📢 Important News</h3>
@@ -1053,6 +1055,19 @@ Question: ...'></textarea>
 <div id="usageMockDetail" class="hidden" style="margin-top:18px"></div>
 
 </div>
+<hr>
+<div class="card" style="margin-top:16px;border:1px solid #fecaca">
+<h3>🛡️ Security Monitor / பாதுகாப்பு</h3>
+<p class="small">Admin account மற்றும் பாதுகாப்பு தொடர்பான நிகழ்வுகளை மட்டும் Admin பார்க்க முடியும். Password, OTP அல்லது sensitive data இங்கே காட்டப்படாது.</p>
+<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+<button onclick="loadSecurityEvents138()">🔄 Security Refresh</button>
+</div>
+<p id="securityMsg138" class="small"></p>
+<div id="securityStats138" class="grid admin-stat-grid" style="margin-top:10px"></div>
+<p id="securitySelectMsg138" class="small">மேலுள்ள Security card-ஐ கிளிக் செய்தால் அந்த வகை நிகழ்வுகள் மட்டும் தனியாக காட்டப்படும்.</p>
+<div id="securityDetail138" class="hidden" style="margin-top:14px"></div>
+</div>
+
 <hr>
 <div class="card" style="margin-top:16px;border:1px solid #fecaca">
 <h3>🛡️ Security Monitor / பாதுகாப்பு</h3>
@@ -5804,7 +5819,44 @@ window.startPractice=async function(n){
 })();
 </script>
 
+<script id="thiral-important-news-display">
+async function loadImportantNews(){
+  const box=document.getElementById('importantNewsList');
+  if(!box)return;
+  box.innerHTML='<div class="card" style="text-align:center;"><p class="small">முக்கிய அறிவிப்புகள் ஏற்றப்படுகிறது...</p></div>';
+  try{
+    if(typeof window.thiralV138Api!=='function') throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
+    const data=await window.thiralV138Api('/important-news');
+    const items=Array.isArray(data.news)?data.news:[];
+    if(!items.length){
+      box.innerHTML='<div class="card" style="text-align:center;"><p>📢 தற்போது முக்கிய அறிவிப்பு எதுவும் இல்லை.</p></div>';
+      return;
+    }
+    box.innerHTML=items.map(n=>{
+      const title=escapeHtmlAdmin(n.title||'முக்கிய அறிவிப்பு');
+      const content=escapeHtmlAdmin(n.content||'').replace(/\n/g,'<br>');
+      const date=n.published_at||n.created_at;
+      let dateText='';
+      if(date){try{dateText=new Date(date).toLocaleString('ta-IN');}catch(e){dateText=String(date);}}
+      return '<div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,#eef6ff,#f5fbff);border:1px solid rgba(18,63,112,.12);text-align:left;">'+
+        '<h3 style="margin:0 0 12px;color:#123f70;">'+title+'</h3>'+
+        '<div style="font-size:17px;line-height:1.8;">'+content+'</div>'+
+        (dateText?'<p class="small" style="margin:14px 0 0;">📅 '+escapeHtmlAdmin(dateText)+'</p>':'')+
+      '</div>';
+    }).join('');
+  }catch(e){
+    box.innerHTML='<div class="card" style="text-align:center;border:1px solid #fecaca;"><p>❌ முக்கிய அறிவிப்பை ஏற்ற முடியவில்லை.</p><p class="small">'+escapeHtmlAdmin(e?.message||e)+'</p><button type="button" onclick="loadImportantNews()">🔄 மீண்டும் முயற்சி</button></div>';
+  }
+}
 
+const __originalShowForImportantNews = window.show;
+if(typeof __originalShowForImportantNews==='function'){
+  window.show=function(id){
+    __originalShowForImportantNews(id);
+    if(id==='importantNews') loadImportantNews();
+  };
+}
+</script>
 <script id="thiral-admin-model-tools">
 function toggleAdminTool(id){
   const el=document.getElementById(id);
