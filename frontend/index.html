@@ -967,14 +967,13 @@ a{
     <option value="draft">Draft / வரைவு</option>
     <option value="published">Published / வெளியிடு</option>
   </select>
-  <p class="small">Saved Important News database-ல் பாதுகாப்பாக இருக்கும். மீண்டும் இந்த பகுதியை திறந்தால் சேமித்த செய்திகள் இங்கே தோன்றும்.</p>
+  <p class="small">Save செய்தவுடன் Important News database-ல் பாதுகாப்பாக சேமிக்கப்படும். மாணவர்களுக்கு Published செய்தி Important News பகுதியில் காட்டப்படும்.</p>
   <div style="display:flex;gap:10px;flex-wrap:wrap">
     <button type="button" onclick="previewAdminNews()">👁️ Preview</button>
     <button type="button" onclick="saveAdminNews()">💾 Save News</button>
     <button type="button" class="secondary" onclick="clearAdminNewsForm()">Clear</button>
   </div>
   <p id="adminNewsSaveMsg" class="small" style="margin-top:10px"></p>
-  <div id="adminNewsSavedList" class="card" style="margin-top:14px;background:#f8fbff;text-align:left;"><p class="small">Saved Important News ஏற்றப்படுகிறது...</p></div>
   <div id="adminNewsPreview" class="card hidden" style="margin-top:14px;background:#f8fbff"></div>
 </div>
 
@@ -1293,10 +1292,6 @@ function show(id){
   if(id==='importantNews'){
     setTimeout(()=>{ try{ loadImportantNews(); }catch(e){} },0);
   }
-  if(id==='admin'){
-    setTimeout(()=>{ try{ loadAdminImportantNews(); }catch(e){} },0);
-  }
-
   /* Home is a two-part landing page: keep the original About/intro section
      visible after Logout as it is on the initial load. Other screens remain
      single-section views. */
@@ -5932,36 +5927,6 @@ function previewModelExam(){
     '<pre style="white-space:pre-wrap;max-height:360px;overflow:auto">'+escapeHtmlAdmin(q||'Question data இன்னும் உள்ளிடப்படவில்லை.')+'</pre>';
 }
 
-async function loadAdminImportantNews(){
-  const box=document.getElementById('adminNewsSavedList');
-  if(!box)return;
-  box.innerHTML='<p class="small">Saved Important News ஏற்றப்படுகிறது...</p>';
-  try{
-    if(typeof window.thiralV138Api!=='function') throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
-    const data=await window.thiralV138Api('/admin/important-news');
-    const items=Array.isArray(data.news)?data.news:[];
-    if(!items.length){
-      box.innerHTML='<p class="small">📢 இதுவரை Important News எதுவும் சேமிக்கப்படவில்லை.</p>';
-      return;
-    }
-    box.innerHTML='<h4 style="margin-top:0">📋 Saved Important News</h4>'+items.map(n=>{
-      const status=n.status==='published'?'Published / வெளியிடப்பட்டது':'Draft / வரைவு';
-      const date=n.published_at||n.created_at;
-      let dateText='';
-      if(date){try{dateText=new Date(date).toLocaleString('ta-IN');}catch(e){dateText=String(date);}}
-      return '<div style="padding:14px 0;border-top:1px solid #dbeafe">'+
-        '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">'+
-        '<strong>'+escapeHtmlAdmin(n.title||'Untitled')+'</strong>'+
-        '<span class="small">'+escapeHtmlAdmin(status)+'</span></div>'+
-        '<div style="white-space:pre-wrap;line-height:1.65;margin-top:7px">'+escapeHtmlAdmin(n.content||'')+'</div>'+ 
-        (dateText?'<div class="small" style="margin-top:7px">📅 '+escapeHtmlAdmin(dateText)+'</div>':'')+
-        '</div>';
-    }).join('');
-  }catch(e){
-    box.innerHTML='<p class="small" style="color:#b91c1c">❌ Saved News ஏற்ற முடியவில்லை: '+escapeHtmlAdmin(e?.message||e)+'</p><button type="button" class="secondary" onclick="loadAdminImportantNews()">🔄 மீண்டும் முயற்சி</button>';
-  }
-}
-
 async function saveAdminNews(){
   const title=(document.getElementById('adminNewsTitle')?.value||'').trim();
   const content=(document.getElementById('adminNewsBody')?.value||'').trim();
@@ -5981,7 +5946,6 @@ async function saveAdminNews(){
       body:JSON.stringify({title,content,status})
     });
     if(msg) msg.textContent='✅ Important News சேமிக்கப்பட்டது. ID: '+(result.news?.id ?? '');
-    await loadAdminImportantNews();
   }catch(e){
     if(msg) msg.textContent='❌ Save failed: '+(e?.message||e);
   }
