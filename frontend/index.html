@@ -967,13 +967,14 @@ a{
     <option value="draft">Draft / வரைவு</option>
     <option value="published">Published / வெளியிடு</option>
   </select>
-  <p class="small">இப்போது இது form மட்டும். Backend/Supabase save அடுத்த கட்டத்தில் இணைக்கப்படும். தற்போதைய Important News data எதுவும் மாற்றப்படாது.</p>
+  <p class="small">Saved Important News database-ல் பாதுகாப்பாக இருக்கும். மீண்டும் இந்த பகுதியை திறந்தால் சேமித்த செய்திகள் இங்கே தோன்றும்.</p>
   <div style="display:flex;gap:10px;flex-wrap:wrap">
     <button type="button" onclick="previewAdminNews()">👁️ Preview</button>
     <button type="button" onclick="saveAdminNews()">💾 Save News</button>
     <button type="button" class="secondary" onclick="clearAdminNewsForm()">Clear</button>
   </div>
   <p id="adminNewsSaveMsg" class="small" style="margin-top:10px"></p>
+  <div id="adminNewsSavedList" class="card" style="margin-top:14px;background:#f8fbff;text-align:left;"><p class="small">Saved Important News ஏற்றப்படுகிறது...</p></div>
   <div id="adminNewsPreview" class="card hidden" style="margin-top:14px;background:#f8fbff"></div>
 </div>
 
@@ -1289,6 +1290,12 @@ function show(id){
   if(!el)return;
   el.classList.remove('hidden');
   el.style.display='block';
+  if(id==='importantNews'){
+    setTimeout(()=>{ try{ loadImportantNews(); }catch(e){} },0);
+  }
+  if(id==='admin'){
+    setTimeout(()=>{ try{ loadAdminImportantNews(); }catch(e){} },0);
+  }
 
   /* Home is a two-part landing page: keep the original About/intro section
      visible after Logout as it is on the initial load. Other screens remain
@@ -5820,37 +5827,15 @@ window.startPractice=async function(n){
 </script>
 
 <script id="thiral-important-news-display">
-/* ===== IMPORTANT NEWS: DIRECT SUPABASE READ =====
-   Only Published news is read here. Admin Save remains unchanged.
-   Replace the two values below with your Supabase Project URL and
-   Publishable/anon key. NEVER put the Service Role Key in frontend.
-*/
-window.THIRAL_SUPABASE_URL = 'PASTE_YOUR_SUPABASE_PROJECT_URL_HERE';
-window.THIRAL_SUPABASE_ANON_KEY = 'PASTE_YOUR_SUPABASE_PUBLISHABLE_OR_ANON_KEY_HERE';
-
 async function loadImportantNews(){
   const box=document.getElementById('importantNewsList');
   if(!box)return;
   box.innerHTML='<div class="card" style="text-align:center;"><p class="small">முக்கிய அறிவிப்புகள் ஏற்றப்படுகிறது...</p></div>';
   try{
-    const base=String(window.THIRAL_SUPABASE_URL||'').trim().replace(/\/$/,'');
-    const key=String(window.THIRAL_SUPABASE_ANON_KEY||'').trim();
-    if(!base || base.includes('PASTE_YOUR_') || !key || key.includes('PASTE_YOUR_')){
-      throw new Error('Supabase URL / Publishable key இன்னும் frontend-ல் சேர்க்கப்படவில்லை.');
-    }
-    const url=base+'/rest/v1/important_news?select=id,title,content,published_at,created_at&status=eq.published&order=published_at.desc.nullslast,created_at.desc&limit=20';
-    const response=await fetch(url,{
-      method:'GET',
-      headers:{
-        'apikey':key,
-        'Authorization':'Bearer '+key,
-        'Accept':'application/json'
-      }
-    });
-    const raw=await response.text();
-    if(!response.ok) throw new Error('Supabase HTTP '+response.status+': '+raw.slice(0,300));
-    const items=JSON.parse(raw);
-    if(!Array.isArray(items)||!items.length){
+    if(typeof window.thiralV138Api!=='function') throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
+    const data=await window.thiralV138Api('/important-news');
+    const items=Array.isArray(data.news)?data.news:[];
+    if(!items.length){
       box.innerHTML='<div class="card" style="text-align:center;"><p>📢 தற்போது முக்கிய அறிவிப்பு எதுவும் இல்லை.</p></div>';
       return;
     }
@@ -5946,6 +5931,36 @@ function previewModelExam(){
     '<pre style="white-space:pre-wrap;max-height:360px;overflow:auto">'+escapeHtmlAdmin(q||'Question data இன்னும் உள்ளிடப்படவில்லை.')+'</pre>';
 }
 
+async function loadAdminImportantNews(){
+  const box=document.getElementById('adminNewsSavedList');
+  if(!box)return;
+  box.innerHTML='<p class="small">Saved Important News ஏற்றப்படுகிறது...</p>';
+  try{
+    if(typeof window.thiralV138Api!=='function') throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
+    const data=await window.thiralV138Api('/admin/important-news');
+    const items=Array.isArray(data.news)?data.news:[];
+    if(!items.length){
+      box.innerHTML='<p class="small">📢 இதுவரை Important News எதுவும் சேமிக்கப்படவில்லை.</p>';
+      return;
+    }
+    box.innerHTML='<h4 style="margin-top:0">📋 Saved Important News</h4>'+items.map(n=>{
+      const status=n.status==='published'?'Published / வெளியிடப்பட்டது':'Draft / வரைவு';
+      const date=n.published_at||n.created_at;
+      let dateText='';
+      if(date){try{dateText=new Date(date).toLocaleString('ta-IN');}catch(e){dateText=String(date);}}
+      return '<div style="padding:14px 0;border-top:1px solid #dbeafe">'+
+        '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">'+
+        '<strong>'+escapeHtmlAdmin(n.title||'Untitled')+'</strong>'+
+        '<span class="small">'+escapeHtmlAdmin(status)+'</span></div>'+
+        '<div style="white-space:pre-wrap;line-height:1.65;margin-top:7px">'+escapeHtmlAdmin(n.content||'')+'</div>'+ 
+        (dateText?'<div class="small" style="margin-top:7px">📅 '+escapeHtmlAdmin(dateText)+'</div>':'')+
+        '</div>';
+    }).join('');
+  }catch(e){
+    box.innerHTML='<p class="small" style="color:#b91c1c">❌ Saved News ஏற்ற முடியவில்லை: '+escapeHtmlAdmin(e?.message||e)+'</p><button type="button" class="secondary" onclick="loadAdminImportantNews()">🔄 மீண்டும் முயற்சி</button>';
+  }
+}
+
 async function saveAdminNews(){
   const title=(document.getElementById('adminNewsTitle')?.value||'').trim();
   const content=(document.getElementById('adminNewsBody')?.value||'').trim();
@@ -5965,6 +5980,7 @@ async function saveAdminNews(){
       body:JSON.stringify({title,content,status})
     });
     if(msg) msg.textContent='✅ Important News சேமிக்கப்பட்டது. ID: '+(result.news?.id ?? '');
+    await loadAdminImportantNews();
   }catch(e){
     if(msg) msg.textContent='❌ Save failed: '+(e?.message||e);
   }
