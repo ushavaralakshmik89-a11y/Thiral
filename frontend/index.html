@@ -839,7 +839,7 @@ a{
   <h2 style="margin-bottom:8px;">முக்கிய அறிவிப்பு / Important News</h2>
   <div id="importantNewsList" style="margin:22px auto;max-width:760px;text-align:left;">
     <div class="card" style="text-align:center;">
-      <p class="small">முக்கிய அறிவிப்புகள் ஏற்றப்படுகிறது...</p>
+      <p class="small">முக்கிய அறிவிப்பு ஏற்றப்படுகிறது...</p>
     </div>
   </div>
   <button class="secondary" onclick="show('home')" style="font-weight:800;">← Back to Home</button>
@@ -5834,7 +5834,8 @@ async function loadImportantNews(){
   try{
     if(typeof window.thiralV138Api!=='function') throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
     const data=await window.thiralV138Api('/important-news');
-    const items=Array.isArray(data.news)?data.news:[];
+    // Student view: show only the latest published Important News. Older announcements remain in DB but are not displayed here.
+    const items=(Array.isArray(data.news)?data.news:[]).slice(0,1);
     if(!items.length){
       box.innerHTML='<div class="card" style="text-align:center;"><p>📢 தற்போது முக்கிய அறிவிப்பு எதுவும் இல்லை.</p></div>';
       return;
