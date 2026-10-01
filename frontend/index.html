@@ -971,6 +971,7 @@ a{
   <div style="display:flex;gap:10px;flex-wrap:wrap">
     <button type="button" onclick="previewAdminNews()">👁️ Preview</button>
     <button type="button" onclick="saveAdminNews()">💾 Save News</button>
+    <button type="button" class="secondary" onclick="deleteCurrentAdminNews()">🗑️ Delete Current News</button>
     <button type="button" class="secondary" onclick="clearAdminNewsForm()">Clear</button>
   </div>
   <p id="adminNewsSaveMsg" class="small" style="margin-top:10px"></p>
@@ -5948,6 +5949,25 @@ async function saveAdminNews(){
     if(msg) msg.textContent='✅ Important News சேமிக்கப்பட்டது. ID: '+(result.news?.id ?? '');
   }catch(e){
     if(msg) msg.textContent='❌ Save failed: '+(e?.message||e);
+  }
+}
+
+async function deleteCurrentAdminNews(){
+  const msg=document.getElementById('adminNewsSaveMsg');
+  if(!confirm('தற்போது மாணவர்களுக்கு காட்டப்படும் Latest Published Important News-ஐ நிரந்தரமாக Delete செய்யவா?')) return;
+  if(msg) msg.textContent='Deleting...';
+  try{
+    if(typeof window.thiralV138Api!=='function'){
+      throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
+    }
+    const result=await window.thiralV138Api('/admin/important-news/current',{
+      method:'DELETE'
+    });
+    if(msg) msg.textContent='🗑️ Current Important News நீக்கப்பட்டது. ID: '+(result.news?.id ?? '');
+    const box=document.getElementById('importantNewsList');
+    if(box) box.innerHTML='<div class="card" style="text-align:center;"><p>📢 தற்போது முக்கிய அறிவிப்பு எதுவும் இல்லை.</p></div>';
+  }catch(e){
+    if(msg) msg.textContent='❌ Delete failed: '+(e?.message||e);
   }
 }
 
