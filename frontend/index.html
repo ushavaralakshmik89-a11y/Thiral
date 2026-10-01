@@ -1032,12 +1032,14 @@ Question: ...'></textarea>
   <input id="adminModelExamFile" type="file" accept=".json,.txt,.csv" onchange="previewModelExamFile(this)">
   <p id="adminModelExamFileMsg" class="small"></p>
 
-  <p class="small">இந்த questions master question bank-ல் சேராது. தனி Model Exam paper-ஆகவே சேமிக்கப்படும். இப்போது form/preview மட்டும்; backend/Supabase save அடுத்த கட்டத்தில் இணைக்கப்படும்.</p>
+  <p class="small">இந்த 200 questions master question bank-ல் சேராது. தனி Model Exam paper-ஆக Supabase-ல் சேமிக்கப்படும். Save செய்வதற்கு முன் Preview மூலம் question count, numbering, options மற்றும் correct answer format சரிபார்க்கப்படும்.</p>
 
-  <div style="display:flex;gap:10px;flex-wrap:wrap">
-    <button type="button" onclick="previewModelExam()">👁️ Preview</button>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <button type="button" onclick="previewModelExam()">👁️ Preview Questions</button>
+    <button type="button" onclick="saveModelExam()">💾 Save Model Exam</button>
     <button type="button" class="secondary" onclick="clearModelExamForm()">Clear</button>
   </div>
+  <p id="adminModelExamSaveMsg" class="small" style="margin-top:10px"></p>
   <div id="adminModelExamPreview" class="card hidden" style="margin-top:14px;background:#f8fbff"></div>
 </div>
 <div class="card" style="margin-top:16px;border:1px solid #dbeafe">
@@ -1418,11 +1420,8 @@ function login(){
  * - Future activation must be controlled by the secure backend
  *   using the configured start/end time.
  */
-async function openModelExam(){
-  if(typeof window.__THIRAL_MODEL_EXAM_START === 'function'){
-    return window.__THIRAL_MODEL_EXAM_START();
-  }
-  alert('Model Exam module ஏற்றப்படவில்லை.');
+function openModelExam(){
+  return;
 }
 
 function logout(){
@@ -5903,32 +5902,115 @@ function clearModelExamForm(){
   const d=document.getElementById('adminModelExamDuration'); if(d)d.value='180';
   const f=document.getElementById('adminModelExamFile'); if(f)f.value='';
   const m=document.getElementById('adminModelExamFileMsg'); if(m)m.textContent='';
+  const sm=document.getElementById('adminModelExamSaveMsg'); if(sm)sm.textContent='';
   const p=document.getElementById('adminModelExamPreview'); if(p){p.classList.add('hidden');p.innerHTML='';}
 }
-function previewModelExamFile(input){
+
+async function previewModelExamFile(input){
   const msg=document.getElementById('adminModelExamFileMsg');
   if(!msg)return;
   const file=input?.files?.[0];
   if(!file){msg.textContent='';return;}
-  msg.textContent='தேர்ந்தெடுக்கப்பட்ட கோப்பு: '+file.name+' ('+Math.round(file.size/1024)+' KB). இப்போது upload செய்யப்படவில்லை; backend இணைப்பு அடுத்த கட்டத்தில்.';
+  try{
+    const text=await file.text();
+    const ta=document.getElementById('adminModelExamQuestions');
+    if(ta)ta.value=text;
+    msg.textContent='✅ கோப்பு படிக்கப்பட்டது: '+file.name+' ('+Math.round(file.size/1024)+' KB). இப்போது Preview அழுத்துங்கள்.';
+  }catch(e){
+    msg.textContent='❌ கோப்பைப் படிக்க முடியவில்லை: '+(e?.message||e);
+  }
 }
+
+function parseAdminModelExamQuestions(raw){
+  const text=String(raw||'').replace(/\r\n/g,'\n').replace(/\r/g,'\n').trim();
+  if(!text)throw new Error('Question Paper காலியாக உள்ளது.');
+  const starts=[...text.matchAll(/^Q\s*([0-9]{1,4})\s*$/gmi)];
+  if(!starts.length)throw new Error('Q001, Q002 போன்ற question numbering கிடைக்கவில்லை.');
+  const out=[];
+  for(let i=0;i<starts.length;i++){
+    const no=Number(starts[i][1]);
+    const start=starts[i].index+starts[i][0].length;
+    const end=i+1<starts.length?starts[i+1].index:text.length;
+    const block=text.slice(start,end).trim();
+    const qm=block.match(/^Question\s*:\s*([\s\S]*?)(?=^A\.\s)/mi);
+    const am=block.match(/^A\.\s*(.*?)\s*$(?=[\s\S]*^B\.\s)/mi);
+    const bm=block.match(/^B\.\s*(.*?)\s*$(?=[\s\S]*^C\.\s)/mi);
+    const cm=block.match(/^C\.\s*(.*?)\s*$(?=[\s\S]*^D\.\s)/mi);
+    const dm=block.match(/^D\.\s*([\s\S]*?)(?=^Correct\s+Answer\s*:|^Explanation\s*:|$)/mi);
+    const corr=block.match(/^Correct\s+Answer\s*:\s*([ABCD])\b/im);
+    const exp=block.match(/^Explanation\s*:\s*([\s\S]*)$/im);
+    if(!qm||!am||!bm||!cm||!dm||!corr)throw new Error('Q'+String(no).padStart(3,'0')+' format incomplete. Question, A-D, Correct Answer தேவை.');
+    const q=qm[1].trim();
+    const options=[am[1],bm[1],cm[1],dm[1]].map(x=>String(x||'').trim());
+    if(!q||options.some(x=>!x))throw new Error('Q'+String(no).padStart(3,'0')+' question/options காலியாக உள்ளது.');
+    out.push({no,q,options,correct:corr[1].toUpperCase(),explanation:exp?exp[1].trim():''});
+  }
+  const seen=new Set();
+  for(const x of out){
+    if(seen.has(x.no))throw new Error('Duplicate question number: Q'+String(x.no).padStart(3,'0'));
+    seen.add(x.no);
+  }
+  out.sort((a,b)=>a.no-b.no);
+  return out;
+}
+
 function previewModelExam(){
   const id=(document.getElementById('adminModelExamId')?.value||'').trim();
   const title=(document.getElementById('adminModelExamTitle')?.value||'').trim();
   const date=document.getElementById('adminModelExamDate')?.value||'';
   const time=document.getElementById('adminModelExamTime')?.value||'';
   const duration=document.getElementById('adminModelExamDuration')?.value||'180';
-  const q=(document.getElementById('adminModelExamQuestions')?.value||'').trim();
+  const raw=(document.getElementById('adminModelExamQuestions')?.value||'').trim();
   const p=document.getElementById('adminModelExamPreview');
   if(!p)return;
   p.classList.remove('hidden');
-  p.innerHTML='<h3 style="margin-top:0">Model Exam Preview</h3>'+
-    '<p><strong>ID:</strong> '+escapeHtmlAdmin(id||'—')+'</p>'+
-    '<p><strong>Title:</strong> '+escapeHtmlAdmin(title||'—')+'</p>'+
-    '<p><strong>Date:</strong> '+escapeHtmlAdmin(date||'—')+' &nbsp; <strong>Start:</strong> '+escapeHtmlAdmin(time||'—')+'</p>'+
-    '<p><strong>Availability:</strong> 24 Hours &nbsp; <strong>Duration:</strong> '+escapeHtmlAdmin(duration)+' minutes</p>'+
-    '<hr><p><strong>Question data preview:</strong></p>'+
-    '<pre style="white-space:pre-wrap;max-height:360px;overflow:auto">'+escapeHtmlAdmin(q||'Question data இன்னும் உள்ளிடப்படவில்லை.')+'</pre>';
+  try{
+    const qs=parseAdminModelExamQuestions(raw);
+    const countOk=qs.length===200;
+    const numberingOk=qs.every((x,i)=>x.no===i+1);
+    let html='<h3 style="margin-top:0">📝 Model Exam Question Preview</h3>';
+    html+='<p><strong>ID:</strong> '+escapeHtmlAdmin(id||'—')+' | <strong>Title:</strong> '+escapeHtmlAdmin(title||'—')+'</p>';
+    html+='<p><strong>Date:</strong> '+escapeHtmlAdmin(date||'—')+' &nbsp; <strong>Start:</strong> '+escapeHtmlAdmin(time||'—')+' &nbsp; <strong>Duration:</strong> 180 minutes</p>';
+    html+='<p><strong>Questions found:</strong> '+qs.length+'/200 '+(countOk?'✅':'❌')+' &nbsp; <strong>Numbering:</strong> '+(numberingOk?'1–200 ✅':'சரிபார்க்க வேண்டும் ❌')+'</p>';
+    html+='<div style="max-height:560px;overflow:auto;border-top:1px solid #dbeafe;margin-top:12px;padding-top:10px">';
+    html+=qs.map(x=>'<div style="padding:12px 4px;border-bottom:1px solid #e5e7eb">'+
+      '<strong>Q'+String(x.no).padStart(3,'0')+'.</strong> '+escapeHtmlAdmin(x.q)+
+      '<div class="small" style="margin-top:6px">A. '+escapeHtmlAdmin(x.options[0])+'<br>B. '+escapeHtmlAdmin(x.options[1])+'<br>C. '+escapeHtmlAdmin(x.options[2])+'<br>D. '+escapeHtmlAdmin(x.options[3])+'</div>'+
+      '<div class="small" style="margin-top:5px"><strong>Correct:</strong> '+escapeHtmlAdmin(x.correct)+(x.explanation?' &nbsp; | &nbsp; Explanation present':'')+'</div>'+
+      '</div>').join('');
+    html+='</div>';
+    p.innerHTML=html;
+  }catch(e){
+    p.innerHTML='<h3 style="margin-top:0">📝 Model Exam Question Preview</h3><p style="color:#b91c1c">❌ '+escapeHtmlAdmin(e?.message||e)+'</p>';
+  }
+}
+
+async function saveModelExam(){
+  const msg=document.getElementById('adminModelExamSaveMsg');
+  const examId=(document.getElementById('adminModelExamId')?.value||'').trim();
+  const title=(document.getElementById('adminModelExamTitle')?.value||'').trim();
+  const examDate=document.getElementById('adminModelExamDate')?.value||'';
+  const examTime=document.getElementById('adminModelExamTime')?.value||'';
+  const duration=Number(document.getElementById('adminModelExamDuration')?.value||180);
+  const raw=(document.getElementById('adminModelExamQuestions')?.value||'').trim();
+  if(!examId||!title||!examDate||!examTime||!raw){if(msg)msg.textContent='❌ Model Exam ID, Title, Date, Start Time மற்றும் 200 Questions அனைத்தும் தேவை.';return;}
+  if(duration!==180){if(msg)msg.textContent='❌ Model Exam duration 180 minutes ஆகவே இருக்க வேண்டும்.';return;}
+  let qs;
+  try{qs=parseAdminModelExamQuestions(raw);}catch(e){if(msg)msg.textContent='❌ '+(e?.message||e);return;}
+  if(qs.length!==200){if(msg)msg.textContent='❌ இந்த Model Exam-க்கு சரியாக 200 questions வேண்டும். தற்போது '+qs.length+' questions உள்ளது.';return;}
+  if(!qs.every((x,i)=>x.no===i+1)){if(msg)msg.textContent='❌ Question numbering Q001 முதல் Q200 வரை தொடர்ச்சியாக இருக்க வேண்டும்.';return;}
+  if(msg)msg.textContent='⏳ 200 questions சேமிக்கப்படுகிறது...';
+  try{
+    if(typeof window.thiralV138Api!=='function')throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
+    const result=await window.thiralV138Api('/admin/model-exam/save',{
+      method:'POST',
+      body:JSON.stringify({examId,title,examDate,examTime,durationMinutes:180,questionText:raw})
+    });
+    const savedCount=result?.questionCount??result?.question_count??qs.length;
+    if(msg)msg.textContent='✅ Model Exam சேமிக்கப்பட்டது. Exam ID: '+(result?.exam?.examId||result?.exam_id||examId)+' | Questions: '+savedCount+'/200';
+  }catch(e){
+    if(msg)msg.textContent='❌ Save failed: '+(e?.message||e);
+  }
 }
 
 async function saveAdminNews(){
@@ -5977,147 +6059,6 @@ async function deleteCurrentAdminNews(){
 function escapeHtmlAdmin(v){
   return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
-</script>
-<section id="modelExamStudent" class="card hidden">
-  <div class="top">
-    <h2 id="meTitle">📝 Model Exam</h2>
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-      <div class="timer">⏱️ <span id="meTimer">03:00:00</span></div>
-      <button type="button" class="secondary" onclick="window.thiralLogoutFromActivity()">Logout</button>
-    </div>
-  </div>
-  <p><span class="badge" id="meProgress">1 / 200</span></p>
-  <p class="small" id="meExamInfo">200 கேள்விகள் • 3 மணி நேரம்</p>
-  <div class="bar"><div id="meBar"></div></div>
-  <div id="meQuestionBox"></div>
-  <div id="meOptions"></div>
-  <p class="small" id="meSaveStatus"></p>
-  <p id="meMessage"></p>
-  <div class="top">
-    <button type="button" class="secondary" id="mePrev" onclick="window.__THIRAL_MODEL_EXAM_PREV()">← Previous</button>
-    <button type="button" class="secondary" id="meNext" onclick="window.__THIRAL_MODEL_EXAM_NEXT()">Next →</button>
-    <button type="button" id="meSubmit" onclick="window.__THIRAL_MODEL_EXAM_SUBMIT(false)">Submit Test</button>
-  </div>
-</section>
-
-<section id="modelExamResult" class="card hidden">
-  <h2>📊 Model Exam Result</h2>
-  <div id="meResultText"></div>
-  <button type="button" class="secondary" onclick="show('dash')">← Dashboard</button>
-</section>
-
-<style id="thiral-model-exam-student-style">
-#modelExamStudent .option{display:block;width:100%;text-align:left;margin:8px 0;box-sizing:border-box;}
-#modelExamStudent .option.selected{font-weight:800;outline:3px solid rgba(37,99,235,.25);}
-#modelExamStudent #meSubmit{display:none;}
-#modelExamStudent #meBar{height:8px;transition:width .2s ease;}
-#modelExamStudent #meQuestionBox h3{line-height:1.65;margin:18px 0;}
-</style>
-
-<script id="thiral-model-exam-student-final">
-(function(){
-  'use strict';
-  var M={questions:[],answers:{},index:0,attemptId:0,startedAt:null,durationMinutes:180,timer:null,submitting:false,examTitle:''};
-  function $(id){return document.getElementById(id);}
-  function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
-  function api(path,opt){
-    if(typeof window.thiralV138Api!=='function') throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
-    return window.thiralV138Api(path,opt||{});
-  }
-  function stopTimer(){if(M.timer){clearInterval(M.timer);M.timer=null;}}
-  function fmt(sec){
-    sec=Math.max(0,Number(sec)||0);
-    var h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60),s=sec%60;
-    return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
-  }
-  function render(){
-    var q=M.questions[M.index];
-    if(!q)return;
-    var total=M.questions.length;
-    $('meTitle').textContent='📝 '+(M.examTitle||'Model Exam');
-    $('meExamInfo').textContent=(total===200?'200 கேள்விகள்':'கேள்விகள்: '+total)+' • 3 மணி நேரம்';
-    $('meProgress').textContent=(M.index+1)+' / '+total;
-    $('meBar').style.width=((M.index+1)/total*100)+'%';
-    $('meQuestionBox').innerHTML='<h3>'+esc(q.question)+'</h3>';
-    var selected=M.answers[String(q.id)]||'';
-    var opts=Array.isArray(q.options)?q.options:[];
-    $('meOptions').innerHTML=opts.map(function(o,i){
-      var letter=String.fromCharCode(65+i);
-      return '<button type="button" class="option '+(selected===letter?'selected':'')+'" onclick="window.__THIRAL_MODEL_EXAM_ANSWER(\\''+letter+'\\')">'+letter+'. '+esc(o)+'</button>';
-    }).join('');
-    $('mePrev').disabled=M.index===0;
-    $('meNext').style.display=M.index===total-1?'none':'inline-block';
-    $('meSubmit').style.display=M.index===total-1?'inline-block':'none';
-    $('meSaveStatus').textContent=selected?'✓ விடை தேர்வு செய்யப்பட்டுள்ளது':'';
-    $('meMessage').textContent='';
-  }
-  function startTimer(){
-    stopTimer();
-    var started=new Date(M.startedAt).getTime();
-    var deadline=started+(Number(M.durationMinutes||180)*60000);
-    function tick(){
-      var left=Math.ceil((deadline-Date.now())/1000);
-      $('meTimer').textContent=fmt(left);
-      if(left<=0){stopTimer();window.__THIRAL_MODEL_EXAM_SUBMIT(true);}
-    }
-    tick();M.timer=setInterval(tick,1000);
-  }
-  async function start(){
-    if(M.submitting)return;
-    M.submitting=false;
-    try{
-      var d=await api('/model-exams/start',{method:'POST',body:'{}'});
-      var qs=Array.isArray(d.questions)?d.questions:[];
-      if(qs.length!==200) throw new Error('Model Exam-க்கு 200 கேள்விகள் இல்லை. கிடைத்தது: '+qs.length);
-      M.questions=qs;M.answers={};
-      (Array.isArray(d.answers)?d.answers:[]).forEach(function(a){
-        if(a&&a.question_id)M.answers[String(a.question_id)]=String(a.answer||'').toUpperCase();
-      });
-      M.index=0;M.attemptId=Number(d.attemptId||0);M.startedAt=d.startedAt;M.durationMinutes=Number(d.durationMinutes||180);M.examTitle=d.exam&&d.exam.title||'Model Exam';
-      if(!M.attemptId)throw new Error('Model Exam attempt உருவாக்கப்படவில்லை.');
-      show('modelExamStudent');render();startTimer();window.scrollTo({top:0,behavior:'instant'});
-    }catch(e){
-      alert(e&&e.message?e.message:'Model Exam தற்போது கிடைக்கவில்லை.');
-    }
-  }
-  async function answer(letter){
-    if(M.submitting)return;
-    var q=M.questions[M.index];if(!q)return;
-    M.answers[String(q.id)]=letter;render();$('meSaveStatus').textContent='சேமிக்கிறது...';
-    try{
-      await api('/model-exams/attempt/'+M.attemptId+'/answer',{method:'POST',body:JSON.stringify({questionId:Number(q.id),answer:letter})});
-      $('meSaveStatus').textContent='✓ விடை சேமிக்கப்பட்டது';
-    }catch(e){
-      delete M.answers[String(q.id)];render();$('meMessage').textContent=e&&e.message?e.message:'விடை சேமிக்க முடியவில்லை.';
-    }
-  }
-  function prev(){if(M.index>0){M.index--;render();window.scrollTo({top:0,behavior:'instant'});}}
-  function next(){if(M.index<M.questions.length-1){M.index++;render();window.scrollTo({top:0,behavior:'instant'});}}
-  async function submit(autoExpired){
-    if(M.submitting||!M.attemptId)return;
-    if(!autoExpired && M.index!==M.questions.length-1)return;
-    M.submitting=true;stopTimer();$('meSubmit').disabled=true;
-    try{
-      var d=await api('/model-exams/attempt/'+M.attemptId+'/submit',{method:'POST',body:'{}'});
-      var r=d.result||{};
-      $('meResultText').innerHTML=
-        '<p><b>மொத்த கேள்விகள்:</b> '+Number(r.total_questions||0)+'</p>'+
-        '<p><b>விடையளித்தது:</b> '+Number(r.attempted||0)+'</p>'+
-        '<p><b>விடையளிக்காதது:</b> '+Number(r.not_attempted||0)+'</p>'+
-        '<p><b>மதிப்பெண்:</b> '+Number(r.marks||0)+'</p>'+
-        '<p><b>சதவீதம்:</b> '+Number(r.percentage||0)+'%</p>';
-      show('modelExamResult');window.scrollTo({top:0,behavior:'instant'});
-    }catch(e){
-      M.submitting=false;$('meSubmit').disabled=false;$('meMessage').textContent=e&&e.message?e.message:'Model Exam submit முடியவில்லை.';
-    }
-  }
-  window.__THIRAL_MODEL_EXAM_START=start;
-  window.__THIRAL_MODEL_EXAM_ANSWER=answer;
-  window.__THIRAL_MODEL_EXAM_PREV=prev;
-  window.__THIRAL_MODEL_EXAM_NEXT=next;
-  window.__THIRAL_MODEL_EXAM_SUBMIT=submit;
-  window.__THIRAL_RESET_MODEL_EXAM_SESSION=function(){stopTimer();M.questions=[];M.answers={};M.index=0;M.attemptId=0;M.submitting=false;};
-})();
 </script>
 </body></html>
 
