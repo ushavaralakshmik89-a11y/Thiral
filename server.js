@@ -2286,6 +2286,7 @@ async function ensureModelExamTables(){
      CREATE TABLE IF NOT EXISTS does not alter an existing table, so the
      migration below adds only missing columns and preserves existing rows. */
   await pool.query(`ALTER TABLE model_exams ADD COLUMN IF NOT EXISTS exam_time TIME`);
+  await pool.query(`ALTER TABLE model_exams ADD COLUMN IF NOT EXISTS start_time TIME`);
   await pool.query(`ALTER TABLE model_exams ADD COLUMN IF NOT EXISTS duration_minutes INTEGER NOT NULL DEFAULT 180`);
   await pool.query(`ALTER TABLE model_exams ADD COLUMN IF NOT EXISTS access_window_hours INTEGER NOT NULL DEFAULT 24`);
   await pool.query(`ALTER TABLE model_exams ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'draft'`);
@@ -2351,8 +2352,11 @@ api.post('/admin/model-exam/save', requireAdmin, async (req,res)=>{
       await client.query('ROLLBACK');
       return sendError(res,409,'இந்த Model Exam ID ஏற்கனவே உள்ளது. Existing exam overwrite செய்யப்படாது.');
     }
-    await client.query(`INSERT INTO model_exams(exam_id,title,exam_date,exam_time,duration_minutes,access_window_hours,status)
-      VALUES($1,$2,$3,$4,$5,24,'draft')`,[examId,title,examDate,examTime,duration]);
+    /* Existing databases may use start_time instead of exam_time.
+       Keep both populated when both columns exist, so old Supabase schemas
+       remain compatible without changing or deleting existing data. */
+    await client.query(`INSERT INTO model_exams(exam_id,title,exam_date,exam_time,start_time,duration_minutes,access_window_hours,status)
+      VALUES($1,$2,$3,$4,$4,$5,24,'draft')`,[examId,title,examDate,examTime,duration]);
     for(const q of questions){
       await client.query(`INSERT INTO model_exam_questions(exam_id,question_no,question,options,correct_option,explanation)
         VALUES($1,$2,$3,$4::jsonb,$5,$6)`,[examId,q.questionNo,q.question,JSON.stringify(q.options),q.correctOption,q.explanation]);
