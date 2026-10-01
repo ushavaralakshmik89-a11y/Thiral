@@ -2280,6 +2280,19 @@ async function ensureModelExamTables(){
       UNIQUE(exam_id, question_no)
     )
   `);
+
+  /* Existing Supabase/Render databases may already contain an older
+     model_exams table created before exam_time was introduced.
+     CREATE TABLE IF NOT EXISTS does not alter an existing table, so the
+     migration below adds only missing columns and preserves existing rows. */
+  await pool.query(`ALTER TABLE model_exams ADD COLUMN IF NOT EXISTS exam_time TIME`);
+  await pool.query(`ALTER TABLE model_exams ADD COLUMN IF NOT EXISTS duration_minutes INTEGER NOT NULL DEFAULT 180`);
+  await pool.query(`ALTER TABLE model_exams ADD COLUMN IF NOT EXISTS access_window_hours INTEGER NOT NULL DEFAULT 24`);
+  await pool.query(`ALTER TABLE model_exams ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'draft'`);
+  await pool.query(`ALTER TABLE model_exams ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now()`);
+  await pool.query(`ALTER TABLE model_exams ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now()`);
+
+  await pool.query(`ALTER TABLE model_exam_questions ADD COLUMN IF NOT EXISTS explanation TEXT NULL`);
   await pool.query(`CREATE INDEX IF NOT EXISTS model_exam_questions_exam_idx ON model_exam_questions(exam_id, question_no)`);
 }
 
