@@ -139,7 +139,8 @@ const SUBJECT_ALIASES = {
   'பொது அறிவு':'gs','General Knowledge':'gs','general knowledge':'gs',
   'பொது அறிவு / General Studies':'gs','General Studies':'gs','general studies':'gs',
   'திறனறிவு / Aptitude':'apt','Aptitude':'apt','aptitude':'apt',
-  'Tamil Nadu Government':'gs','தமிழ்நாடு அரசு':'gs'
+  'Tamil Nadu Government':'gs','தமிழ்நாடு அரசு':'gs',
+  'Tamil Nadu Govt':'gs','தமிழ்நாடு அரசாங்கம்':'gs'
 };
 const EXAM_ALIASES = {'group4':'group4','Group 4':'group4','GROUP 4':'group4'};
 function examCandidates(raw){
@@ -160,6 +161,8 @@ const GROUP4_SUBTOPIC_ALIASES = {
   'அடிப்படை உரிமைகள்':'Fundamental Rights','Fundamental Rights':'அடிப்படை உரிமைகள்',
   'பாராளுமன்றம்':'Parliament','Parliament':'பாராளுமன்றம்',
   'மாநில அரசு':'State Government','State Government':'மாநில அரசு',
+  'ஆட்சி':'Governance','Governance':'ஆட்சி',
+  'ஆட்சி - பதவியாளர்கள்':'Governance - Office Holders','Governance - Office Holders':'ஆட்சி - பதவியாளர்கள்',
   'உள்ளாட்சி':'Local Government','Local Government':'உள்ளாட்சி',
   'இந்தியா':'India','India':'இந்தியா','தமிழ்நாடு':'Tamil Nadu','Tamil Nadu':'தமிழ்நாடு',
   'ஆறுகள்':'Rivers','Rivers':'ஆறுகள்','மலைகள்':'Mountains','Mountains':'மலைகள்','வளங்கள்':'Resources','Resources':'வளங்கள்',
@@ -1965,7 +1968,7 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
 
     const specs=[
       {name:'tamil',candidates:['tamil','தமிழ்'],language:'ta'},
-      {name:'gs',candidates:['பொது அறிவு','General Knowledge','general knowledge','பொது அறிவு / General Studies','General Studies','general studies'],language:requestedLanguage},
+      {name:'gs',candidates:['பொது அறிவு','General Knowledge','general knowledge','பொது அறிவு / General Studies','General Studies','general studies','Tamil Nadu Government','தமிழ்நாடு அரசு','Tamil Nadu Govt','தமிழ்நாடு அரசாங்கம்'],language:requestedLanguage},
       {name:'apt',candidates:['apt','திறனறிவு / Aptitude','Aptitude','aptitude'],language:requestedLanguage}
     ];
 
