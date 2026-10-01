@@ -5820,15 +5820,37 @@ window.startPractice=async function(n){
 </script>
 
 <script id="thiral-important-news-display">
+/* ===== IMPORTANT NEWS: DIRECT SUPABASE READ =====
+   Only Published news is read here. Admin Save remains unchanged.
+   Replace the two values below with your Supabase Project URL and
+   Publishable/anon key. NEVER put the Service Role Key in frontend.
+*/
+window.THIRAL_SUPABASE_URL = 'PASTE_YOUR_SUPABASE_PROJECT_URL_HERE';
+window.THIRAL_SUPABASE_ANON_KEY = 'PASTE_YOUR_SUPABASE_PUBLISHABLE_OR_ANON_KEY_HERE';
+
 async function loadImportantNews(){
   const box=document.getElementById('importantNewsList');
   if(!box)return;
   box.innerHTML='<div class="card" style="text-align:center;"><p class="small">முக்கிய அறிவிப்புகள் ஏற்றப்படுகிறது...</p></div>';
   try{
-    if(typeof window.thiralV138Api!=='function') throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
-    const data=await window.thiralV138Api('/important-news');
-    const items=Array.isArray(data.news)?data.news:[];
-    if(!items.length){
+    const base=String(window.THIRAL_SUPABASE_URL||'').trim().replace(/\/$/,'');
+    const key=String(window.THIRAL_SUPABASE_ANON_KEY||'').trim();
+    if(!base || base.includes('PASTE_YOUR_') || !key || key.includes('PASTE_YOUR_')){
+      throw new Error('Supabase URL / Publishable key இன்னும் frontend-ல் சேர்க்கப்படவில்லை.');
+    }
+    const url=base+'/rest/v1/important_news?select=id,title,content,published_at,created_at&status=eq.published&order=published_at.desc.nullslast,created_at.desc&limit=20';
+    const response=await fetch(url,{
+      method:'GET',
+      headers:{
+        'apikey':key,
+        'Authorization':'Bearer '+key,
+        'Accept':'application/json'
+      }
+    });
+    const raw=await response.text();
+    if(!response.ok) throw new Error('Supabase HTTP '+response.status+': '+raw.slice(0,300));
+    const items=JSON.parse(raw);
+    if(!Array.isArray(items)||!items.length){
       box.innerHTML='<div class="card" style="text-align:center;"><p>📢 தற்போது முக்கிய அறிவிப்பு எதுவும் இல்லை.</p></div>';
       return;
     }
