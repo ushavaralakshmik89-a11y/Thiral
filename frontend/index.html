@@ -936,6 +936,20 @@ a{
 <div class="card admin-stat-card" role="button" tabindex="0" title="கடைசி Login செய்த மாணவரைப் பார்க்க" onclick="openAdminStudentView('lastLogin')" onkeydown="if(event.key==='Enter'||event.key===' ')openAdminStudentView('lastLogin')"><h3>🔑 Last Login</h3><p id="statLogin">-</p><span class="small">கிளிக் செய்து விவரம்</span></div>
 <div class="card admin-stat-card" role="button" tabindex="0" title="Suggestions பகுதிக்குச் செல்ல" onclick="document.getElementById('adminSuggestionList')?.scrollIntoView({behavior:'smooth',block:'start'})"><h3>💡 Suggestions</h3><p id="statSuggestions">0</p><span class="small">Suggestions பட்டியல்</span></div>
 </div>
+
+<div class="grid" style="margin-top:16px">
+  <div class="card" style="border:1px solid #dbeafe">
+    <h3>📢 Important News</h3>
+    <p class="small">மாணவர்களுக்கு காட்ட வேண்டிய முக்கிய அறிவிப்பை இங்கே Copy / Paste செய்து நிர்வகிக்கலாம்.</p>
+    <button type="button" class="secondary" onclick="alert('Important News management பகுதி அடுத்த கட்டத்தில் இணைக்கப்படும்.')">Open / விரைவில்</button>
+  </div>
+
+  <div class="card" style="border:1px solid #dbeafe">
+    <h3>📝 Model Exam Questions</h3>
+    <p class="small">தனி Model Exam-க்கான புதிய கேள்விகளை Upload / Paste செய்யும் பகுதி.</p>
+    <button type="button" class="secondary" onclick="alert('Model Exam Questions upload பகுதி அடுத்த கட்டத்தில் இணைக்கப்படும்.')">Open / விரைவில்</button>
+  </div>
+</div>
 <div class="card" style="margin-top:16px;border:1px solid #dbeafe">
 <h3>📡 Beta Usage Monitor</h3>
 <p class="small">Beta Test-ல் தற்போது எத்தனை மாணவர்கள் உள்ளே இருக்கிறார்கள், கடந்த 24 மணி நேர பயன்பாடு மற்றும் Practice/Mock பயன்பாட்டை central activity data மூலம் பார்க்கும் பகுதி. மாணவர்களின் Password ஒருபோதும் அனுப்பப்படாது.</p>
@@ -1003,29 +1017,6 @@ a{
 <p>Student data-ஐ Admin மட்டும் பார்க்க முடியும். Production version-ல் server-side authentication, password hashing மற்றும் role-based access control கட்டாயம்.</p>
 <button class="secondary" onclick="show('home')">Home</button>
 </section>
-
-
-<!-- Thiral Admin: new management placeholders only. Existing Admin data/functions remain untouched. -->
-<style id="thiral-admin-management-placeholders">
-.thiral-admin-management-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:22px 0;}
-.thiral-admin-management-card{background:#fff;border:1px solid #dce5ef;border-radius:18px;padding:22px;box-shadow:0 6px 18px rgba(0,0,0,.06);}
-.thiral-admin-management-card h3{margin:0 0 8px;color:#123f70;font-size:21px;}
-.thiral-admin-management-card p{margin:0 0 16px;color:#52657a;}
-.thiral-admin-management-card button{margin:0;}
-@media(max-width:700px){.thiral-admin-management-grid{grid-template-columns:1fr;}}
-</style>
-<div class="thiral-admin-management-grid" aria-label="New Admin Management Sections">
-  <div class="thiral-admin-management-card">
-    <h3>📢 Important News</h3>
-    <p>முக்கிய அறிவிப்புகளை நிர்வகிக்கும் பகுதி.</p>
-    <button type="button" class="secondary" disabled>Open / விரைவில்</button>
-  </div>
-  <div class="thiral-admin-management-card">
-    <h3>📝 Model Exam Questions</h3>
-    <p>Model Exam-க்கான புதிய கேள்விகளை Upload / Paste செய்யும் பகுதி.</p>
-    <button type="button" class="secondary" disabled>Open / விரைவில்</button>
-  </div>
-</div>
 
 <section id="adminStudentView" class="card hidden">
 <div class="top"><h2 id="adminStudentDetailTitle">மாணவர் விவரங்கள்</h2><button class="secondary" onclick="show('admin')">← Dashboard</button></div>
