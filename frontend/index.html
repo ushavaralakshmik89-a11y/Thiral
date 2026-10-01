@@ -3343,14 +3343,32 @@ window.V91_ADV_NUM=V91_ADV_NUM;
     show('examHome');
   };
 
-  async function getQuestionsV138(examId, subject, lang, count){
-    var d = await api138(
+  async function getQuestionsV138(examId, subject, lang, count, subtopic){
+    var url =
       '/questions?exam=' + encodeURIComponent(examId) +
       '&subject=' + encodeURIComponent(subject) +
       '&language=' + encodeURIComponent(lang) +
-      '&limit=' + encodeURIComponent(count)
-    );
+      '&limit=' + encodeURIComponent(count);
+    if(String(subtopic || '').trim()){
+      url += '&subtopic=' + encodeURIComponent(String(subtopic).trim());
+    }
+    var d = await api138(url);
     return Array.isArray(d.questions) ? d.questions : [];
+  }
+
+  function practiceDbSubject(subject){
+    if(subject === 'tamil') return 'தமிழ்';
+    if(subject === 'apt') return 'திறனறிவு / Aptitude';
+    return 'பொது அறிவு';
+  }
+
+  function practiceDbSubtopic(){
+    var st = '';
+    try { st = String((typeof currentSub !== 'undefined' && currentSub) || '').trim(); } catch(e) {}
+    if(!st){
+      try { st = String((typeof selectedSubtopic !== 'undefined' && selectedSubtopic) || '').trim(); } catch(e) {}
+    }
+    return st;
   }
 
   function currentLang(){
@@ -3390,6 +3408,8 @@ window.V91_ADV_NUM=V91_ADV_NUM;
       var subject = (typeof currentSubject !== 'undefined' && currentSubject) || 'gs';
       var lang = currentLang();
       var count = (n === 9999) ? 200 : Number(n || 10);
+      var dbSubject = practiceDbSubject(subject);
+      var dbSubtopic = practiceDbSubtopic();
 
       if(el('feedback')) el('feedback').textContent='கேள்விகள் ஏற்றப்படுகிறது...';
 
@@ -3397,10 +3417,29 @@ window.V91_ADV_NUM=V91_ADV_NUM;
       securePractice.language = lang;
       securePractice.questions = await getQuestionsV138(
         selectedExam,
-        subject,
+        dbSubject,
         lang,
-        count
+        count,
+        dbSubtopic
       );
+
+      /* Strict language guard: the selected language is authoritative.
+         Never fall back to q.en/q.enO in Tamil mode or to Tamil data in English mode. */
+      securePractice.questions = securePractice.questions.filter(function(q){
+        return String(q.language || '').toLowerCase() === lang;
+      }).map(function(q){
+        return {
+          id:q.id,
+          exam:q.exam,
+          subject:q.subject,
+          subtopic:q.subtopic,
+          language:q.language,
+          question:String(q.question || ''),
+          options:Array.isArray(q.options) ? q.options : [],
+          correct_option:Number(q.correct_option),
+          explanation:String(q.explanation || '')
+        };
+      });
 
       securePractice.answers = {};
       securePractice.checks = {};
