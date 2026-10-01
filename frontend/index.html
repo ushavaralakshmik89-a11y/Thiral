@@ -968,8 +968,10 @@ a{
   <p class="small">இப்போது இது form மட்டும். Backend/Supabase save அடுத்த கட்டத்தில் இணைக்கப்படும். தற்போதைய Important News data எதுவும் மாற்றப்படாது.</p>
   <div style="display:flex;gap:10px;flex-wrap:wrap">
     <button type="button" onclick="previewAdminNews()">👁️ Preview</button>
+    <button type="button" onclick="saveAdminNews()">💾 Save News</button>
     <button type="button" class="secondary" onclick="clearAdminNewsForm()">Clear</button>
   </div>
+  <p id="adminNewsSaveMsg" class="small" style="margin-top:10px"></p>
   <div id="adminNewsPreview" class="card hidden" style="margin-top:14px;background:#f8fbff"></div>
 </div>
 
@@ -5869,6 +5871,31 @@ function previewModelExam(){
     '<hr><p><strong>Question data preview:</strong></p>'+
     '<pre style="white-space:pre-wrap;max-height:360px;overflow:auto">'+escapeHtmlAdmin(q||'Question data இன்னும் உள்ளிடப்படவில்லை.')+'</pre>';
 }
+
+async function saveAdminNews(){
+  const title=(document.getElementById('adminNewsTitle')?.value||'').trim();
+  const content=(document.getElementById('adminNewsBody')?.value||'').trim();
+  const status=document.getElementById('adminNewsStatus')?.value||'draft';
+  const msg=document.getElementById('adminNewsSaveMsg');
+  if(!title || !content){
+    if(msg) msg.textContent='Title மற்றும் News இரண்டும் தேவை.';
+    return;
+  }
+  if(msg) msg.textContent='Saving...';
+  try{
+    if(typeof window.thiralV138Api!=='function'){
+      throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
+    }
+    const result=await window.thiralV138Api('/admin/important-news',{
+      method:'POST',
+      body:JSON.stringify({title,content,status})
+    });
+    if(msg) msg.textContent='✅ Important News சேமிக்கப்பட்டது. ID: '+(result.news?.id ?? '');
+  }catch(e){
+    if(msg) msg.textContent='❌ Save failed: '+(e?.message||e);
+  }
+}
+
 function escapeHtmlAdmin(v){
   return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
