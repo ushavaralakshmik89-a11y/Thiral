@@ -2429,6 +2429,12 @@ async function ensureModelExamStudentTables(){
       UNIQUE(attempt_id,question_id)
     )
   `);
+  /* Existing installations may already have this table without the newer
+     columns/unique constraint. CREATE TABLE IF NOT EXISTS does not upgrade
+     an existing table, so make the answer-save path migration-safe. */
+  await pool.query(`ALTER TABLE model_exam_answers ADD COLUMN IF NOT EXISTS answer CHAR(1)`);
+  await pool.query(`ALTER TABLE model_exam_answers ADD COLUMN IF NOT EXISTS answered_at TIMESTAMPTZ NOT NULL DEFAULT now()`);
+  await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS model_exam_answers_attempt_question_uidx ON model_exam_answers(attempt_id,question_id)`);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS model_exam_results (
       id BIGSERIAL PRIMARY KEY,
