@@ -2290,6 +2290,25 @@ api.post('/admin/important-news', requireAdmin, async (req,res)=>{
   }
 });
 
+api.delete('/admin/important-news/current', requireAdmin, async (req,res)=>{
+  try{
+    const {rows}=await pool.query(`
+      SELECT id,title
+      FROM important_news
+      WHERE status='published'
+      ORDER BY published_at DESC NULLS LAST, created_at DESC
+      LIMIT 1
+    `);
+    if(!rows.length) return sendError(res,404,'No published Important News found.');
+    const item=rows[0];
+    await pool.query(`DELETE FROM important_news WHERE id=$1`,[item.id]);
+    res.json({deleted:true,news:item});
+  }catch(e){
+    console.error('[IMPORTANT NEWS] delete current error:',e);
+    sendError(res,500,'Important News delete error.');
+  }
+});
+
 api.get('/admin/important-news', requireAdmin, async (req,res)=>{
   try{
     const {rows}=await pool.query(`
