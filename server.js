@@ -2263,7 +2263,6 @@ async function ensureModelExamTables(){
       access_window_hours INTEGER NOT NULL DEFAULT 24,
       status VARCHAR(20) NOT NULL DEFAULT 'draft'
         CHECK (status IN ('draft','active','closed')),
-      is_active BOOLEAN NOT NULL DEFAULT true,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )
@@ -2293,7 +2292,6 @@ async function ensureModelExamTables(){
   await pool.query(`ALTER TABLE model_exams ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'draft'`);
   await pool.query(`ALTER TABLE model_exams ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now()`);
   await pool.query(`ALTER TABLE model_exams ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now()`);
-  await pool.query(`ALTER TABLE model_exams ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true`);
 
   /* Older Supabase installations may already have model_exam_questions with a
      different/partial schema. Add only missing columns; never delete or rewrite
@@ -2360,7 +2358,7 @@ api.post('/admin/model-exam/save', requireAdmin, async (req,res)=>{
     if(duration!==180) return sendError(res,400,'Model Exam duration must be 180 minutes.');
     if(examId.length>100) return sendError(res,400,'Exam ID is too long.');
     const questions=parseModelExamQuestionPaper(questionText);
-    if(questions.length!==200) return sendError(res,400,`Model Exam-க்கு சரியாக 200 questions தேவை. கிடைத்தது: ${questions.length}`);
+    if(questions.length>200) return sendError(res,400,'ஒரு Model Exam-ல் அதிகபட்சம் 200 questions மட்டுமே சேமிக்கலாம்.');
 
     client=await pool.connect();
     await client.query('BEGIN');
@@ -2392,7 +2390,6 @@ api.post('/admin/model-exam/save', requireAdmin, async (req,res)=>{
 
 /* ===== MODEL EXAM STUDENT ENGINE ===== */
 async function ensureModelExamStudentTables(){
-  /* Existing attempts/answers/results are preserved. Add only missing columns. */
   await pool.query(`
     CREATE TABLE IF NOT EXISTS model_exam_attempts (
       id BIGSERIAL PRIMARY KEY,
@@ -2410,15 +2407,6 @@ async function ensureModelExamStudentTables(){
       percentage NUMERIC(6,2) NOT NULL DEFAULT 0
     )
   `);
-  await pool.query(`ALTER TABLE model_exam_attempts ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMPTZ NULL`);
-  await pool.query(`ALTER TABLE model_exam_attempts ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'in_progress'`);
-  await pool.query(`ALTER TABLE model_exam_attempts ADD COLUMN IF NOT EXISTS question_ids JSONB NOT NULL DEFAULT '[]'::jsonb`);
-  await pool.query(`ALTER TABLE model_exam_attempts ADD COLUMN IF NOT EXISTS total_questions INTEGER NOT NULL DEFAULT 0`);
-  await pool.query(`ALTER TABLE model_exam_attempts ADD COLUMN IF NOT EXISTS attempted INTEGER NOT NULL DEFAULT 0`);
-  await pool.query(`ALTER TABLE model_exam_attempts ADD COLUMN IF NOT EXISTS not_attempted INTEGER NOT NULL DEFAULT 0`);
-  await pool.query(`ALTER TABLE model_exam_attempts ADD COLUMN IF NOT EXISTS marks NUMERIC(10,2) NOT NULL DEFAULT 0`);
-  await pool.query(`ALTER TABLE model_exam_attempts ADD COLUMN IF NOT EXISTS percentage NUMERIC(6,2) NOT NULL DEFAULT 0`);
-
   await pool.query(`
     CREATE TABLE IF NOT EXISTS model_exam_answers (
       id BIGSERIAL PRIMARY KEY,
@@ -2429,12 +2417,6 @@ async function ensureModelExamStudentTables(){
       UNIQUE(attempt_id,question_id)
     )
   `);
-  /* Existing installations may already have this table without the newer
-     columns/unique constraint. CREATE TABLE IF NOT EXISTS does not upgrade
-     an existing table, so make the answer-save path migration-safe. */
-  await pool.query(`ALTER TABLE model_exam_answers ADD COLUMN IF NOT EXISTS answer CHAR(1)`);
-  await pool.query(`ALTER TABLE model_exam_answers ADD COLUMN IF NOT EXISTS answered_at TIMESTAMPTZ NOT NULL DEFAULT now()`);
-  await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS model_exam_answers_attempt_question_uidx ON model_exam_answers(attempt_id,question_id)`);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS model_exam_results (
       id BIGSERIAL PRIMARY KEY,
@@ -2615,6 +2597,52 @@ api.post('/model-exams/attempt/:attemptId/submit', requirePasswordReady, async (
     sendError(res,500,'Model Exam submit service error.');
   }finally{client.release();}
 });
+
+/* ===== MODEL EXAM FINAL SCHEMA MIGRATION =====
+   Existing Model Exam data is preserved.
+   This only adds missing columns/indexes required by the student submit flow.
+*/
+async function ensureModelExamFinalSchema(){
+  await pool.query(`
+    ALTER TABLE model_exam_attempts
+      ADD COLUMN IF NOT EXISTS question_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+      ADD COLUMN IF NOT EXISTS total_questions INTEGER NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS attempted INTEGER NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS not_attempted INTEGER NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS marks NUMERIC(10,2) NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS percentage NUMERIC(6,2) NOT NULL DEFAULT 0
+  `);
+
+  await pool.query(`
+    ALTER TABLE model_exam_answers
+      ADD COLUMN IF NOT EXISTS answer CHAR(1) NULL,
+      ADD COLUMN IF NOT EXISTS answered_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  `);
+
+  await pool.query(`
+    ALTER TABLE model_exam_results
+      ADD COLUMN IF NOT EXISTS attempt_id BIGINT,
+      ADD COLUMN IF NOT EXISTS exam_id TEXT,
+      ADD COLUMN IF NOT EXISTS user_id BIGINT,
+      ADD COLUMN IF NOT EXISTS total_questions INTEGER NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS attempted INTEGER NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS not_attempted INTEGER NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS marks NUMERIC(10,2) NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS percentage NUMERIC(6,2) NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  `);
+
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS model_exam_results_attempt_uidx
+    ON model_exam_results(attempt_id)
+    WHERE attempt_id IS NOT NULL
+  `);
+
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS model_exam_answers_attempt_question_uidx
+    ON model_exam_answers(attempt_id, question_id)
+  `);
+}
 
 /* ===== IMPORTANT NEWS ===== */
 async function ensureImportantNewsTable(){
@@ -2829,9 +2857,10 @@ async function start(){
     await ensureLoginDeviceBindingColumn();
     await ensurePasswordResetTables();
     await ensureQuestionHistory();
+    await ensureImportantNewsTable();
     await ensureModelExamTables();
     await ensureModelExamStudentTables();
-    await ensureImportantNewsTable();
+    await ensureModelExamFinalSchema();
     await backfillLastLoginFromAudit();
     await ensureAdmin();
     app.listen(PORT,'0.0.0.0',()=>console.log(`Thiral V171 Secure Temporary Password + Gender Summary + Detailed Usage Monitor listening on port ${PORT}`));
