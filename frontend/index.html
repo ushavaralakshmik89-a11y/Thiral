@@ -967,14 +967,14 @@ a{
     <option value="draft">Draft / வரைவு</option>
     <option value="published">Published / வெளியிடு</option>
   </select>
-  <p class="small">Save செய்தவுடன் Important News database-ல் பாதுகாப்பாக சேமிக்கப்படும். மாணவர்களுக்கு Published செய்தி Important News பகுதியில் காட்டப்படும்.</p>
+  <p class="small">Saved Important News database-ல் பாதுகாப்பாக இருக்கும். மீண்டும் இந்த பகுதியை திறந்தால் சேமித்த செய்திகள் இங்கே தோன்றும்.</p>
   <div style="display:flex;gap:10px;flex-wrap:wrap">
     <button type="button" onclick="previewAdminNews()">👁️ Preview</button>
     <button type="button" onclick="saveAdminNews()">💾 Save News</button>
-    <button type="button" class="secondary" onclick="deleteCurrentAdminNews()">🗑️ Delete Current News</button>
     <button type="button" class="secondary" onclick="clearAdminNewsForm()">Clear</button>
   </div>
   <p id="adminNewsSaveMsg" class="small" style="margin-top:10px"></p>
+  <div id="adminNewsSavedList" class="card" style="margin-top:14px;background:#f8fbff;text-align:left;"><p class="small">Saved Important News ஏற்றப்படுகிறது...</p></div>
   <div id="adminNewsPreview" class="card hidden" style="margin-top:14px;background:#f8fbff"></div>
 </div>
 
@@ -1032,12 +1032,14 @@ Question: ...'></textarea>
   <input id="adminModelExamFile" type="file" accept=".json,.txt,.csv" onchange="previewModelExamFile(this)">
   <p id="adminModelExamFileMsg" class="small"></p>
 
-  <p class="small">இந்த questions master question bank-ல் சேராது. தனி Model Exam paper-ஆகவே சேமிக்கப்படும். இப்போது form/preview மட்டும்; backend/Supabase save அடுத்த கட்டத்தில் இணைக்கப்படும்.</p>
+  <p class="small">இந்த questions master question bank-ல் சேராது. தனி Model Exam paper-ஆகவே சேமிக்கப்படும். Save செய்வதற்கு முன் Preview சரிபார்க்கவும்.</p>
 
   <div style="display:flex;gap:10px;flex-wrap:wrap">
     <button type="button" onclick="previewModelExam()">👁️ Preview</button>
+    <button type="button" onclick="saveModelExam()">💾 Save Model Exam</button>
     <button type="button" class="secondary" onclick="clearModelExamForm()">Clear</button>
   </div>
+  <p id="adminModelExamSaveMsg" class="small" style="margin-top:10px"></p>
   <div id="adminModelExamPreview" class="card hidden" style="margin-top:14px;background:#f8fbff"></div>
 </div>
 <div class="card" style="margin-top:16px;border:1px solid #dbeafe">
@@ -1293,6 +1295,10 @@ function show(id){
   if(id==='importantNews'){
     setTimeout(()=>{ try{ loadImportantNews(); }catch(e){} },0);
   }
+  if(id==='admin'){
+    setTimeout(()=>{ try{ loadAdminImportantNews(); }catch(e){} },0);
+  }
+
   /* Home is a two-part landing page: keep the original About/intro section
      visible after Logout as it is on the initial load. Other screens remain
      single-section views. */
@@ -5900,14 +5906,22 @@ function clearModelExamForm(){
   const d=document.getElementById('adminModelExamDuration'); if(d)d.value='180';
   const f=document.getElementById('adminModelExamFile'); if(f)f.value='';
   const m=document.getElementById('adminModelExamFileMsg'); if(m)m.textContent='';
+  const sm=document.getElementById('adminModelExamSaveMsg'); if(sm)sm.textContent='';
   const p=document.getElementById('adminModelExamPreview'); if(p){p.classList.add('hidden');p.innerHTML='';}
 }
-function previewModelExamFile(input){
+async function previewModelExamFile(input){
   const msg=document.getElementById('adminModelExamFileMsg');
   if(!msg)return;
   const file=input?.files?.[0];
   if(!file){msg.textContent='';return;}
-  msg.textContent='தேர்ந்தெடுக்கப்பட்ட கோப்பு: '+file.name+' ('+Math.round(file.size/1024)+' KB). இப்போது upload செய்யப்படவில்லை; backend இணைப்பு அடுத்த கட்டத்தில்.';
+  try{
+    const text=await file.text();
+    const ta=document.getElementById('adminModelExamQuestions');
+    if(ta) ta.value=text;
+    msg.textContent='✅ கோப்பு படிக்கப்பட்டது: '+file.name+' ('+Math.round(file.size/1024)+' KB). Preview அழுத்தி சரிபார்க்கவும்.';
+  }catch(e){
+    msg.textContent='❌ கோப்பைப் படிக்க முடியவில்லை: '+(e?.message||e);
+  }
 }
 function previewModelExam(){
   const id=(document.getElementById('adminModelExamId')?.value||'').trim();
@@ -5926,6 +5940,57 @@ function previewModelExam(){
     '<p><strong>Availability:</strong> 24 Hours &nbsp; <strong>Duration:</strong> '+escapeHtmlAdmin(duration)+' minutes</p>'+
     '<hr><p><strong>Question data preview:</strong></p>'+
     '<pre style="white-space:pre-wrap;max-height:360px;overflow:auto">'+escapeHtmlAdmin(q||'Question data இன்னும் உள்ளிடப்படவில்லை.')+'</pre>';
+}
+
+async function saveModelExam(){
+  const id=(document.getElementById('adminModelExamId')?.value||'').trim();
+  const title=(document.getElementById('adminModelExamTitle')?.value||'').trim();
+  const date=document.getElementById('adminModelExamDate')?.value||'';
+  const time=document.getElementById('adminModelExamTime')?.value||'';
+  const duration=Number(document.getElementById('adminModelExamDuration')?.value||180);
+  const raw=(document.getElementById('adminModelExamQuestions')?.value||'').trim();
+  const msg=document.getElementById('adminModelExamSaveMsg');
+  if(!id||!title||!date||!time||!raw){ if(msg)msg.textContent='❌ ID, Title, Date, Start Time மற்றும் Questions அனைத்தும் தேவை.'; return; }
+  if(duration!==180){ if(msg)msg.textContent='❌ Model Exam duration 180 minutes ஆக இருக்க வேண்டும்.'; return; }
+  if(msg)msg.textContent='Saving...';
+  try{
+    if(typeof window.thiralV138Api!=='function') throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
+    const result=await window.thiralV138Api('/admin/model-exams',{method:'POST',body:JSON.stringify({exam_id:id,title,exam_date:date,start_time:time,duration_minutes:duration,availability_hours:24,question_text:raw})});
+    if(msg)msg.textContent='✅ Model Exam சேமிக்கப்பட்டது. Exam ID: '+(result.exam?.exam_id||id)+' | Questions: '+(result.question_count||0);
+  }catch(e){
+    if(msg)msg.textContent='❌ Save failed: '+(e?.message||e);
+  }
+}
+
+async function loadAdminImportantNews(){
+  const box=document.getElementById('adminNewsSavedList');
+  if(!box)return;
+  box.innerHTML='<p class="small">Saved Important News ஏற்றப்படுகிறது...</p>';
+  try{
+    if(typeof window.thiralV138Api!=='function') throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
+    const data=await window.thiralV138Api('/admin/important-news');
+    // Admin view: show only the latest saved news. Older records remain safely in the database.
+    const items=(Array.isArray(data.news)?data.news:[]).slice(0,1);
+    if(!items.length){
+      box.innerHTML='<p class="small">📢 இதுவரை Important News எதுவும் சேமிக்கப்படவில்லை.</p>';
+      return;
+    }
+    box.innerHTML='<h4 style="margin-top:0">📋 Saved Important News</h4>'+items.map(n=>{
+      const status=n.status==='published'?'Published / வெளியிடப்பட்டது':'Draft / வரைவு';
+      const date=n.published_at||n.created_at;
+      let dateText='';
+      if(date){try{dateText=new Date(date).toLocaleString('ta-IN');}catch(e){dateText=String(date);}}
+      return '<div style="padding:14px 0;border-top:1px solid #dbeafe">'+
+        '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">'+
+        '<strong>'+escapeHtmlAdmin(n.title||'Untitled')+'</strong>'+
+        '<span class="small">'+escapeHtmlAdmin(status)+'</span></div>'+
+        '<div style="white-space:pre-wrap;line-height:1.65;margin-top:7px">'+escapeHtmlAdmin(n.content||'')+'</div>'+ 
+        (dateText?'<div class="small" style="margin-top:7px">📅 '+escapeHtmlAdmin(dateText)+'</div>':'')+
+        '</div>';
+    }).join('');
+  }catch(e){
+    box.innerHTML='<p class="small" style="color:#b91c1c">❌ Saved News ஏற்ற முடியவில்லை: '+escapeHtmlAdmin(e?.message||e)+'</p><button type="button" class="secondary" onclick="loadAdminImportantNews()">🔄 மீண்டும் முயற்சி</button>';
+  }
 }
 
 async function saveAdminNews(){
@@ -5947,27 +6012,9 @@ async function saveAdminNews(){
       body:JSON.stringify({title,content,status})
     });
     if(msg) msg.textContent='✅ Important News சேமிக்கப்பட்டது. ID: '+(result.news?.id ?? '');
+    await loadAdminImportantNews();
   }catch(e){
     if(msg) msg.textContent='❌ Save failed: '+(e?.message||e);
-  }
-}
-
-async function deleteCurrentAdminNews(){
-  const msg=document.getElementById('adminNewsSaveMsg');
-  if(!confirm('தற்போது மாணவர்களுக்கு காட்டப்படும் Latest Published Important News-ஐ நிரந்தரமாக Delete செய்யவா?')) return;
-  if(msg) msg.textContent='Deleting...';
-  try{
-    if(typeof window.thiralV138Api!=='function'){
-      throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
-    }
-    const result=await window.thiralV138Api('/admin/important-news/current',{
-      method:'DELETE'
-    });
-    if(msg) msg.textContent='🗑️ Current Important News நீக்கப்பட்டது. ID: '+(result.news?.id ?? '');
-    const box=document.getElementById('importantNewsList');
-    if(box) box.innerHTML='<div class="card" style="text-align:center;"><p>📢 தற்போது முக்கிய அறிவிப்பு எதுவும் இல்லை.</p></div>';
-  }catch(e){
-    if(msg) msg.textContent='❌ Delete failed: '+(e?.message||e);
   }
 }
 
