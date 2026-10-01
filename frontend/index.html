@@ -1004,6 +1004,29 @@ a{
 <button class="secondary" onclick="show('home')">Home</button>
 </section>
 
+
+<!-- Thiral Admin: new management placeholders only. Existing Admin data/functions remain untouched. -->
+<style id="thiral-admin-management-placeholders">
+.thiral-admin-management-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:22px 0;}
+.thiral-admin-management-card{background:#fff;border:1px solid #dce5ef;border-radius:18px;padding:22px;box-shadow:0 6px 18px rgba(0,0,0,.06);}
+.thiral-admin-management-card h3{margin:0 0 8px;color:#123f70;font-size:21px;}
+.thiral-admin-management-card p{margin:0 0 16px;color:#52657a;}
+.thiral-admin-management-card button{margin:0;}
+@media(max-width:700px){.thiral-admin-management-grid{grid-template-columns:1fr;}}
+</style>
+<div class="thiral-admin-management-grid" aria-label="New Admin Management Sections">
+  <div class="thiral-admin-management-card">
+    <h3>📢 Important News</h3>
+    <p>முக்கிய அறிவிப்புகளை நிர்வகிக்கும் பகுதி.</p>
+    <button type="button" class="secondary" disabled>Open / விரைவில்</button>
+  </div>
+  <div class="thiral-admin-management-card">
+    <h3>📝 Model Exam Questions</h3>
+    <p>Model Exam-க்கான புதிய கேள்விகளை Upload / Paste செய்யும் பகுதி.</p>
+    <button type="button" class="secondary" disabled>Open / விரைவில்</button>
+  </div>
+</div>
+
 <section id="adminStudentView" class="card hidden">
 <div class="top"><h2 id="adminStudentDetailTitle">மாணவர் விவரங்கள்</h2><button class="secondary" onclick="show('admin')">← Dashboard</button></div>
 <p class="small">Dashboard-ல் தேர்ந்தெடுத்த எண்ணிக்கைக்கான மாணவர் விவரங்கள் மட்டும் இங்கே காட்டப்படும். Password எந்த நிலையிலும் காட்டப்படாது.</p>
