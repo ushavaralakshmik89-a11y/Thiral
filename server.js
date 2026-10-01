@@ -2293,7 +2293,16 @@ async function ensureModelExamTables(){
   await pool.query(`ALTER TABLE model_exams ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now()`);
   await pool.query(`ALTER TABLE model_exams ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now()`);
 
+  /* Older Supabase installations may already have model_exam_questions with a
+     different/partial schema. Add only missing columns; never delete or rewrite
+     existing question rows. Nullable is intentional for migration safety. */
+  await pool.query(`ALTER TABLE model_exam_questions ADD COLUMN IF NOT EXISTS exam_id TEXT`);
+  await pool.query(`ALTER TABLE model_exam_questions ADD COLUMN IF NOT EXISTS question_no INTEGER`);
+  await pool.query(`ALTER TABLE model_exam_questions ADD COLUMN IF NOT EXISTS question TEXT`);
+  await pool.query(`ALTER TABLE model_exam_questions ADD COLUMN IF NOT EXISTS options JSONB`);
+  await pool.query(`ALTER TABLE model_exam_questions ADD COLUMN IF NOT EXISTS correct_option CHAR(1)`);
   await pool.query(`ALTER TABLE model_exam_questions ADD COLUMN IF NOT EXISTS explanation TEXT NULL`);
+  await pool.query(`ALTER TABLE model_exam_questions ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now()`);
   await pool.query(`CREATE INDEX IF NOT EXISTS model_exam_questions_exam_idx ON model_exam_questions(exam_id, question_no)`);
 }
 
