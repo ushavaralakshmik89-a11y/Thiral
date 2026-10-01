@@ -2301,7 +2301,13 @@ async function ensureModelExamTables(){
   await pool.query(`ALTER TABLE model_exam_questions ADD COLUMN IF NOT EXISTS question TEXT`);
   await pool.query(`ALTER TABLE model_exam_questions ADD COLUMN IF NOT EXISTS options JSONB`);
   await pool.query(`ALTER TABLE model_exam_questions ADD COLUMN IF NOT EXISTS correct_option CHAR(1)`);
+  /* Older Model Exam schema used correct_answer instead of correct_option.
+     Keep both columns populated so the existing Supabase table remains compatible. */
+  await pool.query(`ALTER TABLE model_exam_questions ADD COLUMN IF NOT EXISTS correct_answer CHAR(1)`);
   await pool.query(`ALTER TABLE model_exam_questions ADD COLUMN IF NOT EXISTS explanation TEXT NULL`);
+  await pool.query(`ALTER TABLE model_exam_questions ADD COLUMN IF NOT EXISTS subject TEXT NOT NULL DEFAULT ''`);
+  await pool.query(`ALTER TABLE model_exam_questions ADD COLUMN IF NOT EXISTS topic TEXT NOT NULL DEFAULT ''`);
+  await pool.query(`ALTER TABLE model_exam_questions ADD COLUMN IF NOT EXISTS language CHAR(2) NOT NULL DEFAULT 'ta'`);
   await pool.query(`ALTER TABLE model_exam_questions ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now()`);
   await pool.query(`CREATE INDEX IF NOT EXISTS model_exam_questions_exam_idx ON model_exam_questions(exam_id, question_no)`);
 }
@@ -2367,8 +2373,10 @@ api.post('/admin/model-exam/save', requireAdmin, async (req,res)=>{
     await client.query(`INSERT INTO model_exams(exam_id,title,exam_date,exam_time,start_time,duration_minutes,access_window_hours,status)
       VALUES($1,$2,$3,$4,$4,$5,24,'draft')`,[examId,title,examDate,examTime,duration]);
     for(const q of questions){
-      await client.query(`INSERT INTO model_exam_questions(exam_id,question_no,question,options,correct_option,explanation)
-        VALUES($1,$2,$3,$4::jsonb,$5,$6)`,[examId,q.questionNo,q.question,JSON.stringify(q.options),q.correctOption,q.explanation]);
+      await client.query(`INSERT INTO model_exam_questions
+        (exam_id,question_no,question,options,correct_option,correct_answer,explanation,subject,topic,language)
+        VALUES($1,$2,$3,$4::jsonb,$5,$5,$6,$7,$8,$9)`,
+        [examId,q.questionNo,q.question,JSON.stringify(q.options),q.correctOption,q.explanation||'',title,'','ta']);
     }
     await client.query('COMMIT');
     res.status(201).json({saved:true,questionCount:questions.length,exam:{examId,title,examDate,examTime,durationMinutes:duration,status:'draft'}});
