@@ -838,21 +838,10 @@ a{
   <div style="font-size:58px;line-height:1;margin-bottom:10px;">📢</div>
   <h2 style="margin-bottom:8px;">முக்கிய அறிவிப்பு / Important News</h2>
 
-  <div style="margin:22px auto;max-width:760px;padding:24px 22px;border-radius:18px;background:linear-gradient(135deg,#eef6ff,#f5fbff);border:1px solid rgba(18,63,112,.12);">
-    <h3 style="margin:0 0 14px;color:#123f70;">TNPSC Group 4 – Model Exam</h3>
-
-    <p style="font-size:20px;font-weight:800;margin:10px 0;">
-      📅 Model Exam தேதி:
-      <span style="color:#b42318;">தேதி பின்னர் அறிவிக்கப்படும்</span>
-    </p>
-
-    <p style="font-size:18px;line-height:1.7;margin:16px 0;">
-      Thiral-ல் பதிவு செய்த மாணவர்கள் மட்டும் இந்த Model Exam-ல் கலந்து கொள்ள முடியும்.
-    </p>
-
-    <p class="small" style="margin:0;">
-      Registered Student Login மூலம் மட்டுமே Model Exam-ஐ அணுக முடியும்.
-    </p>
+  <div id="importantNewsDynamic" style="margin:22px auto;max-width:760px;">
+    <div style="padding:24px 22px;border-radius:18px;background:linear-gradient(135deg,#eef6ff,#f5fbff);border:1px solid rgba(18,63,112,.12);">
+      <p class="small" style="margin:0;">முக்கிய அறிவிப்புகள் ஏற்றப்படுகிறது...</p>
+    </div>
   </div>
 
   <button class="secondary" onclick="show('home')" style="font-weight:800;">← Back to Home</button>
@@ -1286,6 +1275,9 @@ function show(id){
     }
   }
   window.scrollTo({top:0,behavior:'instant'});
+  if(id==='importantNews' && typeof window.loadImportantNews==='function'){
+    window.loadImportantNews();
+  }
 }
 function showMockResultScreen(){const el=document.getElementById('mockResult');document.querySelectorAll('section').forEach(sec=>{sec.classList.add('hidden');sec.style.display='none'});el.classList.remove('hidden');el.style.display='block';document.getElementById('screenReview').classList.add('screen-review');window.scrollTo({top:0,behavior:'instant'});}
 let contentLanguage=(localStorage.getItem('tnpsc_content_language')||'ta').toLowerCase()==='en'?'en':'ta';
@@ -5899,6 +5891,40 @@ async function saveAdminNews(){
 function escapeHtmlAdmin(v){
   return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
+</script>
+
+<script id="thiral-important-news-display">
+(function(){
+  'use strict';
+  function esc(v){
+    return String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+  window.loadImportantNews = async function(){
+    const box=document.getElementById('importantNewsDynamic');
+    if(!box) return;
+    box.innerHTML='<div style="padding:24px 22px;border-radius:18px;background:linear-gradient(135deg,#eef6ff,#f5fbff);border:1px solid rgba(18,63,112,.12);"><p class="small">முக்கிய அறிவிப்புகள் ஏற்றப்படுகிறது...</p></div>';
+    try{
+      if(typeof window.thiralV138Api!=='function') throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
+      const d=await window.thiralV138Api('/important-news');
+      const items=Array.isArray(d.news)?d.news:[];
+      if(!items.length){
+        box.innerHTML='<div style="padding:24px 22px;border-radius:18px;background:#f8fbff;border:1px solid rgba(18,63,112,.12);"><p class="small" style="margin:0;">தற்போது முக்கிய அறிவிப்பு எதுவும் இல்லை.</p></div>';
+        return;
+      }
+      box.innerHTML=items.map(function(n){
+        const dt=n.published_at || n.created_at;
+        const date=dt ? new Date(dt).toLocaleString('ta-IN',{dateStyle:'medium',timeStyle:'short'}) : '';
+        return '<article style="margin-bottom:16px;text-align:left;padding:22px;border-radius:18px;background:linear-gradient(135deg,#eef6ff,#f5fbff);border:1px solid rgba(18,63,112,.12);">'+
+          '<h3 style="margin:0 0 12px;color:#123f70;">'+esc(n.title)+'</h3>'+
+          (date?'<p class="small" style="margin:0 0 12px;color:#667085;">📅 '+esc(date)+'</p>':'')+
+          '<div style="font-size:18px;line-height:1.8;white-space:pre-wrap;">'+esc(n.content)+'</div>'+
+        '</article>';
+      }).join('');
+    }catch(e){
+      box.innerHTML='<div style="padding:24px 22px;border-radius:18px;background:#fff7ed;border:1px solid #fed7aa;"><p style="margin:0;color:#9a3412;font-weight:700;">முக்கிய அறிவிப்புகளை இப்போது பெற முடியவில்லை.</p><p class="small" style="margin:8px 0 0;">Student Login செய்த பிறகு மீண்டும் Important News-ஐ திறக்கவும்.</p></div>';
+    }
+  };
+})();
 </script>
 </body></html>
 
