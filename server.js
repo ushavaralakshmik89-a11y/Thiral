@@ -2250,6 +2250,109 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
 });
 
 
+/* ===== MODEL EXAM ADMIN SAVE ===== */
+async function ensureModelExamTables(){
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS model_exams (
+      id BIGSERIAL PRIMARY KEY,
+      exam_id TEXT NOT NULL UNIQUE,
+      title TEXT NOT NULL,
+      exam_date DATE NOT NULL,
+      exam_time TIME NOT NULL,
+      duration_minutes INTEGER NOT NULL DEFAULT 180,
+      access_window_hours INTEGER NOT NULL DEFAULT 24,
+      status VARCHAR(20) NOT NULL DEFAULT 'draft'
+        CHECK (status IN ('draft','active','closed')),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS model_exam_questions (
+      id BIGSERIAL PRIMARY KEY,
+      exam_id TEXT NOT NULL REFERENCES model_exams(exam_id) ON DELETE RESTRICT,
+      question_no INTEGER NOT NULL,
+      question TEXT NOT NULL,
+      options JSONB NOT NULL,
+      correct_option CHAR(1) NOT NULL CHECK (correct_option IN ('A','B','C','D')),
+      explanation TEXT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE(exam_id, question_no)
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS model_exam_questions_exam_idx ON model_exam_questions(exam_id, question_no)`);
+}
+
+function parseModelExamQuestionPaper(raw){
+  const text=String(raw||'').replace(/\r\n/g,'\n').replace(/\r/g,'\n').trim();
+  if(!text) throw new Error('Question Paper is empty.');
+  const starts=[...text.matchAll(/^Q\s*([0-9]{1,4})\s*$/gmi)];
+  if(!starts.length) throw new Error('Q001 / Q002 போன்ற question numbering கிடைக்கவில்லை.');
+  const blocks=[];
+  for(let i=0;i<starts.length;i++){
+    const no=Number(starts[i][1]);
+    const start=starts[i].index + starts[i][0].length;
+    const end=i+1<starts.length ? starts[i+1].index : text.length;
+    const block=text.slice(start,end).trim();
+    const qm=block.match(/^Question\s*:\s*([\s\S]*?)(?=^A\.\s)/mi);
+    const am=block.match(/^A\.\s*(.*?)\s*$(?=[\s\S]*^B\.\s)/mi);
+    const bm=block.match(/^B\.\s*(.*?)\s*$(?=[\s\S]*^C\.\s)/mi);
+    const cm=block.match(/^C\.\s*(.*?)\s*$(?=[\s\S]*^D\.\s)/mi);
+    const dm=block.match(/^D\.\s*([\s\S]*?)(?=^Correct\s+Answer\s*:|^Explanation\s*:|$)/mi);
+    const corr=block.match(/^Correct\s+Answer\s*:\s*([ABCD])\b/im);
+    const exp=block.match(/^Explanation\s*:\s*([\s\S]*)$/im);
+    if(!qm || !am || !bm || !cm || !dm || !corr){
+      throw new Error(`Q${String(no).padStart(3,'0')} format incomplete. Question, A-D and Correct Answer தேவை.`);
+    }
+    const question=qm[1].trim();
+    const options=[am[1],bm[1],cm[1],dm[1]].map(x=>String(x||'').trim());
+    if(!question || options.some(x=>!x)) throw new Error(`Q${String(no).padStart(3,'0')} question/options காலியாக உள்ளது.`);
+    blocks.push({questionNo:no,question,options,correctOption:corr[1].toUpperCase(),explanation:exp?exp[1].trim():null});
+  }
+  const nums=blocks.map(x=>x.questionNo);
+  const unique=new Set(nums);
+  if(unique.size!==blocks.length) throw new Error('Question number duplicate உள்ளது.');
+  blocks.sort((a,b)=>a.questionNo-b.questionNo);
+  return blocks;
+}
+
+api.post('/admin/model-exam/save', requireAdmin, async (req,res)=>{
+  let client;
+  try{
+    const examId=String(req.body?.examId||'').trim();
+    const title=String(req.body?.title||'').trim();
+    const examDate=String(req.body?.examDate||'').trim();
+    const examTime=String(req.body?.examTime||'').trim();
+    const duration=Number(req.body?.durationMinutes||180);
+    const questionText=String(req.body?.questionText||'');
+    if(!examId || !title || !examDate || !examTime) return sendError(res,400,'Model Exam ID, title, date and start time are required.');
+    if(!Number.isInteger(duration) || duration<1 || duration>360) return sendError(res,400,'Duration must be between 1 and 360 minutes.');
+    if(examId.length>100) return sendError(res,400,'Exam ID is too long.');
+    const questions=parseModelExamQuestionPaper(questionText);
+    if(questions.length>200) return sendError(res,400,'ஒரு Model Exam-ல் அதிகபட்சம் 200 questions மட்டுமே சேமிக்கலாம்.');
+
+    client=await pool.connect();
+    await client.query('BEGIN');
+    const exists=await client.query('SELECT 1 FROM model_exams WHERE exam_id=$1 LIMIT 1',[examId]);
+    if(exists.rowCount){
+      await client.query('ROLLBACK');
+      return sendError(res,409,'இந்த Model Exam ID ஏற்கனவே உள்ளது. Existing exam overwrite செய்யப்படாது.');
+    }
+    await client.query(`INSERT INTO model_exams(exam_id,title,exam_date,exam_time,duration_minutes,access_window_hours,status)
+      VALUES($1,$2,$3,$4,$5,24,'draft')`,[examId,title,examDate,examTime,duration]);
+    for(const q of questions){
+      await client.query(`INSERT INTO model_exam_questions(exam_id,question_no,question,options,correct_option,explanation)
+        VALUES($1,$2,$3,$4::jsonb,$5,$6)`,[examId,q.questionNo,q.question,JSON.stringify(q.options),q.correctOption,q.explanation]);
+    }
+    await client.query('COMMIT');
+    res.status(201).json({saved:true,questionCount:questions.length,exam:{examId,title,examDate,examTime,durationMinutes:duration,status:'draft'}});
+  }catch(e){
+    if(client){try{await client.query('ROLLBACK');}catch(_){} }
+    console.error('[MODEL EXAM] save error:',e);
+    sendError(res,400,e?.message||'Model Exam save error.');
+  }finally{ if(client) client.release(); }
+});
+
 /* ===== IMPORTANT NEWS ===== */
 async function ensureImportantNewsTable(){
   await pool.query(`
@@ -2464,6 +2567,7 @@ async function start(){
     await ensurePasswordResetTables();
     await ensureQuestionHistory();
     await ensureImportantNewsTable();
+    await ensureModelExamTables();
     await backfillLastLoginFromAudit();
     await ensureAdmin();
     app.listen(PORT,'0.0.0.0',()=>console.log(`Thiral V171 Secure Temporary Password + Gender Summary + Detailed Usage Monitor listening on port ${PORT}`));
