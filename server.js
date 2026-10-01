@@ -399,68 +399,6 @@ app.get('/health', async (req, res) => {
 const api = express.Router();
 api.use(apiLimiter);
 
-/* ===== IMPORTANT NEWS =====
-   Separate announcement data. Existing users, questions, attempts,
-   results, security and admin data are not modified by these routes.
-*/
-api.post('/admin/important-news', requireAdmin, async (req, res) => {
-  try {
-    const title = String(req.body?.title || '').trim();
-    const content = String(req.body?.content || '').trim();
-    const status = String(req.body?.status || 'draft').trim().toLowerCase();
-
-    if (!title || !content) {
-      return sendError(res, 400, 'Title and News content are required.');
-    }
-    if (!['draft','published'].includes(status)) {
-      return sendError(res, 400, 'Invalid Important News status.');
-    }
-
-    const q = await pool.query(
-      `INSERT INTO important_news(title,content,status,published_at)
-       VALUES($1,$2,$3,CASE WHEN $3='published' THEN now() ELSE NULL END)
-       RETURNING id,title,content,status,created_at,updated_at,published_at`,
-      [title, content, status]
-    );
-
-    return res.json({ ok:true, news:q.rows[0] });
-  } catch (e) {
-    console.error('[IMPORTANT NEWS] Save error:', e);
-    return sendError(res, 500, 'Important News save service error.');
-  }
-});
-
-api.get('/admin/important-news', requireAdmin, async (req, res) => {
-  try {
-    const q = await pool.query(
-      `SELECT id,title,content,status,created_at,updated_at,published_at
-         FROM important_news
-        ORDER BY created_at DESC
-        LIMIT 100`
-    );
-    return res.json({ ok:true, news:q.rows });
-  } catch (e) {
-    console.error('[IMPORTANT NEWS] Admin list error:', e);
-    return sendError(res, 500, 'Important News list service error.');
-  }
-});
-
-api.get('/important-news', requireAuth, async (req, res) => {
-  try {
-    const q = await pool.query(
-      `SELECT id,title,content,created_at,published_at
-         FROM important_news
-        WHERE status='published'
-        ORDER BY COALESCE(published_at,created_at) DESC
-        LIMIT 20`
-    );
-    return res.json({ ok:true, news:q.rows });
-  } catch (e) {
-    console.error('[IMPORTANT NEWS] Student list error:', e);
-    return sendError(res, 500, 'Important News service error.');
-  }
-});
-
 api.get('/auth/me', async (req, res) => {
   try {
     const user = await getUserFromSession(req);
@@ -2311,6 +2249,75 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
   }
 });
 
+
+/* ===== IMPORTANT NEWS ===== */
+async function ensureImportantNewsTable(){
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS important_news (
+      id BIGSERIAL PRIMARY KEY,
+      title TEXT NOT NULL,
+      content TEXT NOT NULL,
+      status VARCHAR(20) NOT NULL DEFAULT 'draft'
+        CHECK (status IN ('draft','published')),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      published_at TIMESTAMPTZ NULL
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS important_news_status_idx
+    ON important_news(status, created_at DESC)
+  `);
+}
+
+api.post('/admin/important-news', requireAdmin, async (req,res)=>{
+  try{
+    const title=String(req.body?.title||'').trim();
+    const content=String(req.body?.content||'').trim();
+    const status=String(req.body?.status||'draft').trim().toLowerCase();
+    if(!title || !content) return sendError(res,400,'Title and content are required.');
+    if(!['draft','published'].includes(status)) return sendError(res,400,'Invalid news status.');
+    const {rows}=await pool.query(`
+      INSERT INTO important_news(title,content,status,published_at)
+      VALUES($1,$2,$3,CASE WHEN $3='published' THEN now() ELSE NULL END)
+      RETURNING id,title,content,status,created_at,updated_at,published_at`,
+      [title,content,status]
+    );
+    res.status(201).json({news:rows[0]});
+  }catch(e){
+    console.error('[IMPORTANT NEWS] save error:',e);
+    sendError(res,500,'Important News save error.');
+  }
+});
+
+api.get('/admin/important-news', requireAdmin, async (req,res)=>{
+  try{
+    const {rows}=await pool.query(`
+      SELECT id,title,content,status,created_at,updated_at,published_at
+      FROM important_news ORDER BY created_at DESC LIMIT 100`);
+    res.json({news:rows});
+  }catch(e){
+    console.error('[IMPORTANT NEWS] admin list error:',e);
+    sendError(res,500,'Important News list error.');
+  }
+});
+
+/* Public read only: only published announcements are exposed. */
+api.get('/important-news', async (req,res)=>{
+  try{
+    const {rows}=await pool.query(`
+      SELECT id,title,content,published_at,created_at
+      FROM important_news
+      WHERE status='published'
+      ORDER BY published_at DESC NULLS LAST, created_at DESC
+      LIMIT 20`);
+    res.json({news:rows});
+  }catch(e){
+    console.error('[IMPORTANT NEWS] public list error:',e);
+    sendError(res,500,'Important News service error.');
+  }
+});
+
 app.use('/api', api);
 
 app.use(express.static(path.join(__dirname,'frontend'), { index:'index.html' }));
@@ -2384,26 +2391,6 @@ async function ensurePasswordResetTables() {
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_password_reset_otps_token
     ON password_reset_otps(reset_token_hash)
-  `);
-}
-
-async function ensureImportantNewsTable() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS important_news (
-      id BIGSERIAL PRIMARY KEY,
-      title TEXT NOT NULL,
-      content TEXT NOT NULL,
-      status VARCHAR(20) NOT NULL DEFAULT 'draft'
-        CHECK (status IN ('draft','published')),
-      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-      published_at TIMESTAMPTZ NULL
-    )
-  `);
-
-  await pool.query(`
-    CREATE INDEX IF NOT EXISTS idx_important_news_status_created
-    ON important_news(status, created_at DESC)
   `);
 }
 
