@@ -837,11 +837,24 @@ a{
 <section id="importantNews" class="card hidden" style="text-align:center;">
   <div style="font-size:58px;line-height:1;margin-bottom:10px;">📢</div>
   <h2 style="margin-bottom:8px;">முக்கிய அறிவிப்பு / Important News</h2>
-  <div id="importantNewsList" style="margin:22px auto;max-width:760px;text-align:left;">
-    <div class="card" style="text-align:center;">
-      <p class="small">முக்கிய அறிவிப்பு ஏற்றப்படுகிறது...</p>
-    </div>
+
+  <div style="margin:22px auto;max-width:760px;padding:24px 22px;border-radius:18px;background:linear-gradient(135deg,#eef6ff,#f5fbff);border:1px solid rgba(18,63,112,.12);">
+    <h3 style="margin:0 0 14px;color:#123f70;">TNPSC Group 4 – Model Exam</h3>
+
+    <p style="font-size:20px;font-weight:800;margin:10px 0;">
+      📅 Model Exam தேதி:
+      <span style="color:#b42318;">தேதி பின்னர் அறிவிக்கப்படும்</span>
+    </p>
+
+    <p style="font-size:18px;line-height:1.7;margin:16px 0;">
+      Thiral-ல் பதிவு செய்த மாணவர்கள் மட்டும் இந்த Model Exam-ல் கலந்து கொள்ள முடியும்.
+    </p>
+
+    <p class="small" style="margin:0;">
+      Registered Student Login மூலம் மட்டுமே Model Exam-ஐ அணுக முடியும்.
+    </p>
   </div>
+
   <button class="secondary" onclick="show('home')" style="font-weight:800;">← Back to Home</button>
 </section>
 
@@ -939,138 +952,6 @@ a{
 <div id="usageMockDetail" class="hidden" style="margin-top:18px"></div>
 
 </div>
-<div class="grid" style="margin-top:16px">
-  <div class="card" style="border:1px solid #dbeafe">
-    <h3>📢 Important News</h3>
-    <p class="small">மாணவர்களுக்கு காட்ட வேண்டிய முக்கிய அறிவிப்பை Copy / Paste செய்து நிர்வகிக்கலாம்.</p>
-    <button type="button" class="secondary" onclick="toggleAdminTool('adminImportantNewsTool')">Open / திறக்க</button>
-  </div>
-
-  <div class="card" style="border:1px solid #dbeafe">
-    <h3>📝 Model Exam Questions</h3>
-    <p class="small">தனி Model Exam-க்கான புதிய கேள்விகளை Upload / Paste செய்து தயாரிக்கலாம்.</p>
-    <button type="button" class="secondary" onclick="toggleAdminTool('adminModelExamTool')">Open / திறக்க</button>
-  </div>
-</div>
-
-<div id="adminImportantNewsTool" class="card hidden" style="margin-top:16px;border:1px solid #dbeafe">
-  <div class="top">
-    <h3>📢 Important News Management</h3>
-    <button type="button" class="secondary" onclick="toggleAdminTool('adminImportantNewsTool')">Close</button>
-  </div>
-  <label>தலைப்பு / Title</label>
-  <input id="adminNewsTitle" type="text" maxlength="200" placeholder="உதா: TNPSC Group 4 – Model Exam அறிவிப்பு">
-  <label>அறிவிப்பு / News</label>
-  <textarea id="adminNewsBody" rows="8" maxlength="10000" placeholder="இங்கே உங்கள் Important News-ஐ Copy / Paste செய்யுங்கள்..."></textarea>
-  <label>நிலை / Status</label>
-  <select id="adminNewsStatus">
-    <option value="draft">Draft / வரைவு</option>
-    <option value="published">Published / வெளியிடு</option>
-  </select>
-  <p class="small">Saved Important News database-ல் பாதுகாப்பாக இருக்கும். மீண்டும் இந்த பகுதியை திறந்தால் சேமித்த செய்திகள் இங்கே தோன்றும்.</p>
-  <div style="display:flex;gap:10px;flex-wrap:wrap">
-    <button type="button" onclick="previewAdminNews()">👁️ Preview</button>
-    <button type="button" onclick="saveAdminNews()">💾 Save News</button>
-    <button type="button" class="secondary" onclick="clearAdminNewsForm()">Clear</button>
-  </div>
-  <p id="adminNewsSaveMsg" class="small" style="margin-top:10px"></p>
-  <div id="adminNewsSavedList" class="card" style="margin-top:14px;background:#f8fbff;text-align:left;"><p class="small">Saved Important News ஏற்றப்படுகிறது...</p></div>
-  <div id="adminNewsPreview" class="card hidden" style="margin-top:14px;background:#f8fbff"></div>
-</div>
-
-<div id="adminModelExamTool" class="card hidden" style="margin-top:16px;border:1px solid #dbeafe">
-  <div class="top">
-    <h3>📝 Model Exam Questions</h3>
-    <button type="button" class="secondary" onclick="toggleAdminTool('adminModelExamTool')">Close</button>
-  </div>
-
-  <label>Model Exam ID</label>
-  <input id="adminModelExamId" type="text" maxlength="100" placeholder="உதா: ME-2026-001">
-
-  <label>Exam Title</label>
-  <input id="adminModelExamTitle" type="text" maxlength="250" placeholder="உதா: TNPSC Group 4 – Model Exam 01">
-
-  <div class="grid">
-    <div>
-      <label>Exam Date</label>
-      <input id="adminModelExamDate" type="date">
-    </div>
-    <div>
-      <label>Start Time</label>
-      <input id="adminModelExamTime" type="time">
-    </div>
-  </div>
-
-  <div class="grid">
-    <div>
-      <label>Availability</label>
-      <input id="adminModelExamAvailability" type="text" value="24 Hours" readonly>
-    </div>
-    <div>
-      <label>Duration</label>
-      <input id="adminModelExamDuration" type="number" value="180" min="1" placeholder="Minutes">
-    </div>
-  </div>
-
-  <label>Question Paper – Copy / Paste</label>
-  <textarea id="adminModelExamQuestions" rows="14" placeholder='இங்கே புதிய Model Exam questions-ஐ paste செய்யலாம்.
-
-உதாரண வடிவம்:
-Q001
-Question: ...
-A. ...
-B. ...
-C. ...
-D. ...
-Correct Answer: A
-Explanation: ...
-
-Q002
-Question: ...'></textarea>
-
-  <label>அல்லது Question File Upload</label>
-  <input id="adminModelExamFile" type="file" accept=".json,.txt,.csv" onchange="previewModelExamFile(this)">
-  <p id="adminModelExamFileMsg" class="small"></p>
-
-  <p class="small">இந்த questions master question bank-ல் சேராது. தனி Model Exam paper-ஆகவே சேமிக்கப்படும். Save செய்வதற்கு முன் Preview சரிபார்க்கவும்.</p>
-
-  <div style="display:flex;gap:10px;flex-wrap:wrap">
-    <button type="button" onclick="previewModelExam()">👁️ Preview</button>
-    <button type="button" onclick="saveModelExam()">💾 Save Model Exam</button>
-    <button type="button" class="secondary" onclick="clearModelExamForm()">Clear</button>
-  </div>
-  <p id="adminModelExamSaveMsg" class="small" style="margin-top:10px"></p>
-  <div id="adminModelExamPreview" class="card hidden" style="margin-top:14px;background:#f8fbff"></div>
-</div>
-<div class="card" style="margin-top:16px;border:1px solid #dbeafe">
-<h3>📡 Beta Usage Monitor</h3>
-<p class="small">Beta Test-ல் தற்போது எத்தனை மாணவர்கள் உள்ளே இருக்கிறார்கள், கடந்த 24 மணி நேர பயன்பாடு மற்றும் Practice/Mock பயன்பாட்டை central activity data மூலம் பார்க்கும் பகுதி. மாணவர்களின் Password ஒருபோதும் அனுப்பப்படாது.</p>
-<div class="grid admin-stat-grid">
-<div class="card admin-stat-card" role="button" tabindex="0" onclick="toggleUsageDetail('onlineStudentList')" onkeydown="if(event.key==='Enter'||event.key===' ')toggleUsageDetail('onlineStudentList')" style="cursor:pointer"><h3>🟢 Currently Online</h3><p id="onlineActiveNow">-</p><span class="small">விவரங்களை காண்க ▾</span></div>
-<div class="card admin-stat-card" role="button" tabindex="0" onclick="toggleUsageDetail('usageLast24Detail')" onkeydown="if(event.key==='Enter'||event.key===' ')toggleUsageDetail('usageLast24Detail')" style="cursor:pointer"><h3>🕐 Last 24 Hours</h3><p id="onlineActive24h">-</p><span class="small">விவரங்களை காண்க ▾</span></div>
-<div class="card admin-stat-card" role="button" tabindex="0" onclick="toggleUsageDetail('usagePracticeDetail')" onkeydown="if(event.key==='Enter'||event.key===' ')toggleUsageDetail('usagePracticeDetail')" style="cursor:pointer"><h3>📝 Practice Sessions</h3><p id="onlinePracticeCount">-</p><span class="small">யார் யார் என்பதை காண்க ▾</span></div>
-<div class="card admin-stat-card" role="button" tabindex="0" onclick="toggleUsageDetail('usageMockDetail')" onkeydown="if(event.key==='Enter'||event.key===' ')toggleUsageDetail('usageMockDetail')" style="cursor:pointer"><h3>🎯 Mock Tests</h3><p id="onlineMockCount">-</p><span class="small">யார் யார் என்பதை காண்க ▾</span></div>
-</div>
-<p id="onlineMonitorMsg" class="small">மேலுள்ள எண்ணிக்கையை அழுத்தினால் அந்த எண்ணிக்கைக்கான முழு விவரங்கள் திறக்கும்.</p>
-<div id="onlineStudentList" class="hidden" style="margin-top:14px"></div>
-<div id="usageLast24Detail" class="hidden" style="margin-top:18px"></div>
-<div id="usagePracticeDetail" class="hidden" style="margin-top:18px"></div>
-<div id="usageMockDetail" class="hidden" style="margin-top:18px"></div>
-
-</div>
-<hr>
-<div class="card" style="margin-top:16px;border:1px solid #fecaca">
-<h3>🛡️ Security Monitor / பாதுகாப்பு</h3>
-<p class="small">Admin account மற்றும் பாதுகாப்பு தொடர்பான நிகழ்வுகளை மட்டும் Admin பார்க்க முடியும். Password, OTP அல்லது sensitive data இங்கே காட்டப்படாது.</p>
-<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
-<button onclick="loadSecurityEvents138()">🔄 Security Refresh</button>
-</div>
-<p id="securityMsg138" class="small"></p>
-<div id="securityStats138" class="grid admin-stat-grid" style="margin-top:10px"></div>
-<p id="securitySelectMsg138" class="small">மேலுள்ள Security card-ஐ கிளிக் செய்தால் அந்த வகை நிகழ்வுகள் மட்டும் தனியாக காட்டப்படும்.</p>
-<div id="securityDetail138" class="hidden" style="margin-top:14px"></div>
-</div>
-
 <hr>
 <div class="card" style="margin-top:16px;border:1px solid #fecaca">
 <h3>🛡️ Security Monitor / பாதுகாப்பு</h3>
@@ -1114,6 +995,35 @@ Question: ...'></textarea>
 <p id="adminExamResultsMsg" class="small" style="margin-top:10px"></p>
 </div>
 <hr>
+
+<hr>
+<section id="adminModelExamTool" class="card" style="margin-top:16px;border:1px solid #bfdbfe">
+  <h3>📝 Model Exam Questions / மாதிரி தேர்வு கேள்விகள்</h3>
+  <p class="small">இந்த பகுதி Master Question Bank-ஐ தொடாது. Model Exam-க்கு தனி database-ல் மட்டும் சேமிக்கப்படும்.</p>
+  <div class="grid">
+    <div><label>Model Exam ID</label><input id="meExamId" value="ME-2026-001" placeholder="ME-2026-001"></div>
+    <div><label>Exam Title</label><input id="meTitle" placeholder="6th Standard Tamil"></div>
+    <div><label>Exam Date</label><input id="meDate" type="date"></div>
+    <div><label>Start Time</label><input id="meStartTime" type="time" value="00:00"></div>
+    <div><label>Availability</label><input id="meAvailability" type="number" min="1" max="168" value="24"></div>
+    <div><label>Duration</label><input id="meDuration" type="number" value="180" readonly></div>
+  </div>
+  <label style="display:block;margin-top:12px">Question Paper – Copy / Paste</label>
+  <textarea id="meQuestionText" rows="14" placeholder="Q001\nQuestion: ...\nA. ...\nB. ...\nC. ...\nD. ...\nCorrect Answer: B"></textarea>
+  <div style="margin-top:10px">
+    <label>அல்லது Question File Upload</label>
+    <input id="meQuestionFile" type="file" accept=".txt,.json,.csv" onchange="loadModelExamQuestionFile(this)">
+    <p class="small">Admin file-ல் Correct Answer இருக்கலாம். Student screen-ல் அது ஒருபோதும் காட்டப்படாது.</p>
+  </div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+    <button type="button" onclick="previewModelExamUpload()">👁 Preview</button>
+    <button type="button" onclick="saveModelExamUpload()">💾 Save Model Exam</button>
+    <button type="button" class="secondary" onclick="clearModelExamUpload()">Clear</button>
+  </div>
+  <p id="modelExamUploadMsg" class="small" style="margin-top:10px"></p>
+  <div id="modelExamUploadPreview" class="hidden" style="margin-top:14px"></div>
+</section>
+
 <h3>📚 Content Management</h3>
 <p>Subjects → Topics → Subtopics → Study Material → Questions ஆகியவற்றை Admin நிர்வகிக்கும் பகுதி.</p>
 <h3>📝 Question Bank</h3>
@@ -1292,12 +1202,6 @@ function show(id){
   if(!el)return;
   el.classList.remove('hidden');
   el.style.display='block';
-  if(id==='importantNews'){
-    setTimeout(()=>{ try{ loadImportantNews(); }catch(e){} },0);
-  }
-  if(id==='admin'){
-    setTimeout(()=>{ try{ loadAdminImportantNews(); }catch(e){} },0);
-  }
 
   /* Home is a two-part landing page: keep the original About/intro section
      visible after Logout as it is on the initial load. Other screens remain
@@ -5828,200 +5732,101 @@ window.startPractice=async function(n){
 })();
 </script>
 
-<script id="thiral-important-news-display">
-async function loadImportantNews(){
-  const box=document.getElementById('importantNewsList');
-  if(!box)return;
-  box.innerHTML='<div class="card" style="text-align:center;"><p class="small">முக்கிய அறிவிப்புகள் ஏற்றப்படுகிறது...</p></div>';
-  try{
-    if(typeof window.thiralV138Api!=='function') throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
-    const data=await window.thiralV138Api('/important-news');
-    // Student view: show only the latest published Important News. Older announcements remain in DB but are not displayed here.
-    const items=(Array.isArray(data.news)?data.news:[]).slice(0,1);
-    if(!items.length){
-      box.innerHTML='<div class="card" style="text-align:center;"><p>📢 தற்போது முக்கிய அறிவிப்பு எதுவும் இல்லை.</p></div>';
-      return;
-    }
-    box.innerHTML=items.map(n=>{
-      const title=escapeHtmlAdmin(n.title||'முக்கிய அறிவிப்பு');
-      const content=escapeHtmlAdmin(n.content||'').replace(/\n/g,'<br>');
-      const date=n.published_at||n.created_at;
-      let dateText='';
-      if(date){try{dateText=new Date(date).toLocaleString('ta-IN');}catch(e){dateText=String(date);}}
-      return '<div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,#eef6ff,#f5fbff);border:1px solid rgba(18,63,112,.12);text-align:left;">'+
-        '<h3 style="margin:0 0 12px;color:#123f70;">'+title+'</h3>'+
-        '<div style="font-size:17px;line-height:1.8;">'+content+'</div>'+
-        (dateText?'<p class="small" style="margin:14px 0 0;">📅 '+escapeHtmlAdmin(dateText)+'</p>':'')+
-      '</div>';
-    }).join('');
-  }catch(e){
-    box.innerHTML='<div class="card" style="text-align:center;border:1px solid #fecaca;"><p>❌ முக்கிய அறிவிப்பை ஏற்ற முடியவில்லை.</p><p class="small">'+escapeHtmlAdmin(e?.message||e)+'</p><button type="button" onclick="loadImportantNews()">🔄 மீண்டும் முயற்சி</button></div>';
-  }
-}
 
-const __originalShowForImportantNews = window.show;
-if(typeof __originalShowForImportantNews==='function'){
-  window.show=function(id){
-    __originalShowForImportantNews(id);
-    if(id==='importantNews') loadImportantNews();
+<script id="thiral-model-exam-admin-save-ui">
+(function(){
+  'use strict';
+  function meEl(id){ return document.getElementById(id); }
+  function meApi(path,opt){
+    opt=opt||{};
+    return window.thiralV138Api(path,Object.assign({method:'GET'},opt));
+  }
+  function parseMEText(text){
+    var lines=String(text||'').replace(/\r/g,'').split('\n');
+    var blocks=[], cur=null;
+    function push(){ if(cur && (cur.question || cur.options.length)) blocks.push(cur); cur=null; }
+    for(var i=0;i<lines.length;i++){
+      var line=lines[i].trim();
+      if(!line){ continue; }
+      var qm=line.match(/^Q(\d+)\s*$/i);
+      if(qm){ push(); cur={question_no:Number(qm[1]),question:'',options:[],correct_answer:'',explanation:'',subject:'',topic:'',language:'ta'}; continue; }
+      if(!cur) continue;
+      if(/^Question\s*:/i.test(line)) cur.question=line.replace(/^Question\s*:/i,'').trim();
+      else if(/^([ABCD])\s*[\.:]\s*/i.test(line)){ var m=line.match(/^([ABCD])\s*[\.:]\s*(.*)$/i); cur.options['ABCD'.indexOf(m[1].toUpperCase())]=m[2].trim(); }
+      else if(/^Correct\s+Answer\s*:/i.test(line)) cur.correct_answer=line.replace(/^Correct\s+Answer\s*:/i,'').trim().toUpperCase();
+      else if(/^Explanation\s*:/i.test(line)) cur.explanation=line.replace(/^Explanation\s*:/i,'').trim();
+      else if(/^Subject\s*:/i.test(line)) cur.subject=line.replace(/^Subject\s*:/i,'').trim();
+      else if(/^Topic\s*:/i.test(line)) cur.topic=line.replace(/^Topic\s*:/i,'').trim();
+      else if(/^Language\s*:/i.test(line)) cur.language=line.replace(/^Language\s*:/i,'').trim().toLowerCase();
+    }
+    push();
+    return blocks;
+  }
+  function parseMEJson(text){
+    var data=JSON.parse(text); if(!Array.isArray(data)) data=data.questions||[]; return data.map(function(q,i){return {question_no:Number(q.question_no||q.no||i+1),question:String(q.question||''),options:Array.isArray(q.options)?q.options:[],correct_answer:String(q.correct_answer||q.correct_option||'').toUpperCase(),explanation:String(q.explanation||''),subject:String(q.subject||''),topic:String(q.topic||q.subtopic||''),language:String(q.language||'ta').toLowerCase()};});
+  }
+  function parseMECsv(text){
+    var rows=String(text||'').trim().split(/\r?\n/); if(rows.length<2) return [];
+    var head=rows[0].split(',').map(function(x){return x.trim().toLowerCase();});
+    return rows.slice(1).map(function(line,i){var a=line.split(',').map(function(x){return x.trim().replace(/^"|"$/g,'');});var o={};head.forEach(function(h,j){o[h]=a[j]||'';});return {question_no:Number(o.question_no||i+1),question:o.question||'',options:[o.a||'',o.b||'',o.c||'',o.d||''],correct_answer:String(o.correct_answer||'').toUpperCase(),explanation:o.explanation||'',subject:o.subject||'',topic:o.topic||'',language:(o.language||'ta').toLowerCase()};});
+  }
+  function parseME(text,name){
+    if(/\.json$/i.test(name||'')){try{return parseMEJson(text);}catch(e){throw new Error('JSON file format is invalid.');}}
+    if(/\.csv$/i.test(name||'')) return parseMECsv(text);
+    return parseMEText(text);
+  }
+  function currentRows(){
+    var raw=meEl('meQuestionText').value||'';
+    return parseME(raw,'questions.txt');
+  }
+  function validateRows(rows){
+    if(!rows.length) return 'கேள்விகள் இல்லை.';
+    var nums={};
+    for(var i=0;i<rows.length;i++){
+      var q=rows[i];
+      if(!Number.isInteger(q.question_no)||q.question_no<1) return 'Question number தவறாக உள்ளது.';
+      if(nums[q.question_no]) return 'Duplicate question number: Q'+q.question_no;
+      nums[q.question_no]=1;
+      if(!q.question) return 'Q'+q.question_no+'-ல் Question இல்லை.';
+      if(!Array.isArray(q.options)||q.options.length!==4||q.options.some(function(x){return !String(x||'').trim();})) return 'Q'+q.question_no+'-ல் A/B/C/D நான்கும் தேவை.';
+      if(!/^[ABCD]$/.test(String(q.correct_answer||'').toUpperCase())) return 'Q'+q.question_no+'-ல் Correct Answer தேவை.';
+    }
+    return '';
+  }
+  window.loadModelExamQuestionFile=function(input){
+    var f=input&&input.files&&input.files[0]; if(!f)return;
+    var reader=new FileReader();
+    reader.onload=function(){ try{ var rows=parseME(reader.result,f.name); var err=validateRows(rows); if(err) throw new Error(err); meEl('meQuestionText').value=rows.map(function(q){return 'Q'+String(q.question_no).padStart(3,'0')+'\nQuestion: '+q.question+'\nA. '+q.options[0]+'\nB. '+q.options[1]+'\nC. '+q.options[2]+'\nD. '+q.options[3]+'\nCorrect Answer: '+q.correct_answer+(q.explanation?'\nExplanation: '+q.explanation:'');}).join('\n\n'); meEl('modelExamUploadMsg').textContent=rows.length+' questions file loaded. Preview செய்து சரிபார்க்கவும்.'; }catch(e){meEl('modelExamUploadMsg').textContent='❌ '+e.message;} };
+    reader.readAsText(f,'UTF-8');
   };
-}
+  window.previewModelExamUpload=function(){
+    try{
+      var rows=currentRows(), err=validateRows(rows); if(err) throw new Error(err);
+      var box=meEl('modelExamUploadPreview'); box.classList.remove('hidden');
+      box.innerHTML='<h4>Question data preview: '+rows.length+' questions</h4>'+rows.map(function(q){return '<div class="card" style="margin:10px 0"><b>Q'+String(q.question_no).padStart(3,'0')+'</b><p>'+escapeHtml(q.question)+'</p>'+q.options.map(function(o,i){return '<div>'+String.fromCharCode(65+i)+'. '+escapeHtml(o)+'</div>';}).join('')+'</div>';}).join('');
+      meEl('modelExamUploadMsg').textContent='Preview ready. Correct Answer admin data-ல் மட்டும் இருக்கும்.';
+      window.__modelExamUploadRows=rows;
+    }catch(e){meEl('modelExamUploadMsg').textContent='❌ '+e.message;}
+  };
+  window.saveModelExamUpload=async function(){
+    try{
+      var rows=window.__modelExamUploadRows||currentRows(), err=validateRows(rows); if(err) throw new Error(err);
+      var examId=meEl('meExamId').value.trim(), title=meEl('meTitle').value.trim(), date=meEl('meDate').value, time=meEl('meStartTime').value, avail=Number(meEl('meAvailability').value||24);
+      if(!examId||!title||!date||!time) throw new Error('Exam ID, Title, Date, Start Time அனைத்தும் தேவை.');
+      meEl('modelExamUploadMsg').textContent='Saving...';
+      var d=await meApi('/admin/model-exams',{method:'POST',body:JSON.stringify({exam_id:examId,title:title,exam_date:date,start_time:time,availability_hours:avail,duration_minutes:180,questions:rows})});
+      meEl('modelExamUploadMsg').textContent='✅ '+d.message+' | '+d.question_count+' questions saved.';
+    }catch(e){meEl('modelExamUploadMsg').textContent='❌ '+(e.message||e);}
+  };
+  window.clearModelExamUpload=function(){
+    ['meTitle','meDate','meQuestionText'].forEach(function(id){if(meEl(id))meEl(id).value='';});
+    meEl('meExamId').value='ME-2026-001'; meEl('meStartTime').value='00:00'; meEl('meAvailability').value='24';
+    meEl('modelExamUploadPreview').innerHTML=''; meEl('modelExamUploadPreview').classList.add('hidden'); meEl('modelExamUploadMsg').textContent=''; window.__modelExamUploadRows=null;
+  };
+  function escapeHtml(s){return String(s).replace(/[&<>'"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c];});}
+})();
 </script>
-<script id="thiral-admin-model-tools">
-function toggleAdminTool(id){
-  const el=document.getElementById(id);
-  if(!el)return;
-  el.classList.toggle('hidden');
-  if(!el.classList.contains('hidden')){
-    setTimeout(()=>el.scrollIntoView({behavior:'smooth',block:'start'}),30);
-  }
-}
-function clearAdminNewsForm(){
-  ['adminNewsTitle','adminNewsBody'].forEach(id=>{
-    const e=document.getElementById(id); if(e)e.value='';
-  });
-  const s=document.getElementById('adminNewsStatus'); if(s)s.value='draft';
-  const p=document.getElementById('adminNewsPreview'); if(p){p.classList.add('hidden');p.innerHTML='';}
-}
-function previewAdminNews(){
-  const title=(document.getElementById('adminNewsTitle')?.value||'').trim();
-  const body=(document.getElementById('adminNewsBody')?.value||'').trim();
-  const status=document.getElementById('adminNewsStatus')?.value||'draft';
-  const p=document.getElementById('adminNewsPreview');
-  if(!p)return;
-  if(!title && !body){
-    p.classList.remove('hidden');
-    p.innerHTML='<p class="small">முன்னோட்டத்திற்கு Title அல்லது News உள்ளிடுங்கள்.</p>';
-    return;
-  }
-  p.classList.remove('hidden');
-  p.innerHTML='<h3 style="margin-top:0">'+escapeHtmlAdmin(title||'Untitled')+'</h3>'+
-    '<p class="small">Status: '+(status==='published'?'Published / வெளியிடப்பட்டது':'Draft / வரைவு')+'</p>'+
-    '<div style="white-space:pre-wrap;line-height:1.7">'+escapeHtmlAdmin(body)+'</div>';
-}
-function clearModelExamForm(){
-  ['adminModelExamId','adminModelExamTitle','adminModelExamDate','adminModelExamTime','adminModelExamQuestions'].forEach(id=>{
-    const e=document.getElementById(id); if(e)e.value='';
-  });
-  const d=document.getElementById('adminModelExamDuration'); if(d)d.value='180';
-  const f=document.getElementById('adminModelExamFile'); if(f)f.value='';
-  const m=document.getElementById('adminModelExamFileMsg'); if(m)m.textContent='';
-  const sm=document.getElementById('adminModelExamSaveMsg'); if(sm)sm.textContent='';
-  const p=document.getElementById('adminModelExamPreview'); if(p){p.classList.add('hidden');p.innerHTML='';}
-}
-async function previewModelExamFile(input){
-  const msg=document.getElementById('adminModelExamFileMsg');
-  if(!msg)return;
-  const file=input?.files?.[0];
-  if(!file){msg.textContent='';return;}
-  try{
-    const text=await file.text();
-    const ta=document.getElementById('adminModelExamQuestions');
-    if(ta) ta.value=text;
-    msg.textContent='✅ கோப்பு படிக்கப்பட்டது: '+file.name+' ('+Math.round(file.size/1024)+' KB). Preview அழுத்தி சரிபார்க்கவும்.';
-  }catch(e){
-    msg.textContent='❌ கோப்பைப் படிக்க முடியவில்லை: '+(e?.message||e);
-  }
-}
-function previewModelExam(){
-  const id=(document.getElementById('adminModelExamId')?.value||'').trim();
-  const title=(document.getElementById('adminModelExamTitle')?.value||'').trim();
-  const date=document.getElementById('adminModelExamDate')?.value||'';
-  const time=document.getElementById('adminModelExamTime')?.value||'';
-  const duration=document.getElementById('adminModelExamDuration')?.value||'180';
-  const q=(document.getElementById('adminModelExamQuestions')?.value||'').trim();
-  const p=document.getElementById('adminModelExamPreview');
-  if(!p)return;
-  p.classList.remove('hidden');
-  p.innerHTML='<h3 style="margin-top:0">Model Exam Preview</h3>'+
-    '<p><strong>ID:</strong> '+escapeHtmlAdmin(id||'—')+'</p>'+
-    '<p><strong>Title:</strong> '+escapeHtmlAdmin(title||'—')+'</p>'+
-    '<p><strong>Date:</strong> '+escapeHtmlAdmin(date||'—')+' &nbsp; <strong>Start:</strong> '+escapeHtmlAdmin(time||'—')+'</p>'+
-    '<p><strong>Availability:</strong> 24 Hours &nbsp; <strong>Duration:</strong> '+escapeHtmlAdmin(duration)+' minutes</p>'+
-    '<hr><p><strong>Question data preview:</strong></p>'+
-    '<pre style="white-space:pre-wrap;max-height:360px;overflow:auto">'+escapeHtmlAdmin(q||'Question data இன்னும் உள்ளிடப்படவில்லை.')+'</pre>';
-}
 
-async function saveModelExam(){
-  const id=(document.getElementById('adminModelExamId')?.value||'').trim();
-  const title=(document.getElementById('adminModelExamTitle')?.value||'').trim();
-  const date=document.getElementById('adminModelExamDate')?.value||'';
-  const time=document.getElementById('adminModelExamTime')?.value||'';
-  const duration=Number(document.getElementById('adminModelExamDuration')?.value||180);
-  const raw=(document.getElementById('adminModelExamQuestions')?.value||'').trim();
-  const msg=document.getElementById('adminModelExamSaveMsg');
-  if(!id||!title||!date||!time||!raw){ if(msg)msg.textContent='❌ ID, Title, Date, Start Time மற்றும் Questions அனைத்தும் தேவை.'; return; }
-  if(duration!==180){ if(msg)msg.textContent='❌ Model Exam duration 180 minutes ஆக இருக்க வேண்டும்.'; return; }
-  if(msg)msg.textContent='Saving...';
-  try{
-    if(typeof window.thiralV138Api!=='function') throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
-    const result=await window.thiralV138Api('/admin/model-exams',{method:'POST',body:JSON.stringify({exam_id:id,title,exam_date:date,start_time:time,duration_minutes:duration,availability_hours:24,question_text:raw})});
-    if(msg)msg.textContent='✅ Model Exam சேமிக்கப்பட்டது. Exam ID: '+(result.exam?.exam_id||id)+' | Questions: '+(result.question_count||0);
-  }catch(e){
-    if(msg)msg.textContent='❌ Save failed: '+(e?.message||e);
-  }
-}
-
-async function loadAdminImportantNews(){
-  const box=document.getElementById('adminNewsSavedList');
-  if(!box)return;
-  box.innerHTML='<p class="small">Saved Important News ஏற்றப்படுகிறது...</p>';
-  try{
-    if(typeof window.thiralV138Api!=='function') throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
-    const data=await window.thiralV138Api('/admin/important-news');
-    // Admin view: show only the latest saved news. Older records remain safely in the database.
-    const items=(Array.isArray(data.news)?data.news:[]).slice(0,1);
-    if(!items.length){
-      box.innerHTML='<p class="small">📢 இதுவரை Important News எதுவும் சேமிக்கப்படவில்லை.</p>';
-      return;
-    }
-    box.innerHTML='<h4 style="margin-top:0">📋 Saved Important News</h4>'+items.map(n=>{
-      const status=n.status==='published'?'Published / வெளியிடப்பட்டது':'Draft / வரைவு';
-      const date=n.published_at||n.created_at;
-      let dateText='';
-      if(date){try{dateText=new Date(date).toLocaleString('ta-IN');}catch(e){dateText=String(date);}}
-      return '<div style="padding:14px 0;border-top:1px solid #dbeafe">'+
-        '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">'+
-        '<strong>'+escapeHtmlAdmin(n.title||'Untitled')+'</strong>'+
-        '<span class="small">'+escapeHtmlAdmin(status)+'</span></div>'+
-        '<div style="white-space:pre-wrap;line-height:1.65;margin-top:7px">'+escapeHtmlAdmin(n.content||'')+'</div>'+ 
-        (dateText?'<div class="small" style="margin-top:7px">📅 '+escapeHtmlAdmin(dateText)+'</div>':'')+
-        '</div>';
-    }).join('');
-  }catch(e){
-    box.innerHTML='<p class="small" style="color:#b91c1c">❌ Saved News ஏற்ற முடியவில்லை: '+escapeHtmlAdmin(e?.message||e)+'</p><button type="button" class="secondary" onclick="loadAdminImportantNews()">🔄 மீண்டும் முயற்சி</button>';
-  }
-}
-
-async function saveAdminNews(){
-  const title=(document.getElementById('adminNewsTitle')?.value||'').trim();
-  const content=(document.getElementById('adminNewsBody')?.value||'').trim();
-  const status=document.getElementById('adminNewsStatus')?.value||'draft';
-  const msg=document.getElementById('adminNewsSaveMsg');
-  if(!title || !content){
-    if(msg) msg.textContent='Title மற்றும் News இரண்டும் தேவை.';
-    return;
-  }
-  if(msg) msg.textContent='Saving...';
-  try{
-    if(typeof window.thiralV138Api!=='function'){
-      throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
-    }
-    const result=await window.thiralV138Api('/admin/important-news',{
-      method:'POST',
-      body:JSON.stringify({title,content,status})
-    });
-    if(msg) msg.textContent='✅ Important News சேமிக்கப்பட்டது. ID: '+(result.news?.id ?? '');
-    await loadAdminImportantNews();
-  }catch(e){
-    if(msg) msg.textContent='❌ Save failed: '+(e?.message||e);
-  }
-}
-
-function escapeHtmlAdmin(v){
-  return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-}
-</script>
 </body></html>
 
 
