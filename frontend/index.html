@@ -1001,7 +1001,7 @@ gs:{
 title:'📗 பொது அறிவு',
 topics:{
 'இந்திய வரலாறு':['பண்டைய இந்தியா','இடைக்கால இந்தியா','நவீன இந்தியா','சுதந்திரப் போராட்டம்'],
-'தமிழ்நாடு வரலாறு':['சங்க காலம்','சோழர்','பாண்டியர்','பல்லவர்','நாயக்கர்'],
+'தமிழ்நாடு வரலாறு':['சங்க காலம்','சோழர்','பாண்டியர்','பல்லவர்','நாயக்கர்','ஆட்சி','அரசியல்','நீதித்துறை','பதவியாளர்கள்'],
 'இந்திய அரசியல்':['அரசியலமைப்பு','அடிப்படை உரிமைகள்','பாராளுமன்றம்','மாநில அரசு','உள்ளாட்சி'],
 'புவியியல்':['இந்தியா','தமிழ்நாடு','ஆறுகள்','மலைகள்','வளங்கள்'],
 'அறிவியல்':['இயற்பியல்','வேதியியல்','உயிரியல்','சுற்றுச்சூழல்'],
@@ -1022,7 +1022,7 @@ const EN_LABELS={
   title:'📗 General Studies',
   topics:{
    'இந்திய வரலாறு':{'en':'Indian History','subs':{'பண்டைய இந்தியா':'Ancient India','இடைக்கால இந்தியா':'Medieval India','நவீன இந்தியா':'Modern India','சுதந்திரப் போராட்டம்':'Indian Freedom Movement'}},
-   'தமிழ்நாடு வரலாறு':{'en':'Tamil Nadu History','subs':{'சங்க காலம்':'Sangam Age','சோழர்':'Cholas','பாண்டியர்':'Pandyas','பல்லவர்':'Pallavas','நாயக்கர்':'Nayaks'}},
+   'தமிழ்நாடு வரலாறு':{'en':'Tamil Nadu History','subs':{'சங்க காலம்':'Sangam Age','சோழர்':'Cholas','பாண்டியர்':'Pandyas','பல்லவர்':'Pallavas','நாயக்கர்':'Nayaks','ஆட்சி':'Governance','அரசியல்':'Politics','நீதித்துறை':'Judiciary','பதவியாளர்கள்':'Office Holders'}},
    'இந்திய அரசியல்':{'en':'Indian Polity','subs':{'அரசியலமைப்பு':'Constitution','அடிப்படை உரிமைகள்':'Fundamental Rights','பாராளுமன்றம்':'Parliament','மாநில அரசு':'State Government','உள்ளாட்சி':'Local Government'}},
    'புவியியல்':{'en':'Geography','subs':{'இந்தியா':'India','தமிழ்நாடு':'Tamil Nadu','ஆறுகள்':'Rivers','மலைகள்':'Mountains','வளங்கள்':'Resources'}},
    'அறிவியல்':{'en':'Science','subs':{'இயற்பியல்':'Physics','வேதியியல்':'Chemistry','உயிரியல்':'Biology','சுற்றுச்சூழல்':'Environment'}},
@@ -5627,113 +5627,6 @@ window.startPractice=async function(n){
     window._practiceReentry=false;
     try{ var picker=document.getElementById('thiralMockLanguagePicker'); if(picker) picker.remove(); }catch(e){}
     try{ if(typeof window.logout==='function') await window.logout(); else show('home'); }catch(e){ try{ show('home'); }catch(_){ } }
-  };
-})();
-</script>
-
-
-<!-- THIRAL FINAL LANGUAGE SEPARATION FIX V1
-     Database language column is authoritative.
-     ta => question/options/explanation from the ta row only.
-     en => question/options/explanation from the en row only.
-     No destructive database operation is performed by this frontend fix.
--->
-<script>
-(function(){
-  'use strict';
-
-  function thiralIsEnglish(){
-    return String(window.contentLanguage || 'ta').toLowerCase() === 'en'
-      && String(window.currentSubject || '') !== 'tamil';
-  }
-
-  function thiralDisplay(q){
-    if(!q) return null;
-    /* /api/questions returns the language-specific DB row directly.
-       Therefore q.q / q.o / q.e are already the selected language.
-       Do not fall back to q.en/q.enO/q.enE, which caused the old split-bank logic. */
-    const text = String(q.q ?? '');
-    const opts = Array.isArray(q.o) ? q.o : [];
-    const exp = String(q.e ?? '');
-    if(text && opts.length === 4) return {q:text,o:opts,e:exp};
-    return null;
-  }
-
-  window.__THIRAL_LANGUAGE_RULE_V1__ = {
-    tamil: 'ta:q/o/e only',
-    english: 'en:q/o/e only',
-    database: 'language column authoritative'
-  };
-
-  /* Final Practice renderer. */
-  window.loadQ = function(){
-    if(!window.questions || !questions.length){
-      show('actions');
-      alert(thiralIsEnglish() ? 'No questions are currently available for this subtopic.' : 'இந்த பாடத்திற்கான கேள்விகள் தற்போது இல்லை.');
-      return;
-    }
-    if(qi >= Math.min(total, questions.length)){
-      finish();
-      return;
-    }
-
-    locked=false;
-    clearInterval(timer);
-    const q=questions[qi];
-    const d=thiralDisplay(q);
-
-    if(!d){
-      /* Never show a question from another language/source. */
-      qi++;
-      window.loadQ();
-      return;
-    }
-
-    const levelLabel = thiralIsEnglish() ? 'Difficulty' : 'சிரமநிலை';
-    level.textContent = levelLabel + ': ' + (q.d || q.level || (thiralIsEnglish() ? 'Moderate' : 'மிதமானது'));
-    progress.textContent=(qi+1)+' / '+Math.min(total,questions.length);
-    question.textContent=d.q;
-    options.innerHTML=d.o.map((x,i)=>`<button class="option" onclick="answer(${i})">${String.fromCharCode(65+i)}. ${x}</button>`).join('');
-    feedback.textContent='';
-    const pct=(qi/Math.min(total,questions.length))*100;
-    bar.style.width=pct+'%';
-
-    let t=15;
-    timerEl(t);
-    timer=setInterval(()=>{
-      t--;
-      timerEl(t);
-      if(t<=0){clearInterval(timer);answer(-1);}
-    },1000);
-  };
-
-  /* Final answer feedback also uses only the selected DB row's explanation. */
-  window.answer = function(i){
-    if(locked) return;
-    locked=true;
-    clearInterval(timer);
-    const q=questions[qi];
-    practiceAnswers[qi]=i;
-    const d=thiralDisplay(q);
-    const exp=d ? d.e : '';
-
-    if(i===-1){
-      unanswered++;
-      feedback.innerHTML='<span class="warn">⏱️ நேரம் முடிந்தது. விடை அளிக்கப்படவில்லை.</span>';
-    }else if(i===q.a){
-      correct++;
-      feedback.innerHTML='<span class="good">✓ '+(thiralIsEnglish()?'Correct':'சரி')+'</span><br>'+exp;
-    }else{
-      wrong++;
-      feedback.innerHTML='<span class="bad">✗ '+(thiralIsEnglish()?'Incorrect':'தவறு')+'</span><br>'+exp;
-    }
-    setTimeout(()=>{qi++;window.loadQ();},1200);
-  };
-
-  /* Review uses the exact same selected-language DB fields. */
-  window.__THIRAL_DISPLAY_SELECTED_LANGUAGE__ = function(q){
-    const d=thiralDisplay(q);
-    return d || {q:'',o:[],e:''};
   };
 })();
 </script>
