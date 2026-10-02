@@ -4777,11 +4777,24 @@ async function loadPracticeQuestions(requested){
   const isTamilagaPolitics = currentSubject==='gs' && POLITICS_SUBTOPICS.has(selectedSubtopic);
 
   const dbSubject =
-    currentSubject==='gs' ? (isTamilagaPolitics ? 'தமிழக அரசியல்' : 'பொது அறிவு') :
+    currentSubject==='gs' ? (isTamilagaPolitics ? (contentLanguage==='en' ? 'Tamil Nadu Politics' : 'தமிழக அரசியல்') : 'பொது அறிவு') :
     currentSubject==='apt' ? 'apt' :
     currentSubject==='tamil' ? 'tamil' : '';
   let dbSubtopic=selectedSubtopic;
-  /* Group 4 database uses Tamil subtopic keys for GK in both languages,
+  /* Tamil Nadu Politics is stored with English subject/subtopic names for
+     the English bank, while the UI keeps the existing Tamil internal keys. */
+  if(isTamilagaPolitics && contentLanguage==='en'){
+    const politicsEnglishSubtopics={
+      'தமிழ்நாடு முதலமைச்சர்கள்':'Tamil Nadu Chief Ministers',
+      'அமைச்சர்கள் மற்றும் அமைச்சரவைகள்':'Ministers and Councils of Ministers',
+      'தமிழ்நாடு மாவட்டங்கள்':'Tamil Nadu Districts',
+      'தமிழ்நாடு ஆளுநர்கள்':'Tamil Nadu Governors',
+      'தமிழ்நாடு சட்டமன்றம்':'Tamil Nadu Legislature',
+      'தமிழ்நாடு தேர்தல்கள் மற்றும் அரசியல் கட்சிகள்':'Tamil Nadu Elections and Political Parties'
+    };
+    dbSubtopic=politicsEnglishSubtopics[selectedSubtopic]||selectedSubtopic;
+  }
+  /* Group 4 database uses Tamil subtopic keys for GK in Tamil,
      while Aptitude English uses English subtopic keys. */
   if(currentSubject==='apt' && contentLanguage==='en'){
     for(const topicKey of Object.keys(EN_LABELS.apt?.topics||{})){
