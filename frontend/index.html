@@ -5979,21 +5979,41 @@ function escapeHtmlAdmin(v){
 }
 </script>
 <section id="modelExamStudent" class="card hidden">
-  <div class="top">
+  <div class="me-head">
     <h2 id="meTitle">📝 Model Exam</h2>
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+    <div class="me-head-right">
       <div class="timer">⏱️ <span id="meTimer">03:00:00</span></div>
       <button type="button" class="secondary" onclick="window.thiralLogoutFromActivity()">Logout</button>
     </div>
   </div>
-  <p><span class="badge" id="meProgress">1 / 200</span></p>
-  <p class="small" id="meExamInfo">200 கேள்விகள் • 3 மணி நேரம்</p>
+  <div class="me-progress-head">
+    <span class="badge" id="meProgress">1 / 200</span>
+    <span class="small" id="meExamInfo">200 கேள்விகள் • 3 மணி நேரம்</span>
+  </div>
   <div class="bar"><div id="meBar"></div></div>
-  <div id="meQuestionBox"></div>
-  <div id="meOptions"></div>
+
+  <div id="meSinglePanel" class="me-single-panel">
+    <div id="meQuestionBox"></div>
+    <div id="meOptions"></div>
+  </div>
+
+  <div id="meBiPanel" class="me-bi-panel hidden">
+    <div class="me-lang-column">
+      <div class="me-lang-title">தமிழ்</div>
+      <div id="meTamilQuestion" class="me-question-text"></div>
+      <div id="meTamilOptions"></div>
+    </div>
+    <div class="me-lang-column">
+      <div class="me-lang-title">English</div>
+      <div id="meEnglishQuestion" class="me-question-text"></div>
+      <div id="meEnglishOptions"></div>
+    </div>
+  </div>
+
   <p class="small" id="meSaveStatus"></p>
   <p id="meMessage"></p>
-  <div class="top">
+
+  <div class="me-navigation">
     <button type="button" class="secondary" id="mePrev" onclick="window.__THIRAL_MODEL_EXAM_PREV()">← Previous</button>
     <button type="button" class="secondary" id="meNext" onclick="window.__THIRAL_MODEL_EXAM_NEXT()">Next →</button>
     <button type="button" id="meSubmit" onclick="window.__THIRAL_MODEL_EXAM_SUBMIT(false)">Submit Test</button>
@@ -6005,6 +6025,7 @@ function escapeHtmlAdmin(v){
   <div id="meResultText"></div>
   <div class="top" style="margin-top:16px;">
     <button type="button" class="secondary" onclick="show('dash')">← Dashboard</button>
+    <button type="button" class="secondary" id="meReviewBtn" onclick="window.__THIRAL_MODEL_EXAM_REVIEW()">📋 விடை மதிப்பாய்வு</button>
   </div>
 </section>
 
@@ -6016,25 +6037,43 @@ function escapeHtmlAdmin(v){
   <button type="button" class="secondary" onclick="show('modelExamResult')">← Result</button>
 </section>
 
-<style id="thiral-model-exam-student-style">
+<style id="thiral-model-exam-student-adaptive-style">
+#modelExamStudent .me-head{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;}
+#modelExamStudent .me-head-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+#modelExamStudent .me-progress-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:8px 0 10px;}
+#modelExamStudent .me-single-panel{display:block;}
+#modelExamStudent .me-bi-panel{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin-top:14px;}
+#modelExamStudent .me-lang-column{background:#fff;border:1px solid #dbe3ef;border-radius:14px;padding:14px;min-width:0;}
+#modelExamStudent .me-lang-title{background:#1677e8;color:#fff;border-radius:10px;padding:12px;text-align:center;font-size:28px;font-weight:900;margin-bottom:14px;}
+#modelExamStudent .me-question-text{font-size:22px;font-weight:800;line-height:1.65;margin:10px 4px 16px;}
 #modelExamStudent .option{display:block;width:100%;text-align:left;margin:8px 0;box-sizing:border-box;}
 #modelExamStudent .option.selected{font-weight:800;outline:3px solid rgba(37,99,235,.25);}
 #modelExamStudent #meSubmit{display:inline-block;}
 #modelExamStudent #meBar{height:8px;transition:width .2s ease;}
 #modelExamStudent #meQuestionBox h3{line-height:1.65;margin:18px 0;}
-
+#modelExamStudent .me-navigation{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;align-items:center;margin-top:20px;padding-top:14px;border-top:1px solid #e2e8f0;}
+#modelExamStudent .me-navigation button{margin:0;min-height:54px;}
+#modelExamStudent .me-navigation #meNext{text-align:center;}
+#modelExamStudent .me-navigation #meSubmit{text-align:center;}
+#modelExamStudent .me-bilingual-missing{color:#64748b;font-weight:600;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:10px;padding:14px;}
 #modelExamReview .review-item{border:1px solid #dbe3ef;border-radius:12px;padding:14px;margin:12px 0;}
 #modelExamReview .review-item.correct{border-left:6px solid #16a34a;}
 #modelExamReview .review-item.wrong{border-left:6px solid #dc2626;}
 #modelExamReview .review-item.not_attempted{border-left:6px solid #64748b;}
 #modelExamReview .review-status{font-weight:800;margin-bottom:8px;}
 #modelExamReview .review-option{margin:4px 0;}
+@media(max-width:760px){
+  #modelExamStudent .me-bi-panel{grid-template-columns:1fr;}
+  #modelExamStudent .me-lang-title{font-size:23px;}
+  #modelExamStudent .me-question-text{font-size:19px;}
+  #modelExamStudent .me-navigation{grid-template-columns:1fr 1fr 1fr;gap:6px;}
+  #modelExamStudent .me-navigation button{font-size:14px;padding:12px 7px;}
+}
 </style>
-
-<script id="thiral-model-exam-student-final">
+<script id="thiral-model-exam-student-adaptive-final">
 (function(){
   'use strict';
-  var M={questions:[],answers:{},index:0,attemptId:0,startedAt:null,durationMinutes:180,timer:null,submitting:false,examTitle:''};
+  var M={questions:[],answers:{},index:0,attemptId:0,startedAt:null,durationMinutes:180,timer:null,submitting:false,examTitle:'',layout:'single'};
   function $(id){return document.getElementById(id);}
   function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
   function api(path,opt){
@@ -6047,21 +6086,75 @@ function escapeHtmlAdmin(v){
     var h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60),s=sec%60;
     return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
   }
+  function val(q,names){
+    for(var i=0;i<names.length;i++){
+      var v=q&&q[names[i]];
+      if(v!==undefined&&v!==null&&String(v)!=='') return v;
+    }
+    return null;
+  }
+  function arr(v){return Array.isArray(v)?v:[];}
+  function langOf(q){return String(q&&q.language||'').trim().toLowerCase();}
+  function hasPair(q){
+    return !!(val(q,['tamil_question','question_ta','ta_question','questionTamil','question_tamil','taQuestion']) ||
+               val(q,['english_question','question_en','en_question','questionEnglish','question_english','enQuestion']) ||
+               q&&q.tamil&&q.english);
+  }
+  function pairData(q){
+    var t=val(q,['tamil_question','question_ta','ta_question','questionTamil','question_tamil','taQuestion']);
+    var e=val(q,['english_question','question_en','en_question','questionEnglish','question_english','enQuestion']);
+    var to=val(q,['tamil_options','options_ta','ta_options','optionsTamil','options_tamil','taOptions']);
+    var eo=val(q,['english_options','options_en','en_options','optionsEnglish','options_english','enOptions']);
+    if(q&&q.tamil){t=t||q.tamil.question;to=to||q.tamil.options;}
+    if(q&&q.english){e=e||q.english.question;eo=eo||q.english.options;}
+    return {t:t,e:e,to:arr(to),eo:arr(eo)};
+  }
+  function determineLayout(qs){
+    if(!qs.length)return 'single';
+    var allTamil=qs.every(function(q){return langOf(q)==='ta'||langOf(q)==='tamil';});
+    if(allTamil&&!qs.some(hasPair))return 'single-ta';
+    var explicitPair=qs.some(hasPair);
+    var bilingualFlag=qs.some(function(q){var l=langOf(q);return ['bilingual','bi','ta-en','en-ta','both','ta_en','en_ta'].indexOf(l)>=0;});
+    if(explicitPair||bilingualFlag)return 'bilingual';
+    var allEnglish=qs.every(function(q){return langOf(q)==='en'||langOf(q)==='english';});
+    if(allEnglish)return 'single-en';
+    var mixed=qs.some(function(q){var l=langOf(q);return l==='en'||l==='english';})&&qs.some(function(q){var l=langOf(q);return l==='ta'||l==='tamil';});
+    if(mixed)return 'bilingual';
+    return 'single';
+  }
+  function renderOptions(containerId,opts,selected){
+    var box=$(containerId);if(!box)return;
+    box.innerHTML=arr(opts).map(function(o,i){
+      var letter=String.fromCharCode(65+i);
+      return '<button type="button" class="option '+(selected===letter?'selected':'')+'" onclick="window.__THIRAL_MODEL_EXAM_ANSWER(\''+letter+'\')">'+letter+'. '+esc(o)+'</button>';
+    }).join('');
+  }
   function render(){
-    var q=M.questions[M.index];
-    if(!q)return;
+    var q=M.questions[M.index];if(!q)return;
     var total=M.questions.length;
     $('meTitle').textContent='📝 '+(M.examTitle||'Model Exam');
     $('meExamInfo').textContent=(total===200?'200 கேள்விகள்':'கேள்விகள்: '+total)+' • 3 மணி நேரம்';
     $('meProgress').textContent=(M.index+1)+' / '+total;
     $('meBar').style.width=((M.index+1)/total*100)+'%';
-    $('meQuestionBox').innerHTML='<h3>'+esc(q.question)+'</h3>';
     var selected=M.answers[String(q.id)]||'';
-    var opts=Array.isArray(q.options)?q.options:[];
-    $('meOptions').innerHTML=opts.map(function(o,i){
-      var letter=String.fromCharCode(65+i);
-      return '<button type="button" class="option '+(selected===letter?'selected':'')+'" onclick="window.__THIRAL_MODEL_EXAM_ANSWER(\''+letter+'\')">'+letter+'. '+esc(o)+'</button>';
-    }).join('');
+    if(M.layout==='bilingual'){
+      $('meSinglePanel').classList.add('hidden');
+      $('meBiPanel').classList.remove('hidden');
+      var p=pairData(q);
+      var tq=p.t||((langOf(q)==='ta'||langOf(q)==='tamil')?q.question:'');
+      var eq=p.e||((langOf(q)==='en'||langOf(q)==='english')?q.question:'');
+      $('meTamilQuestion').innerHTML=tq?'<h3 style="margin:0">'+esc(tq)+'</h3>':'<div class="me-bilingual-missing">தமிழ் கேள்வி வழங்கப்படவில்லை.</div>';
+      $('meEnglishQuestion').innerHTML=eq?'<h3 style="margin:0">'+esc(eq)+'</h3>':'<div class="me-bilingual-missing">English question not provided.</div>';
+      var optsTa=p.to.length?p.to:((langOf(q)==='ta'||langOf(q)==='tamil')?arr(q.options):[]);
+      var optsEn=p.eo.length?p.eo:((langOf(q)==='en'||langOf(q)==='english')?arr(q.options):[]);
+      renderOptions('meTamilOptions',optsTa,selected);
+      renderOptions('meEnglishOptions',optsEn,selected);
+    }else{
+      $('meSinglePanel').classList.remove('hidden');
+      $('meBiPanel').classList.add('hidden');
+      $('meQuestionBox').innerHTML='<h3>'+esc(q.question)+'</h3>';
+      renderOptions('meOptions',arr(q.options),selected);
+    }
     $('mePrev').disabled=M.index===0;
     $('meNext').style.display=M.index===total-1?'none':'inline-block';
     $('meSubmit').style.display='inline-block';
@@ -6092,10 +6185,9 @@ function escapeHtmlAdmin(v){
       });
       M.index=0;M.attemptId=Number(d.attemptId||0);M.startedAt=d.startedAt;M.durationMinutes=Number(d.durationMinutes||180);M.examTitle=d.exam&&d.exam.title||'Model Exam';
       if(!M.attemptId)throw new Error('Model Exam attempt உருவாக்கப்படவில்லை.');
+      M.layout=determineLayout(qs);
       show('modelExamStudent');render();startTimer();window.scrollTo({top:0,behavior:'instant'});
-    }catch(e){
-      alert(e&&e.message?e.message:'Model Exam தற்போது கிடைக்கவில்லை.');
-    }
+    }catch(e){alert(e&&e.message?e.message:'Model Exam தற்போது கிடைக்கவில்லை.');}
   }
   async function answer(letter){
     if(M.submitting)return;
@@ -6104,9 +6196,7 @@ function escapeHtmlAdmin(v){
     try{
       await api('/model-exams/attempt/'+M.attemptId+'/answer',{method:'POST',body:JSON.stringify({questionId:Number(q.id),answer:letter})});
       $('meSaveStatus').textContent='✓ விடை சேமிக்கப்பட்டது';
-    }catch(e){
-      delete M.answers[String(q.id)];render();$('meMessage').textContent=e&&e.message?e.message:'விடை சேமிக்க முடியவில்லை.';
-    }
+    }catch(e){delete M.answers[String(q.id)];render();$('meMessage').textContent=e&&e.message?e.message:'விடை சேமிக்க முடியவில்லை.';}
   }
   function prev(){if(M.index>0){M.index--;render();window.scrollTo({top:0,behavior:'instant'});}}
   function next(){if(M.index<M.questions.length-1){M.index++;render();window.scrollTo({top:0,behavior:'instant'});}}
@@ -6116,71 +6206,39 @@ function escapeHtmlAdmin(v){
     try{
       var d=await api('/model-exams/attempt/'+M.attemptId+'/submit',{method:'POST',body:'{}'});
       var r=d.result||{};
-      $('meResultText').innerHTML=
-        '<p><b>மொத்த கேள்விகள்:</b> '+Number(r.total_questions||0)+'</p>'+
-        '<p><b>விடையளித்தது:</b> '+Number(r.attempted||0)+'</p>'+
-        '<p><b>விடையளிக்காதது:</b> '+Number(r.not_attempted||0)+'</p>'+
-        '<p><b>மதிப்பெண்:</b> '+Number(r.marks||0)+'</p>'+
-        '<p><b>சதவீதம்:</b> '+Number(r.percentage||0)+'%</p>';
+      $('meResultText').innerHTML='<p><b>மொத்த கேள்விகள்:</b> '+Number(r.total_questions||0)+'</p><p><b>விடையளித்தது:</b> '+Number(r.attempted||0)+'</p><p><b>விடையளிக்காதது:</b> '+Number(r.not_attempted||0)+'</p><p><b>மதிப்பெண்:</b> '+Number(r.marks||0)+'</p><p><b>சதவீதம்:</b> '+Number(r.percentage||0)+'%</p>';
       show('modelExamResult');window.scrollTo({top:0,behavior:'instant'});
-    }catch(e){
-      M.submitting=false;$('meSubmit').disabled=false;$('meMessage').textContent=e&&e.message?e.message:'Model Exam submit முடியவில்லை.';
-    }
+    }catch(e){M.submitting=false;$('meSubmit').disabled=false;$('meMessage').textContent=e&&e.message?e.message:'Model Exam submit முடியவில்லை.';}
   }
-
   async function review(){
     if(!M.attemptId)return;
-    var btn=$('meReviewBtn');
-    if(btn)btn.disabled=true;
+    var btn=$('meReviewBtn');if(btn)btn.disabled=true;
     try{
       var d=await api('/model-exams/attempt/'+M.attemptId+'/review',{method:'GET'});
       var rows=Array.isArray(d.review)?d.review:[];
       var correct=rows.filter(function(x){return x.status==='correct';}).length;
       var wrong=rows.filter(function(x){return x.status==='wrong';}).length;
       var na=rows.filter(function(x){return x.status==='not_attempted';}).length;
-
-      $('meReviewSummary').innerHTML=
-        '<div class="top">'+
-        '<p><b>மொத்த கேள்விகள்:</b> '+rows.length+'</p>'+
-        '<p>✅ <b>சரி:</b> '+correct+'</p>'+
-        '<p>❌ <b>தவறு:</b> '+wrong+'</p>'+
-        '<p>⚪ <b>விடையளிக்கவில்லை:</b> '+na+'</p>'+
-        '</div>';
-
+      $('meReviewSummary').innerHTML='<div class="top"><p><b>மொத்த கேள்விகள்:</b> '+rows.length+'</p><p>✅ <b>சரி:</b> '+correct+'</p><p>❌ <b>தவறு:</b> '+wrong+'</p><p>⚪ <b>விடையளிக்கவில்லை:</b> '+na+'</p></div>';
       $('meReviewList').innerHTML=rows.map(function(r){
-        var cls=r.status;
-        var label=r.status==='correct'?'✅ சரி':(r.status==='wrong'?'❌ தவறு':'⚪ விடையளிக்கவில்லை');
+        var cls=r.status;var label=r.status==='correct'?'✅ சரி':(r.status==='wrong'?'❌ தவறு':'⚪ விடையளிக்கவில்லை');
         var opts=Array.isArray(r.options)?r.options:[];
-        var optionHtml=opts.map(function(o,i){
-          var letter=String.fromCharCode(65+i);
-          return '<div class="review-option">'+letter+'. '+esc(o)+'</div>';
-        }).join('');
-        return '<div class="review-item '+cls+'">'+
-          '<div class="review-status">Q'+esc(r.question_no)+' · '+label+'</div>'+
-          '<div><b>'+esc(r.question)+'</b></div>'+
-          '<div style="margin-top:8px;">'+optionHtml+'</div>'+
-          '<div style="margin-top:8px;"><b>உங்கள் விடை:</b> '+esc(r.user_answer||'விடையளிக்கவில்லை')+'</div>'+
-          '<div><b>சரியான விடை:</b> '+esc(r.correct_answer||'-')+'</div>'+
-        '</div>';
+        var optionHtml=opts.map(function(o,i){return '<div class="review-option">'+String.fromCharCode(65+i)+'. '+esc(o)+'</div>';}).join('');
+        return '<div class="review-item '+cls+'"><div class="review-status">Q'+esc(r.question_no)+' · '+label+'</div><div><b>'+esc(r.question)+'</b></div><div style="margin-top:8px;">'+optionHtml+'</div><div style="margin-top:8px;"><b>உங்கள் விடை:</b> '+esc(r.user_answer||'விடையளிக்கவில்லை')+'</div><div><b>சரியான விடை:</b> '+esc(r.correct_answer||'-')+'</div></div>';
       }).join('');
-
       show('modelExamReview');window.scrollTo({top:0,behavior:'instant'});
-    }catch(e){
-      alert(e&&e.message?e.message:'விடை மதிப்பாய்வு கிடைக்கவில்லை.');
-    }finally{
-      if(btn)btn.disabled=false;
-    }
+    }catch(e){alert(e&&e.message?e.message:'விடை மதிப்பாய்வு கிடைக்கவில்லை.');}finally{if(btn)btn.disabled=false;}
   }
-
   window.__THIRAL_MODEL_EXAM_START=start;
   window.__THIRAL_MODEL_EXAM_ANSWER=answer;
   window.__THIRAL_MODEL_EXAM_PREV=prev;
   window.__THIRAL_MODEL_EXAM_NEXT=next;
   window.__THIRAL_MODEL_EXAM_SUBMIT=submit;
   window.__THIRAL_MODEL_EXAM_REVIEW=review;
-  window.__THIRAL_RESET_MODEL_EXAM_SESSION=function(){stopTimer();M.questions=[];M.answers={};M.index=0;M.attemptId=0;M.submitting=false;};
+  window.__THIRAL_RESET_MODEL_EXAM_SESSION=function(){stopTimer();M.questions=[];M.answers={};M.index=0;M.attemptId=0;M.submitting=false;M.layout='single';};
 })();
 </script>
+
 </body></html>
 
 
