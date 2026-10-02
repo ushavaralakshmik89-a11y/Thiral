@@ -6238,7 +6238,12 @@ function escapeHtmlAdmin(v){
     try{
       var d=await api('/model-exams/attempt/'+M.attemptId+'/submit',{method:'POST',body:'{}'});
       var r=d.result||{};
-      $('meResultText').innerHTML='<p><b>மொத்த கேள்விகள்:</b> '+Number(r.total_questions||0)+'</p><p><b>விடையளித்தது:</b> '+Number(r.attempted||0)+'</p><p><b>விடையளிக்காதது:</b> '+Number(r.not_attempted||0)+'</p><p><b>மதிப்பெண்:</b> '+Number(r.marks||0)+'</p><p><b>சதவீதம்:</b> '+Number(r.percentage||0)+'%</p>';
+      var totalQuestions=Number(r.total_questions||0);
+      var attempted=Number(r.attempted||0);
+      var notAttempted=Number(r.not_attempted||0);
+      var correct=Number(r.correct||r.marks||0);
+      var wrong=Math.max(0,attempted-correct);
+      $('meResultText').innerHTML='<p><b>மொத்த கேள்விகள்:</b> '+totalQuestions+'</p><p><b>விடையளித்தது:</b> '+attempted+'</p><p><b>விடையளிக்காதது:</b> '+notAttempted+'</p><p><b>சரி:</b> '+correct+'</p><p><b>தவறு:</b> '+wrong+'</p><p><b>மதிப்பெண்:</b> '+Number(r.marks||0)+'</p><p><b>சதவீதம்:</b> '+Number(r.percentage||0)+'%</p>';
       show('modelExamResult');window.scrollTo({top:0,behavior:'instant'});
     }catch(e){M.submitting=false;$('meSubmit').disabled=false;$('meMessage').textContent=e&&e.message?e.message:'Model Exam submit முடியவில்லை.';}
   }
