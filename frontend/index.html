@@ -685,9 +685,12 @@ a{
 <button onclick="openExam('assistant')">📁 Assistant</button>
 <button onclick="openExam('junior_assistant')">📁 Junior Assistant</button>
 </div>
-<h3>📮 Postal</h3>
+<h3>📮 Department of Posts</h3>
 <div class="grid">
-<button onclick="openExam('postal_pa_sa')">📮 Postal PA / SA</button>
+<button onclick="openExam('gds_to_mts')">📬 GDS → MTS</button>
+<button onclick="openExam('mts_gds_to_postman_mailguard')">📮 MTS / GDS → Postman / Mail Guard</button>
+<button onclick="openExam('postal_pa_sa')">📬 Postal Assistant / Sorting Assistant (PA/SA)</button>
+<button onclick="openExam('pa_to_ipos')">🏤 PA → IPOS</button>
 </div>
 <hr>
 <button class="secondary" onclick="showLastResult()">📊 என் Result</button><button class="secondary" onclick="showResultHistory()">🗂️ என் Result History</button><button class="secondary" onclick="openSuggestionPage()">💡 Suggestion / Feedback</button>
@@ -1152,7 +1155,10 @@ const EXAMS={
  clerical:{title:'📁 Clerical',info:'General Knowledge • Aptitude • Reasoning',subjects:[['gs','📗 General Knowledge'],['apt','📐 Aptitude / Reasoning']]},
  assistant:{title:'📁 Assistant',info:'General Knowledge • Aptitude • Reasoning',subjects:[['gs','📗 General Knowledge'],['apt','📐 Aptitude / Reasoning']]},
  junior_assistant:{title:'📁 Junior Assistant',info:'General Knowledge • Aptitude • Reasoning',subjects:[['gs','📗 General Knowledge'],['apt','📐 Aptitude / Reasoning']]},
- postal_pa_sa:{title:'📮 Postal PA / SA',info:'General Awareness • Aptitude • Reasoning',subjects:[['gs','📗 General Awareness'],['apt','📐 Aptitude / Reasoning']]},
+ gds_to_mts:{title:'📬 GDS → MTS',info:'Department of Posts • GDS to MTS Departmental Exam',subjects:[['gs','📗 General Awareness'],['apt','📐 Aptitude / Reasoning']]},
+ mts_gds_to_postman_mailguard:{title:'📮 MTS / GDS → Postman / Mail Guard',info:'Department of Posts • MTS / GDS to Postman / Mail Guard Departmental Exam',subjects:[['gs','📗 General Awareness'],['apt','📐 Aptitude / Reasoning']]},
+ postal_pa_sa:{title:'📬 Postal Assistant / Sorting Assistant (PA/SA)',info:'Department of Posts • Postal Assistant / Sorting Assistant',subjects:[['gs','📗 General Awareness'],['apt','📐 Aptitude / Reasoning']]},
+ pa_to_ipos:{title:'🏤 PA → IPOS',info:'Department of Posts • Postal Assistant to IPOS Departmental Exam',subjects:[['gs','📗 General Awareness'],['apt','📐 Aptitude / Reasoning']]},
  tntet_p1:{title:'👩‍🏫 TNTET Paper I',info:'Child Development • Language • Mathematics • Environmental Studies',subjects:[['gs','📗 Child Development / General'],['apt','📐 Mathematics / Reasoning']]},
  tntet_p2:{title:'👩‍🏫 TNTET Paper II',info:'Child Development • Language • Mathematics / Science / Social Science',subjects:[['gs','📗 Child Development / General'],['apt','📐 Subject Aptitude / Reasoning']]},
  trb:{title:'👩‍🏫 TRB தேர்வுகள்',info:'Teacher Recruitment – பாடத்திட்டம் தேர்வின்படி மாறும்',subjects:[['gs','📗 General / Subject Knowledge'],['apt','📐 Reasoning / Aptitude']]},
