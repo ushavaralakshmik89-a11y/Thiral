@@ -1096,7 +1096,7 @@ Question: ...'></textarea>
 <p class="small">தேவையான தேர்வை / வகையை / பாடத்தைத் தேர்ந்தெடுத்து Excel Export செய்யலாம். Browser-ல் result table காட்டப்படாது. தேர்வு வாரியாக தனித்தனி Excel tab-களில் முழு result records வரும்.</p>
 <div class="grid" style="margin-top:12px">
 <div><label>Exam / தேர்வு</label><select id="adminExamFilter" style="width:100%"><option value="">அனைத்து தேர்வுகளும்</option></select></div>
-<div><label>Exam Type / வகை</label><select id="adminExamTypeFilter" style="width:100%" onchange="loadAdminExamResults(1)"><option value="">அனைத்தும்</option><option value="model">Model Exam</option><option value="mock">Mock Test</option><option value="10">10 Questions</option><option value="20">20 Questions</option><option value="50">50 Questions</option><option value="practice">Practice</option><option value="bank">Question Bank</option></select></div>
+<div><label>Exam Type / வகை</label><select id="adminExamTypeFilter" style="width:100%" onchange="loadAdminExamResults(1)"><option value="all" selected>அனைத்தும்</option><option value="model">Model Exam</option><option value="mock">Mock Test</option><option value="10">10 Questions</option><option value="20">20 Questions</option><option value="50">50 Questions</option><option value="practice">Practice</option><option value="bank">Question Bank</option></select></div>
 <div><label>Subject / பாடம்</label><select id="adminExamSubjectFilter" style="width:100%"><option value="">அனைத்து பாடங்களும்</option></select></div>
 <div><label>Topic / தலைப்பு</label><select id="adminExamTopicFilter" style="width:100%"><option value="">அனைத்து தலைப்புகளும்</option></select></div>
 <div><label>Subtopic / உள்தலைப்பு</label><select id="adminExamSubtopicFilter" style="width:100%"><option value="">அனைத்து உள்தலைப்புகளும்</option></select></div>
@@ -4286,7 +4286,7 @@ window.V91_ADV_NUM=V91_ADV_NUM;
   };
 
   window.clearAdminExamResults = function(){
-    ['adminExamFilter','adminExamTypeFilter','adminExamSubjectFilter','adminExamTopicFilter','adminExamSubtopicFilter'].forEach(function(id){if(el(id))el(id).value='';});
+    ['adminExamFilter','adminExamSubjectFilter','adminExamTopicFilter','adminExamSubtopicFilter'].forEach(function(id){if(el(id))el(id).value='';}); if(el('adminExamTypeFilter'))el('adminExamTypeFilter').value='all';
     ['adminExamFrom','adminExamTo'].forEach(function(id){if(el(id))el(id).value='';});
     if(el('adminExamMin'))el('adminExamMin').value='0';
     if(el('adminExamMax'))el('adminExamMax').value='100';
@@ -6238,12 +6238,7 @@ function escapeHtmlAdmin(v){
     try{
       var d=await api('/model-exams/attempt/'+M.attemptId+'/submit',{method:'POST',body:'{}'});
       var r=d.result||{};
-      var totalQuestions=Number(r.total_questions||0);
-      var attempted=Number(r.attempted||0);
-      var notAttempted=Number(r.not_attempted||0);
-      var correct=Number(r.correct||r.marks||0);
-      var wrong=Math.max(0,attempted-correct);
-      $('meResultText').innerHTML='<p><b>மொத்த கேள்விகள்:</b> '+totalQuestions+'</p><p><b>விடையளித்தது:</b> '+attempted+'</p><p><b>விடையளிக்காதது:</b> '+notAttempted+'</p><p><b>சரி:</b> '+correct+'</p><p><b>தவறு:</b> '+wrong+'</p><p><b>மதிப்பெண்:</b> '+Number(r.marks||0)+'</p><p><b>சதவீதம்:</b> '+Number(r.percentage||0)+'%</p>';
+      $('meResultText').innerHTML='<p><b>மொத்த கேள்விகள்:</b> '+Number(r.total_questions||0)+'</p><p><b>விடையளித்தது:</b> '+Number(r.attempted||0)+'</p><p><b>விடையளிக்காதது:</b> '+Number(r.not_attempted||0)+'</p><p><b>மதிப்பெண்:</b> '+Number(r.marks||0)+'</p><p><b>சதவீதம்:</b> '+Number(r.percentage||0)+'%</p>';
       show('modelExamResult');window.scrollTo({top:0,behavior:'instant'});
     }catch(e){M.submitting=false;$('meSubmit').disabled=false;$('meMessage').textContent=e&&e.message?e.message:'Model Exam submit முடியவில்லை.';}
   }
