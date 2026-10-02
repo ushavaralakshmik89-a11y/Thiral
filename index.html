@@ -737,7 +737,7 @@ const EXAMS={
  clerical:{title:'📁 Clerical',info:'General Knowledge • Aptitude • Reasoning',subjects:[['gs','📗 General Knowledge'],['apt','📐 Aptitude / Reasoning']]},
  assistant:{title:'📁 Assistant',info:'General Knowledge • Aptitude • Reasoning',subjects:[['gs','📗 General Knowledge'],['apt','📐 Aptitude / Reasoning']]},
  junior_assistant:{title:'📁 Junior Assistant',info:'General Knowledge • Aptitude • Reasoning',subjects:[['gs','📗 General Knowledge'],['apt','📐 Aptitude / Reasoning']]},
- gds_to_mts:{title:'📬 GDS → MTS',info:'Department of Posts • GDS to MTS Departmental Exam',subjects:[['gs','📗 General Awareness'],['apt','📐 Aptitude / Reasoning']]},
+ gds_to_mts:{title:'📬 GDS → MTS',info:'Department of Posts • 60 Minutes • Part-A: Basic Postal Knowledge (30 Questions / 60 Marks) • Part-B: General Awareness & Basic Arithmetic (20 Questions / 40 Marks)',subjects:[['gds_postal_a','📮 Part-A: Basic Postal Knowledge'],['gds_ga','📘 Part-B: General Awareness / Knowledge'],['gds_arithmetic','📐 Part-B: Basic Arithmetic']]},
  mts_gds_to_postman_mailguard:{title:'📮 MTS / GDS → Postman / Mail Guard',info:'Department of Posts • MTS / GDS to Postman / Mail Guard Departmental Exam',subjects:[['gs','📗 General Awareness'],['apt','📐 Aptitude / Reasoning']]},
  postal_pa_sa:{title:'📬 Postal Assistant / Sorting Assistant (PA/SA)',info:'Department of Posts • Postal Assistant / Sorting Assistant',subjects:[['gs','📗 General Awareness'],['apt','📐 Aptitude / Reasoning']]},
  pa_to_ipos:{title:'🏤 PA → IPOS',info:'Department of Posts • Postal Assistant to IPOS Departmental Exam',subjects:[['gs','📗 General Awareness'],['apt','📐 Aptitude / Reasoning']]},
@@ -770,7 +770,21 @@ function backToExam(){renderExamHome();show('examHome');}
 function startSelectedMock(){startMock();}
 function showLastResult(){const r=JSON.parse(localStorage.getItem('tnpsc_last_result')||'null');if(!r){alert('இன்னும் Result இல்லை. முதலில் ஒரு Practice அல்லது Mock Test முடிக்கவும்.');return;}if(r.type==='Mock Test'){showMockResultScreen();setTimeout(()=>window.scrollTo({top:0,behavior:'instant'}),50);return;}document.getElementById('resultText').innerHTML=`<p><b>மாணவர் பெயர்:</b> ${r.student}</p><p><b>தேர்வு:</b> ${r.exam}</p><p><b>வகை:</b> ${r.type}</p><p><b>மொத்த கேள்விகள்:</b> ${r.total}</p><p><b>சரி:</b> ${r.correct} | <b>தவறு:</b> ${r.wrong} | <b>விடையளிக்காதது:</b> ${r.unanswered}</p><p><b>மதிப்பெண்:</b> ${r.score}</p>`;show('result');}
 
+const GDS_POSTAL_TOPICS={
+'Post Office Guide Part-I (23 Questions)':['Organization of the Department','Type of Post Offices','Business Hours','Payment of Postage, Stamps, and Stationery','General Rules for Packing, Sealing, and Posting','Methods of Addressing','Post Boxes and Post Bags','Duties of Letter Box Peon','Official Postal Articles','Prohibited Postal Articles','Products and Services: Mails, Banking & Remittances, Insurance, Stamps, and Business'],
+'Postal Manual Volume V (7 Questions)':['Definitions']
+};
+const GDS_GA_TOPICS={
+'General Awareness / Knowledge (10 Questions)':['Indian Geography','Civics','General Knowledge','Indian Culture & Freedom Struggle','Ethics and Moral Studies']
+};
+const GDS_ARITH_TOPICS={
+'Basic Arithmetic (10 Questions)':['BODMAS (Brackets, Orders, Division, Multiplication, Addition, Subtraction)','Percentage','Profit and Loss','Simple Interest','Average','Time and Work','Time and Distance','Unitary Method']
+};
+
 const data={
+gds_postal_a:{title:'📮 Part-A: Basic Postal Knowledge',topics:GDS_POSTAL_TOPICS},
+gds_ga:{title:'📘 Part-B: General Awareness / Knowledge',topics:GDS_GA_TOPICS},
+gds_arithmetic:{title:'📐 Part-B: Basic Arithmetic',topics:GDS_ARITH_TOPICS},
 tamil:{
 title:'📚 தமிழ்',
 topics:{
@@ -800,6 +814,12 @@ topics:{
 };
 
 const EN_LABELS={
+gds_postal_a:{title:'📮 Part-A: Basic Postal Knowledge',topics:{
+'Post Office Guide Part-I (23 Questions)':{en:'Post Office Guide Part-I (23 Questions)',subs:{'Organization of the Department':'Organization of the Department','Type of Post Offices':'Type of Post Offices','Business Hours':'Business Hours','Payment of Postage, Stamps, and Stationery':'Payment of Postage, Stamps, and Stationery','General Rules for Packing, Sealing, and Posting':'General Rules for Packing, Sealing, and Posting','Methods of Addressing':'Methods of Addressing','Post Boxes and Post Bags':'Post Boxes and Post Bags','Duties of Letter Box Peon':'Duties of Letter Box Peon','Official Postal Articles':'Official Postal Articles','Prohibited Postal Articles':'Prohibited Postal Articles','Products and Services: Mails, Banking & Remittances, Insurance, Stamps, and Business':'Products and Services: Mails, Banking & Remittances, Insurance, Stamps, and Business'}},
+'Postal Manual Volume V (7 Questions)':{en:'Postal Manual Volume V (7 Questions)',subs:{'Definitions':'Definitions'}}
+}},
+gds_ga:{title:'📘 Part-B: General Awareness / Knowledge',topics:{'General Awareness / Knowledge (10 Questions)':{en:'General Awareness / Knowledge (10 Questions)',subs:{'Indian Geography':'Indian Geography','Civics':'Civics','General Knowledge':'General Knowledge','Indian Culture & Freedom Struggle':'Indian Culture & Freedom Struggle','Ethics and Moral Studies':'Ethics and Moral Studies'}}}},
+gds_arithmetic:{title:'📐 Part-B: Basic Arithmetic',topics:{'Basic Arithmetic (10 Questions)':{en:'Basic Arithmetic (10 Questions)',subs:{'BODMAS (Brackets, Orders, Division, Multiplication, Addition, Subtraction)':'BODMAS (Brackets, Orders, Division, Multiplication, Addition, Subtraction)','Percentage':'Percentage','Profit and Loss':'Profit and Loss','Simple Interest':'Simple Interest','Average':'Average','Time and Work':'Time and Work','Time and Distance':'Time and Distance','Unitary Method':'Unitary Method'}}}},
  gs:{
   title:'📗 General Studies',
   topics:{
@@ -823,7 +843,11 @@ const EN_LABELS={
 };
 function labelForSubject(s){
  if(s==='tamil') return '📚 தமிழ்';
- return (contentLanguage==='en' && EN_LABELS[s]) ? EN_LABELS[s].title : (s==='gs'?'📗 பொது அறிவு':'📐 திறனறிவு / Aptitude');
+ if(EN_LABELS[s] && contentLanguage==='en') return EN_LABELS[s].title;
+ if(s==='gds_postal_a') return '📮 Part-A: Basic Postal Knowledge';
+ if(s==='gds_ga') return '📘 Part-B: General Awareness / Knowledge';
+ if(s==='gds_arithmetic') return '📐 Part-B: Basic Arithmetic';
+ return s==='gs'?'📗 பொது அறிவு':'📐 திறனறிவு / Aptitude';
 }
 function labelForTopic(s,t){
  if(contentLanguage==='en' && EN_LABELS[s]?.topics[t]) return EN_LABELS[s].topics[t].en;
