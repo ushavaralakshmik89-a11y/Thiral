@@ -6043,7 +6043,7 @@ function escapeHtmlAdmin(v){
     var opts=Array.isArray(q.options)?q.options:[];
     $('meOptions').innerHTML=opts.map(function(o,i){
       var letter=String.fromCharCode(65+i);
-      return '<button type="button" class="option '+(selected===letter?'selected':'')+'" onclick="window.__THIRAL_MODEL_EXAM_ANSWER(\\''+letter+'\\')">'+letter+'. '+esc(o)+'</button>';
+      return '<button type="button" class="option '+(selected===letter?'selected':'')+'" onclick="window.__THIRAL_MODEL_EXAM_ANSWER(\''+letter+'\')">'+letter+'. '+esc(o)+'</button>';
     }).join('');
     $('mePrev').disabled=M.index===0;
     $('meNext').style.display=M.index===total-1?'none':'inline-block';
