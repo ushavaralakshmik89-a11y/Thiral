@@ -2707,6 +2707,60 @@ async function ensureModelExamSubmitSchema(){
   `);
 }
 
+api.get('/model-exams/attempt/:attemptId/review', requirePasswordReady, async (req,res)=>{
+  try{
+    const attemptId=Number(req.params.attemptId);
+    if(!Number.isInteger(attemptId)) return sendError(res,400,'Invalid attempt ID.');
+
+    const a=await getModelExamAttemptForUser(attemptId,req.user.id);
+    if(!a) return sendError(res,404,'Model Exam attempt not found.');
+
+    if(a.status==='in_progress'){
+      return sendError(res,409,'விடை மதிப்பாய்வு தேர்வு முடிந்த பிறகே கிடைக்கும்.');
+    }
+
+    const rows=await pool.query(`
+      SELECT
+        q.question_no,
+        q.question,
+        q.options,
+        q.correct_option,
+        q.correct_answer,
+        a.answer AS user_answer
+      FROM model_exam_questions q
+      LEFT JOIN model_exam_answers a
+        ON a.question_id=q.id AND a.attempt_id=$1
+      WHERE q.exam_id=$2
+      ORDER BY q.question_no
+    `,[attemptId,a.exam_id]);
+
+    const review=rows.rows.map(r=>{
+      let correct=String(r.correct_option ?? r.correct_answer ?? '').trim().toUpperCase();
+      let user=String(r.user_answer ?? '').trim().toUpperCase();
+      let status=!user ? 'not_attempted' : (user===correct ? 'correct' : 'wrong');
+
+      let options=r.options;
+      if(typeof options==='string'){
+        try{ options=JSON.parse(options); }catch(_){}
+      }
+
+      return {
+        question_no:r.question_no,
+        question:r.question,
+        options:Array.isArray(options)?options:[],
+        user_answer:user||null,
+        correct_answer:correct||null,
+        status
+      };
+    });
+
+    res.json({ok:true,review});
+  }catch(e){
+    console.error('[MODEL EXAM] review error:',e);
+    sendError(res,500,'Model Exam review service error.');
+  }
+});
+
 /* ===== IMPORTANT NEWS ===== */
 async function ensureImportantNewsTable(){
   await pool.query(`
