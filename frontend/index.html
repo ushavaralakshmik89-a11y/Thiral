@@ -4764,8 +4764,20 @@ function selectPracticeByDifficulty(bank,n){
 async function loadPracticeQuestions(requested){
   const selectedSubtopic=(typeof currentSub!=='undefined'?String(currentSub||'').trim():'');
   if(!selectedSubtopic) throw new Error('Subtopic தேர்வு செய்யப்படவில்லை.');
+  /* தமிழக அரசியல் is displayed inside the GS UI, but its database
+     subject is intentionally separate from the normal பொது அறிவு bank. */
+  const POLITICS_SUBTOPICS = new Set([
+    'தமிழ்நாடு முதலமைச்சர்கள்',
+    'அமைச்சர்கள் மற்றும் அமைச்சரவைகள்',
+    'தமிழ்நாடு மாவட்டங்கள்',
+    'தமிழ்நாடு ஆளுநர்கள்',
+    'தமிழ்நாடு சட்டமன்றம்',
+    'தமிழ்நாடு தேர்தல்கள் மற்றும் அரசியல் கட்சிகள்'
+  ]);
+  const isTamilagaPolitics = currentSubject==='gs' && POLITICS_SUBTOPICS.has(selectedSubtopic);
+
   const dbSubject =
-    currentSubject==='gs' ? 'பொது அறிவு' :
+    currentSubject==='gs' ? (isTamilagaPolitics ? 'தமிழக அரசியல்' : 'பொது அறிவு') :
     currentSubject==='apt' ? 'apt' :
     currentSubject==='tamil' ? 'tamil' : '';
   let dbSubtopic=selectedSubtopic;
@@ -4880,7 +4892,12 @@ async function startPractice(n){
     const a=await api('/attempts',{
       method:'POST',
       body:JSON.stringify({
-        exam:String(selectedExam||'group4'),subject:(currentSubject==='gs'?'பொது அறிவு':currentSubject==='apt'?'apt':'tamil'),mode:'practice',language:(contentLanguage==='en'?'en':'ta'),
+        exam:String(selectedExam||'group4'),
+        subject:(currentSubject==='gs'
+          ? (['தமிழ்நாடு முதலமைச்சர்கள்','அமைச்சர்கள் மற்றும் அமைச்சரவைகள்','தமிழ்நாடு மாவட்டங்கள்','தமிழ்நாடு ஆளுநர்கள்','தமிழ்நாடு சட்டமன்றம்','தமிழ்நாடு தேர்தல்கள் மற்றும் அரசியல் கட்சிகள்'].includes(String(currentSub||'')) ? 'தமிழக அரசியல்' : 'பொது அறிவு')
+          : currentSubject==='apt' ? 'apt' : 'tamil'),
+        mode:'practice',
+        language:(contentLanguage==='en'?'en':'ta'),
         questionIds:T.q.map(q=>Number(q.id))
       })
     });
@@ -5147,7 +5164,7 @@ window.__THIRAL_GROUP4_FINAL_LANGUAGE_FIXED__='TA-GK + EN-GK + TA-APT + EN-APT';
 'use strict';
 window.__THIRAL_GROUP4_FINAL_WEBSITE__={
   exam:'group4',
-  dbSubjects:{tamil:'tamil',gs:'பொது அறிவு',apt:'apt'},
+  dbSubjects:{tamil:'tamil',gs:'பொது அறிவு',apt:'apt',politics:'தமிழக அரசியல்'},
   languages:{tamil:['ta'],gs:['ta','en'],apt:['ta','en']},
   checked:'syntax-only'
 };
