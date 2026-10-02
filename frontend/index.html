@@ -240,70 +240,6 @@ background:linear-gradient(135deg,#123f70,#167d62);color:#fff;font-weight:900;fo
 .admin-stat-card .small{display:block;margin-top:6px;opacity:.72}
 </style>
 </style>
-
-<style id="thiral-model-exam-card">
-/* ===== Thiral Model Exam: Home dashboard card ===== */
-.model-exam-wrap{
-  display:flex;
-  align-items:center;
-  justify-content:flex-end;
-  gap:10px;
-}
-.model-exam-card{
-  display:flex;
-  align-items:center;
-  gap:12px;
-  min-height:54px;
-  padding:9px 16px;
-  border:1px solid rgba(255,255,255,.18);
-  border-radius:14px;
-  background:linear-gradient(135deg,#123f9b,#174fc0);
-  color:#fff;
-  box-shadow:0 4px 12px rgba(0,0,0,.12);
-  cursor:pointer;
-  text-align:left;
-  transition:transform .15s ease,box-shadow .15s ease;
-}
-.model-exam-card:hover{
-  transform:translateY(-1px);
-  box-shadow:0 7px 16px rgba(0,0,0,.14);
-}
-.model-exam-card:focus{
-  outline:3px solid rgba(37,99,235,.25);
-  outline-offset:2px;
-}
-.model-exam-icon{
-  width:38px;
-  height:38px;
-  display:grid;
-  place-items:center;
-  border-radius:10px;
-  background:rgba(255,255,255,.16);
-  color:#fff;
-  font-size:21px;
-  flex:0 0 auto;
-}
-.model-exam-title{
-  font-weight:800;
-  font-size:16px;
-  line-height:1.2;
-}
-.model-exam-subtitle{
-  margin-top:3px;
-  font-size:12px;
-  opacity:.72;
-}
-.model-exam-arrow{
-  font-size:22px;
-  font-weight:800;
-  opacity:.75;
-  margin-left:3px;
-}
-@media(max-width:720px){
-  .model-exam-wrap{justify-content:flex-start;margin-top:10px}
-  .model-exam-card{width:100%;justify-content:flex-start}
-}
-</style>
 <style>
 @media print{
   body{background:#fff}
@@ -425,138 +361,6 @@ a{
   window.formatDOB=formatDOB;
 })();
 </script>
-
-<style id="thiral-daily-content-v3">
-/* Full-width home layout + single-line navigation. */
-.wrap{max-width:none !important;width:100% !important;margin:0 auto !important;padding:0 16px !important}
-#home.thiral-home-shell{width:100% !important}
-/* Keep the daily-content card separate from the home navigation buttons. */
-#home.thiral-home-shell{
-  background:transparent !important;
-  color:inherit !important;
-  border:0 !important;
-  box-shadow:none !important;
-  backdrop-filter:none !important;
-  padding:0 !important;
-  margin:18px 0 0 !important;
-}
-.thiral-home-actions{
-  display:flex;
-  flex-wrap:nowrap;
-  align-items:stretch;
-  justify-content:stretch;
-  gap:8px;
-  width:100%;
-  margin:0 0 24px;
-  overflow:hidden;
-}
-.thiral-home-actions button{
-  flex:1 1 0;
-  min-width:0;
-  margin:0;
-  padding:13px 8px;
-  font-size:15px;
-  white-space:nowrap;
-  line-height:1.25;
-}
-.thiral-daily-content{
-  display:grid;grid-template-columns:minmax(0,1.25fr) minmax(260px,.75fr);gap:22px;
-  align-items:stretch;margin:0 0 22px;padding:24px 26px;border-radius:22px;
-  background:linear-gradient(135deg,#fffdf2,#ffffff);border:1px solid rgba(37,99,235,.10);
-  box-shadow:0 8px 24px rgba(15,23,42,.06);
-}
-.thiral-daily-main{min-width:0;padding:4px 8px 4px 4px}
-.thiral-daily-kicker{display:inline-block;font-weight:800;font-size:21px;line-height:1.35;color:#173b8f;
-  background:#fff0b8;border-radius:12px;padding:8px 14px;margin-bottom:14px}
-.thiral-daily-title{font-size:22px;font-weight:800;line-height:1.65;color:#163b78;margin-bottom:8px}
-.thiral-daily-text{font-size:20px;line-height:1.75;color:#243b64;white-space:pre-line}
-.thiral-daily-explain{background:#eef7ff;border-radius:18px;padding:20px 22px;color:#24456f;font-size:18px;line-height:1.7}
-.thiral-daily-explain-title{font-size:20px;font-weight:800;color:#0d4b91;margin-bottom:8px}
-@media(max-width:760px){
-  .thiral-daily-content{grid-template-columns:1fr;gap:14px;padding:18px}
-  .thiral-daily-kicker{font-size:18px}.thiral-daily-title{font-size:20px}.thiral-daily-text{font-size:18px}.thiral-daily-explain{font-size:17px}
-  .thiral-home-actions{gap:4px;overflow-x:auto;overflow-y:hidden}
-  .thiral-home-actions button{flex:0 0 auto;font-size:12px;padding:11px 7px}
-}
-</style>
-
-
-<style id="thiral-daily-layout-v4">
-/* V4: compact daily card + full-width single-row navigation */
-#home.thiral-home-shell{
-  width:100vw !important;
-  margin-left:calc(50% - 50vw) !important;
-  margin-right:calc(50% - 50vw) !important;
-  padding:0 !important;
-}
-#home.thiral-home-shell .thiral-daily-content{
-  width:min(880px,84vw) !important;
-  margin:18px auto 22px !important;
-  box-sizing:border-box !important;
-  padding:22px 26px !important;
-  gap:22px !important;
-  align-items:center !important;
-}
-#home.thiral-home-shell .thiral-daily-main,
-#home.thiral-home-shell .thiral-daily-explain{
-  min-width:0 !important;
-}
-#home.thiral-home-shell .thiral-daily-main{
-  padding:2px 8px 2px 2px !important;
-}
-#home.thiral-home-shell .thiral-daily-kicker{
-  margin-bottom:10px !important;
-}
-#home.thiral-home-shell .thiral-daily-title{
-  margin-bottom:5px !important;
-  line-height:1.45 !important;
-}
-#home.thiral-home-shell .thiral-daily-text{
-  line-height:1.55 !important;
-}
-#home.thiral-home-shell .thiral-daily-explain{
-  padding:17px 20px !important;
-  line-height:1.55 !important;
-}
-#home.thiral-home-shell .thiral-home-actions{
-  width:100% !important;
-  box-sizing:border-box !important;
-  padding:0 16px !important;
-  margin:0 0 26px !important;
-  gap:8px !important;
-  display:flex !important;
-  flex-wrap:nowrap !important;
-  overflow:hidden !important;
-}
-#home.thiral-home-shell .thiral-home-actions button{
-  flex:1 1 0 !important;
-  width:auto !important;
-  min-width:0 !important;
-  margin:0 !important;
-  padding:14px 8px !important;
-  font-size:15px !important;
-  white-space:nowrap !important;
-  min-height:52px !important;
-}
-@media(max-width:760px){
-  #home.thiral-home-shell .thiral-daily-content{
-    width:calc(100% - 28px) !important;
-    grid-template-columns:1fr !important;
-    padding:18px !important;
-    gap:12px !important;
-  }
-  #home.thiral-home-shell .thiral-home-actions{
-    overflow-x:auto !important;
-    justify-content:flex-start !important;
-  }
-  #home.thiral-home-shell .thiral-home-actions button{
-    flex:0 0 auto !important;
-    font-size:13px !important;
-    padding:12px 10px !important;
-  }
-}
-</style>
-
 </head>
 <body>
 <header class="thiral-final-hero">
@@ -574,27 +378,22 @@ a{
 <div class="wrap">
 
 
-<section id="home" class="thiral-home-shell">
-<div class="thiral-daily-content" id="thiralDailyContent">
-  <div class="thiral-daily-main">
-    <div class="thiral-daily-kicker" id="thiralDailyType">📖 இன்றைய திருக்குறள்</div>
-    <div class="thiral-daily-title" id="thiralDailyTitle"></div>
-    <div class="thiral-daily-text" id="thiralDailyText"></div>
-  </div>
-  <div class="thiral-daily-explain">
-    <div class="thiral-daily-explain-title" id="thiralDailyExplainTitle">💡 விளக்கம்</div>
-    <div id="thiralDailyExplanation"></div>
-  </div>
-</div>
+<section id="home" class="card">
+<div class="thiral-home-brand">
+      <span class="thiral-mark">தி</span>
+      <div>
+        <div class="brand-mini">திறல்</div>
+        <div class="brand-mini-sub">கற்றிடு • சிந்தித்திடு • போராடு • முன்னேறு • வெற்றி பெறு</div>
+      </div>
+    </div>
+    </div>
 
-<div class="thiral-home-actions">
-  <button onclick="show('login')">🔐 Student Login</button>
-  <button class="secondary" onclick="show('register')">📝 New Registration</button>
-  <button class="secondary" onclick="show('termsPage')">📜 Terms & Conditions</button>
-  <button class="secondary" onclick="show('adminLogin')">🛠️ Admin</button>
-  <button class="secondary" onclick="show('contactUs')">📞 Contact Us</button>
-  <button class="secondary" onclick="show('importantNews')">📢 Important News / முக்கிய அறிவிப்பு</button>
-</div>
+<button onclick="show('login')">🔐 Student Login</button>
+<button class="secondary" onclick="show('register')">📝 New Registration</button>
+<button class="secondary" onclick="show('termsPage')">📜 Terms & Conditions</button>
+<button class="secondary" onclick="show('adminLogin')">🛠️ Admin</button>
+<button class="secondary" onclick="show('contactUs')">📞 Contact Us</button>
+<button class="secondary" onclick="show('importantNews')">📢 Important News / முக்கிய அறிவிப்பு</button>
 </section>
 
 <section id="register" class="card hidden">
@@ -620,34 +419,38 @@ a{
 <p id="lm"></p>
 <button onclick="login()">Login</button>
 <button class="secondary" onclick="show('register')">New Registration</button>
+<button class="secondary" onclick="show('forgotPassword')">Forgot Password?</button>
 </section>
 
-<section id="forcePasswordChange" class="card hidden">
-<h2>🔐 புதிய Password அமைக்கவும் / Set New Password</h2>
-<p class="small">Admin வழங்கிய Temporary Password மூலம் முதல் Login செய்துள்ளீர்கள். தொடர்வதற்கு உங்கள் சொந்த புதிய Password-ஐ அமைக்க வேண்டும்.</p>
-<input id="currentTempPassword" type="password" placeholder="Temporary Password / தற்போதைய Password">
-<input id="newForcePassword" type="password" placeholder="New Password / புதிய Password">
-<input id="confirmForcePassword" type="password" placeholder="Confirm New Password / புதிய Password உறுதி">
-<p id="forcePasswordMsg"></p>
-<button onclick="changeForcedPassword()">🔐 புதிய Password சேமிக்கவும்</button>
-<button class="secondary" onclick="logout()">Logout</button>
+<section id="forgotPassword" class="card hidden">
+<h2>🔑 Forgot Password / கடவுச்சொல் மறந்துவிட்டதா?</h2>
+<p class="small">முதலில் பதிவு செய்யப்பட்ட Email ID-ஐ உள்ளிடுங்கள். OTP சரிபார்த்த பிறகே புதிய Password அமைக்க முடியும்.</p>
+
+<div id="fpStep1">
+<input id="fpemail" type="email" placeholder="Registered Email ID / பதிவு செய்த மின்னஞ்சல்">
+<p id="fpmsg"></p>
+<button onclick="sendForgotOTP()">📧 OTP அனுப்பவும்</button>
+</div>
+
+<div id="fpStep2" class="hidden">
+<input id="fpotp" inputmode="numeric" maxlength="6" placeholder="6 இலக்க OTP / Enter OTP">
+<p id="fpOtpMsg"></p>
+<button onclick="verifyForgotOTP()">✓ OTP சரிபார்க்கவும்</button>
+<button class="secondary" onclick="resendForgotOTP()">↻ OTP மீண்டும் அனுப்பவும்</button>
+</div>
+
+<div id="fpStep3" class="hidden">
+<input id="fppass" type="password" placeholder="New Password / புதிய கடவுச்சொல்">
+<input id="fpcpass" type="password" placeholder="Confirm New Password / புதிய கடவுச்சொல் உறுதி">
+<p id="fpPassMsg"></p>
+<button onclick="resetPasswordAfterOTP()">🔐 புதிய Password அமைக்கவும்</button>
+</div>
+
+<button class="secondary" onclick="show('login')">← Back to Login</button>
 </section>
 
 <section id="dash" class="card hidden">
-<div class="top">
-<h2>👋 வணக்கம் / Welcome, <span id="studentName"></span></h2>
-<div class="model-exam-wrap">
-  <button type="button" class="model-exam-card" onclick="openModelExam()" aria-label="மாதிரி தேர்வு / Model Exam">
-    <span class="model-exam-icon">▣</span>
-    <span>
-      <span class="model-exam-title">மாதிரி தேர்வு / Model Exam</span>
-      <span class="model-exam-subtitle">சிறப்பு தேர்வு</span>
-    </span>
-    <span class="model-exam-arrow">›</span>
-  </button>
-  <button onclick="logout()">Logout</button>
-</div>
-</div>
+<div class="top"><h2>👋 வணக்கம் / Welcome, <span id="studentName"></span></h2><div><button onclick="logout()">Logout</button></div></div>
 <p class="small">உங்கள் தயாரிப்பை தொடங்க முதலில் தேர்வைத் தேர்வு செய்யுங்கள்.</p>
 <h3 class="category-title"><span class="thiral-mark" title="திறல் கல்வி அடையாளம்">தி</span>TNPSC</h3>
 <div class="grid">
@@ -687,10 +490,10 @@ a{
 </div>
 <h3>📮 Department of Posts</h3>
 <div class="grid">
-<button type="button" onclick="window.openExam('gds_to_mts')">📬 GDS → MTS</button>
-<button type="button" onclick="window.openExam('mts_gds_to_postman_mailguard')">📮 MTS / GDS → Postman / Mail Guard</button>
-<button type="button" onclick="window.openExam('postal_pa_sa')">📬 Postal Assistant / Sorting Assistant (PA/SA)</button>
-<button type="button" onclick="window.openExam('pa_to_ipos')">🏤 PA → IPOS</button>
+<button onclick="openExam('gds_to_mts')">📬 GDS → MTS</button>
+<button onclick="openExam('mts_gds_to_postman_mailguard')">📮 MTS / GDS → Postman / Mail Guard</button>
+<button onclick="openExam('postal_pa_sa')">📬 Postal Assistant / Sorting Assistant (PA/SA)</button>
+<button onclick="openExam('pa_to_ipos')">🏤 PA → IPOS</button>
 </div>
 <hr>
 <button class="secondary" onclick="showLastResult()">📊 என் Result</button><button class="secondary" onclick="showResultHistory()">🗂️ என் Result History</button><button class="secondary" onclick="openSuggestionPage()">💡 Suggestion / Feedback</button>
@@ -748,7 +551,7 @@ a{
 <button onclick="startPractice(10)">📝 10 கேள்விகள்</button>
 <button onclick="startPractice(20)">📝 20 கேள்விகள்</button>
 <button onclick="startPractice(50)">📝 50 கேள்விகள்</button>
-<button onclick="startPractice(100)">📝 100 கேள்விகள்</button>
+<button onclick="startPractice(9999)">♾️ Question Bank முழுவதும் / தொடர்ச்சி</button>
 <button onclick="show('material')">📖 Study Material</button>
 
 </div>
@@ -762,7 +565,7 @@ a{
 </section>
 
 <section id="practice" class="card hidden">
-<div class="top"><h2>📝 Practice</h2><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><div class="timer">⏱️ <span id="timer">15</span>s</div><button type="button" id="practiceLogoutBtn" class="secondary" onclick="window.thiralLogoutFromActivity()">Logout</button></div></div>
+<div class="top"><h2>📝 Practice</h2><div class="timer">⏱️ <span id="timer">15</span>s</div></div>
 <p><span class="badge" id="level"></span> <span class="badge" id="progress"></span></p>
 <div class="bar"><div id="bar"></div></div>
 <h3 id="question"></h3><div id="options"></div><p id="feedback"></p><button id="stopInfinitePractice" class="secondary hidden" onclick="stopInfinitePractice()">⏹ Practice நிறுத்தி Result பார்க்க</button>
@@ -779,13 +582,13 @@ a{
 
 
 <section id="mockTest" class="card hidden">
-<div class="top"><h2>🎯 TNPSC Group 4 – Full Mock Test</h2><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><div class="timer">⏱️ <span id="mockTimer">03:00:00</span></div><button type="button" id="mockLogoutBtn" class="secondary" onclick="window.thiralLogoutFromActivity()">Logout</button></div></div>
+<div class="top"><h2>🎯 TNPSC Group 4 – Full Mock Test</h2><div class="timer">⏱️ <span id="mockTimer">03:00:00</span></div></div>
 <p><span class="badge" id="mockProgress">1 / 200</span></p>
 <h3 id="mockQuestion"></h3>
 <div id="mockOptions"></div>
 <div class="top">
 <button class="secondary" onclick="mockPrev()">← Previous</button>
-<button class="secondary" id="mockNextBtn" onclick="mockNext()">Next →</button>
+<button class="secondary" onclick="mockNext()">Next →</button>
 <button type="button" onclick="submitMock(false)">Submit Test</button>
 </div>
 </section>
@@ -840,11 +643,24 @@ a{
 <section id="importantNews" class="card hidden" style="text-align:center;">
   <div style="font-size:58px;line-height:1;margin-bottom:10px;">📢</div>
   <h2 style="margin-bottom:8px;">முக்கிய அறிவிப்பு / Important News</h2>
-  <div id="importantNewsList" style="margin:22px auto;max-width:760px;text-align:left;">
-    <div class="card" style="text-align:center;">
-      <p class="small">முக்கிய அறிவிப்பு ஏற்றப்படுகிறது...</p>
-    </div>
+
+  <div style="margin:22px auto;max-width:760px;padding:24px 22px;border-radius:18px;background:linear-gradient(135deg,#eef6ff,#f5fbff);border:1px solid rgba(18,63,112,.12);">
+    <h3 style="margin:0 0 14px;color:#123f70;">TNPSC Group 4 – Model Exam</h3>
+
+    <p style="font-size:20px;font-weight:800;margin:10px 0;">
+      📅 Model Exam தேதி:
+      <span style="color:#b42318;">தேதி பின்னர் அறிவிக்கப்படும்</span>
+    </p>
+
+    <p style="font-size:18px;line-height:1.7;margin:16px 0;">
+      Thiral-ல் பதிவு செய்த மாணவர்கள் மட்டும் இந்த Model Exam-ல் கலந்து கொள்ள முடியும்.
+    </p>
+
+    <p class="small" style="margin:0;">
+      Registered Student Login மூலம் மட்டுமே Model Exam-ஐ அணுக முடியும்.
+    </p>
   </div>
+
   <button class="secondary" onclick="show('home')" style="font-weight:800;">← Back to Home</button>
 </section>
 
@@ -857,11 +673,11 @@ a{
   </div>
 
   <div style="max-width:980px;margin:0 auto 24px;display:flex;align-items:stretch;justify-content:center;gap:18px;flex-wrap:wrap;">
-    <a href="mailto:thiraladmin@gmail.com" style="flex:1 1 380px;min-width:280px;display:flex;align-items:center;gap:18px;text-align:left;padding:22px 26px;border-radius:18px;text-decoration:none;background:linear-gradient(135deg,#eef7ff,#e3f1ff);border:1px solid rgba(37,99,235,.18);box-shadow:0 8px 24px rgba(37,99,235,.10);box-sizing:border-box;">
+    <a href="mailto:thiral.admin@gmail.com" style="flex:1 1 380px;min-width:280px;display:flex;align-items:center;gap:18px;text-align:left;padding:22px 26px;border-radius:18px;text-decoration:none;background:linear-gradient(135deg,#eef7ff,#e3f1ff);border:1px solid rgba(37,99,235,.18);box-shadow:0 8px 24px rgba(37,99,235,.10);box-sizing:border-box;">
       <span style="width:62px;height:62px;flex:0 0 62px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:31px;background:#1677e8;color:#fff;box-shadow:0 5px 14px rgba(37,99,235,.25);">✉</span>
       <span style="min-width:0;">
         <span style="display:block;font-size:20px;font-weight:800;color:#123f70;margin-bottom:5px;">Email</span>
-        <span style="display:block;font-size:clamp(19px,2.3vw,27px);font-weight:900;color:#1265d6;word-break:break-word;line-height:1.25;">thiraladmin@gmail.com</span>
+        <span style="display:block;font-size:clamp(19px,2.3vw,27px);font-weight:900;color:#1265d6;word-break:break-word;line-height:1.25;">thiral.admin@gmail.com</span>
       </span>
     </a>
 
@@ -928,161 +744,16 @@ a{
 </div>
 <div class="card" style="margin-top:16px;border:1px solid #dbeafe">
 <h3>📡 Beta Usage Monitor</h3>
-<p class="small">Beta Test-ல் தற்போது எத்தனை மாணவர்கள் உள்ளே இருக்கிறார்கள், கடந்த 24 மணி நேர பயன்பாடு மற்றும் Practice/Mock பயன்பாட்டை central activity data மூலம் பார்க்கும் பகுதி. மாணவர்களின் Password ஒருபோதும் அனுப்பப்படாது.</p>
+<p class="small">10 மாணவர்கள் Beta Test பயன்படுத்துகிறார்களா என்பதை central activity data மூலம் பார்க்கும் பகுதி. மாணவர்களின் Password ஒருபோதும் அனுப்பப்படாது.</p>
 <div class="grid admin-stat-grid">
-<div class="card admin-stat-card" role="button" tabindex="0" onclick="toggleUsageDetail('onlineStudentList')" onkeydown="if(event.key==='Enter'||event.key===' ')toggleUsageDetail('onlineStudentList')" style="cursor:pointer"><h3>🟢 Currently Online</h3><p id="onlineActiveNow">-</p><span class="small">விவரங்களை காண்க ▾</span></div>
-<div class="card admin-stat-card" role="button" tabindex="0" onclick="toggleUsageDetail('usageLast24Detail')" onkeydown="if(event.key==='Enter'||event.key===' ')toggleUsageDetail('usageLast24Detail')" style="cursor:pointer"><h3>🕐 Last 24 Hours</h3><p id="onlineActive24h">-</p><span class="small">விவரங்களை காண்க ▾</span></div>
-<div class="card admin-stat-card" role="button" tabindex="0" onclick="toggleUsageDetail('usagePracticeDetail')" onkeydown="if(event.key==='Enter'||event.key===' ')toggleUsageDetail('usagePracticeDetail')" style="cursor:pointer"><h3>📝 Practice Sessions</h3><p id="onlinePracticeCount">-</p><span class="small">யார் யார் என்பதை காண்க ▾</span></div>
-<div class="card admin-stat-card" role="button" tabindex="0" onclick="toggleUsageDetail('usageMockDetail')" onkeydown="if(event.key==='Enter'||event.key===' ')toggleUsageDetail('usageMockDetail')" style="cursor:pointer"><h3>🎯 Mock Tests</h3><p id="onlineMockCount">-</p><span class="small">யார் யார் என்பதை காண்க ▾</span></div>
+<div class="card admin-stat-card"><h3>🟢 Active Today</h3><p id="onlineActiveToday">-</p></div>
+<div class="card admin-stat-card"><h3>🕐 Last 24 Hours</h3><p id="onlineActive24h">-</p></div>
+<div class="card admin-stat-card"><h3>📝 Practice Sessions</h3><p id="onlinePracticeCount">-</p></div>
+<div class="card admin-stat-card"><h3>🎯 Mock Tests</h3><p id="onlineMockCount">-</p></div>
 </div>
-<p id="onlineMonitorMsg" class="small">மேலுள்ள எண்ணிக்கையை அழுத்தினால் அந்த எண்ணிக்கைக்கான முழு விவரங்கள் திறக்கும்.</p>
-<div id="onlineStudentList" class="hidden" style="margin-top:14px"></div>
-<div id="usageLast24Detail" class="hidden" style="margin-top:18px"></div>
-<div id="usagePracticeDetail" class="hidden" style="margin-top:18px"></div>
-<div id="usageMockDetail" class="hidden" style="margin-top:18px"></div>
-
-</div>
-<div class="grid" style="margin-top:16px">
-  <div class="card" style="border:1px solid #dbeafe">
-    <h3>📢 Important News</h3>
-    <p class="small">மாணவர்களுக்கு காட்ட வேண்டிய முக்கிய அறிவிப்பை Copy / Paste செய்து நிர்வகிக்கலாம்.</p>
-    <button type="button" class="secondary" onclick="toggleAdminTool('adminImportantNewsTool')">Open / திறக்க</button>
-  </div>
-
-  <div class="card" style="border:1px solid #dbeafe">
-    <h3>📝 Model Exam Questions</h3>
-    <p class="small">தனி Model Exam-க்கான புதிய கேள்விகளை Upload / Paste செய்து தயாரிக்கலாம்.</p>
-    <button type="button" class="secondary" onclick="toggleAdminTool('adminModelExamTool')">Open / திறக்க</button>
-  </div>
-</div>
-
-<div id="adminImportantNewsTool" class="card hidden" style="margin-top:16px;border:1px solid #dbeafe">
-  <div class="top">
-    <h3>📢 Important News Management</h3>
-    <button type="button" class="secondary" onclick="toggleAdminTool('adminImportantNewsTool')">Close</button>
-  </div>
-  <label>தலைப்பு / Title</label>
-  <input id="adminNewsTitle" type="text" maxlength="200" placeholder="உதா: TNPSC Group 4 – Model Exam அறிவிப்பு">
-  <label>அறிவிப்பு / News</label>
-  <textarea id="adminNewsBody" rows="8" maxlength="10000" placeholder="இங்கே உங்கள் Important News-ஐ Copy / Paste செய்யுங்கள்..."></textarea>
-  <label>நிலை / Status</label>
-  <select id="adminNewsStatus">
-    <option value="draft">Draft / வரைவு</option>
-    <option value="published">Published / வெளியிடு</option>
-  </select>
-  <p class="small">Save செய்தவுடன் Important News database-ல் பாதுகாப்பாக சேமிக்கப்படும். மாணவர்களுக்கு Published செய்தி Important News பகுதியில் காட்டப்படும்.</p>
-  <div style="display:flex;gap:10px;flex-wrap:wrap">
-    <button type="button" onclick="previewAdminNews()">👁️ Preview</button>
-    <button type="button" onclick="saveAdminNews()">💾 Save News</button>
-    <button type="button" class="secondary" onclick="deleteCurrentAdminNews()">🗑️ Delete Current News</button>
-    <button type="button" class="secondary" onclick="clearAdminNewsForm()">Clear</button>
-  </div>
-  <p id="adminNewsSaveMsg" class="small" style="margin-top:10px"></p>
-  <div id="adminNewsPreview" class="card hidden" style="margin-top:14px;background:#f8fbff"></div>
-</div>
-
-<div id="adminModelExamTool" class="card hidden" style="margin-top:16px;border:1px solid #dbeafe">
-  <div class="top">
-    <h3>📝 Model Exam Questions</h3>
-    <button type="button" class="secondary" onclick="toggleAdminTool('adminModelExamTool')">Close</button>
-  </div>
-
-  <label>Model Exam ID</label>
-  <input id="adminModelExamId" type="text" maxlength="100" placeholder="உதா: ME-2026-001">
-
-  <label>Exam Title</label>
-  <input id="adminModelExamTitle" type="text" maxlength="250" placeholder="உதா: TNPSC Group 4 – Model Exam 01">
-
-  <div class="grid">
-    <div>
-      <label>Exam Date</label>
-      <input id="adminModelExamDate" type="date">
-    </div>
-    <div>
-      <label>Start Time</label>
-      <input id="adminModelExamTime" type="time">
-    </div>
-  </div>
-
-  <div class="grid">
-    <div>
-      <label>Availability</label>
-      <input id="adminModelExamAvailability" type="text" value="24 Hours" readonly>
-    </div>
-    <div>
-      <label>Duration</label>
-      <input id="adminModelExamDuration" type="number" value="180" min="1" placeholder="Minutes">
-    </div>
-  </div>
-
-  <label>Question Paper – Copy / Paste</label>
-  <textarea id="adminModelExamQuestions" rows="14" placeholder='இங்கே புதிய Model Exam questions-ஐ paste செய்யலாம்.
-
-உதாரண வடிவம்:
-Q001
-Question: ...
-A. ...
-B. ...
-C. ...
-D. ...
-Correct Answer: A
-Explanation: ...
-
-Q002
-Question: ...'></textarea>
-
-  <label>அல்லது Question File Upload</label>
-  <input id="adminModelExamFile" type="file" accept=".json,.txt,.csv" onchange="previewModelExamFile(this)">
-  <p id="adminModelExamFileMsg" class="small"></p>
-
-  <p class="small">இந்த questions master question bank-ல் சேராது. தனி Model Exam paper-ஆகவே சேமிக்கப்படும். இப்போது form/preview மட்டும்; backend/Supabase save அடுத்த கட்டத்தில் இணைக்கப்படும்.</p>
-
-  <div style="display:flex;gap:10px;flex-wrap:wrap">
-    <button type="button" onclick="previewModelExam()">👁️ Preview</button>
-    <button type="button" class="secondary" onclick="clearModelExamForm()">Clear</button>
-  </div>
-  <div id="adminModelExamPreview" class="card hidden" style="margin-top:14px;background:#f8fbff"></div>
-</div>
-<div class="card" style="margin-top:16px;border:1px solid #dbeafe">
-<h3>📡 Beta Usage Monitor</h3>
-<p class="small">Beta Test-ல் தற்போது எத்தனை மாணவர்கள் உள்ளே இருக்கிறார்கள், கடந்த 24 மணி நேர பயன்பாடு மற்றும் Practice/Mock பயன்பாட்டை central activity data மூலம் பார்க்கும் பகுதி. மாணவர்களின் Password ஒருபோதும் அனுப்பப்படாது.</p>
-<div class="grid admin-stat-grid">
-<div class="card admin-stat-card" role="button" tabindex="0" onclick="toggleUsageDetail('onlineStudentList')" onkeydown="if(event.key==='Enter'||event.key===' ')toggleUsageDetail('onlineStudentList')" style="cursor:pointer"><h3>🟢 Currently Online</h3><p id="onlineActiveNow">-</p><span class="small">விவரங்களை காண்க ▾</span></div>
-<div class="card admin-stat-card" role="button" tabindex="0" onclick="toggleUsageDetail('usageLast24Detail')" onkeydown="if(event.key==='Enter'||event.key===' ')toggleUsageDetail('usageLast24Detail')" style="cursor:pointer"><h3>🕐 Last 24 Hours</h3><p id="onlineActive24h">-</p><span class="small">விவரங்களை காண்க ▾</span></div>
-<div class="card admin-stat-card" role="button" tabindex="0" onclick="toggleUsageDetail('usagePracticeDetail')" onkeydown="if(event.key==='Enter'||event.key===' ')toggleUsageDetail('usagePracticeDetail')" style="cursor:pointer"><h3>📝 Practice Sessions</h3><p id="onlinePracticeCount">-</p><span class="small">யார் யார் என்பதை காண்க ▾</span></div>
-<div class="card admin-stat-card" role="button" tabindex="0" onclick="toggleUsageDetail('usageMockDetail')" onkeydown="if(event.key==='Enter'||event.key===' ')toggleUsageDetail('usageMockDetail')" style="cursor:pointer"><h3>🎯 Mock Tests</h3><p id="onlineMockCount">-</p><span class="small">யார் யார் என்பதை காண்க ▾</span></div>
-</div>
-<p id="onlineMonitorMsg" class="small">மேலுள்ள எண்ணிக்கையை அழுத்தினால் அந்த எண்ணிக்கைக்கான முழு விவரங்கள் திறக்கும்.</p>
-<div id="onlineStudentList" class="hidden" style="margin-top:14px"></div>
-<div id="usageLast24Detail" class="hidden" style="margin-top:18px"></div>
-<div id="usagePracticeDetail" class="hidden" style="margin-top:18px"></div>
-<div id="usageMockDetail" class="hidden" style="margin-top:18px"></div>
-
-</div>
-<hr>
-<div class="card" style="margin-top:16px;border:1px solid #fecaca">
-<h3>🛡️ Security Monitor / பாதுகாப்பு</h3>
-<p class="small">Admin account மற்றும் பாதுகாப்பு தொடர்பான நிகழ்வுகளை மட்டும் Admin பார்க்க முடியும். Password, OTP அல்லது sensitive data இங்கே காட்டப்படாது.</p>
-<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
-<button onclick="loadSecurityEvents138()">🔄 Security Refresh</button>
-</div>
-<p id="securityMsg138" class="small"></p>
-<div id="securityStats138" class="grid admin-stat-grid" style="margin-top:10px"></div>
-<p id="securitySelectMsg138" class="small">மேலுள்ள Security card-ஐ கிளிக் செய்தால் அந்த வகை நிகழ்வுகள் மட்டும் தனியாக காட்டப்படும்.</p>
-<div id="securityDetail138" class="hidden" style="margin-top:14px"></div>
-</div>
-
-<hr>
-<div class="card" style="margin-top:16px;border:1px solid #fecaca">
-<h3>🛡️ Security Monitor / பாதுகாப்பு</h3>
-<p class="small">Admin account மற்றும் பாதுகாப்பு தொடர்பான நிகழ்வுகளை மட்டும் Admin பார்க்க முடியும். Password, OTP அல்லது sensitive data இங்கே காட்டப்படாது.</p>
-<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
-<button onclick="loadSecurityEvents138()">🔄 Security Refresh</button>
-</div>
-<p id="securityMsg138" class="small"></p>
-<div id="securityStats138" class="grid admin-stat-grid" style="margin-top:10px"></div>
-<p id="securitySelectMsg138" class="small">மேலுள்ள Security card-ஐ கிளிக் செய்தால் அந்த வகை நிகழ்வுகள் மட்டும் தனியாக காட்டப்படும்.</p>
-<div id="securityDetail138" class="hidden" style="margin-top:14px"></div>
+<p id="onlineMonitorMsg" class="small">Online tracking அமைக்கப்படவில்லை.</p>
+<button class="secondary" onclick="refreshOnlineMonitor()">🔄 Usage Refresh</button>
+<div id="onlineStudentList" style="margin-top:14px"></div>
 </div>
 <hr>
 <h3>💡 Student Suggestions / Feedback</h3>
@@ -1094,26 +765,9 @@ Question: ...'></textarea>
 </div>
 <div id="adminSuggestionList"></div>
 <hr>
-<div class="card" style="margin-top:16px;border:1px solid #dbeafe">
-<h3>📥 Exam Results Excel / தேர்வு முடிவுகள் Excel</h3>
-<p class="small">தேவையான தேர்வை / வகையை / பாடத்தைத் தேர்ந்தெடுத்து Excel Export செய்யலாம். Browser-ல் result table காட்டப்படாது. தேர்வு வாரியாக தனித்தனி Excel tab-களில் முழு result records வரும்.</p>
-<div class="grid" style="margin-top:12px">
-<div><label>Exam / தேர்வு</label><select id="adminExamFilter" style="width:100%"><option value="">அனைத்து தேர்வுகளும்</option></select></div>
-<div><label>Exam Type / வகை</label><select id="adminExamTypeFilter" style="width:100%" onchange="loadAdminExamResults(1)"><option value="all" selected>அனைத்தும்</option><option value="model">Model Exam</option><option value="mock">Mock Test</option><option value="10">10 Questions</option><option value="20">20 Questions</option><option value="50">50 Questions</option><option value="practice">Practice</option><option value="bank">Question Bank</option></select></div>
-<div><label>Subject / பாடம்</label><select id="adminExamSubjectFilter" style="width:100%"><option value="">அனைத்து பாடங்களும்</option></select></div>
-<div><label>Topic / தலைப்பு</label><select id="adminExamTopicFilter" style="width:100%"><option value="">அனைத்து தலைப்புகளும்</option></select></div>
-<div><label>Subtopic / உள்தலைப்பு</label><select id="adminExamSubtopicFilter" style="width:100%"><option value="">அனைத்து உள்தலைப்புகளும்</option></select></div>
-<div><label>From Date</label><input id="adminExamFrom" type="date" style="width:100%"></div>
-<div><label>To Date</label><input id="adminExamTo" type="date" style="width:100%"></div>
-<div><label>Min %</label><input id="adminExamMin" type="number" min="0" max="100" value="0" style="width:100%"></div>
-<div><label>Max %</label><input id="adminExamMax" type="number" min="0" max="100" value="100" style="width:100%"></div>
-</div>
-<div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
-<button onclick="exportAdminExamResults()">📥 Excel Export</button>
-<button class="secondary" onclick="clearAdminExamResults()">Clear / அழி</button>
-</div>
-<p id="adminExamResultsMsg" class="small" style="margin-top:10px"></p>
-</div>
+<h3>👨‍🎓 Registered Students</h3>
+<p class="small">பதிவு செய்த ஒவ்வொரு மாணவரின் பெயர், Email, தொலைபேசி, பாலினம், பிறந்த தேதி, பதிவு நேரம் மற்றும் கடைசி Login நேரம் இங்கே காட்டப்படும். Password மட்டும் Admin-க்கும் காட்டப்படாது.</p>
+<div id="adminStudentList"></div>
 <hr>
 <h3>📚 Content Management</h3>
 <p>Subjects → Topics → Subtopics → Study Material → Questions ஆகியவற்றை Admin நிர்வகிக்கும் பகுதி.</p>
@@ -1124,13 +778,13 @@ Question: ...'></textarea>
 <button class="secondary" onclick="show('home')">Home</button>
 </section>
 
-<section id="adminStudentView" class="card hidden">
-<div class="top"><h2 id="adminStudentDetailTitle">மாணவர் விவரங்கள்</h2><button class="secondary" onclick="show('admin')">← Dashboard</button></div>
-<p class="small">Dashboard-ல் தேர்ந்தெடுத்த எண்ணிக்கைக்கான மாணவர் விவரங்கள் மட்டும் இங்கே காட்டப்படும். Password எந்த நிலையிலும் காட்டப்படாது.</p>
-<div id="adminStudentDetailBody"></div>
-</section>
-
 </div>
+<div id="adminStudentDetailModal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10000;display:flex;align-items:center;justify-content:center;padding:18px">
+<div class="card" style="max-width:1200px;width:100%;max-height:90vh;overflow:auto;position:relative">
+<div class="top"><h2 id="adminStudentDetailTitle">மாணவர் விவரங்கள்</h2><button class="secondary" onclick="closeAdminStudentView()">✕ மூடு</button></div>
+<p class="small">மேலுள்ள Dashboard எண்ணிக்கையில் கிளிக் செய்த மாணவர்களின் விவரங்கள் இங்கே காட்டப்படும். Password எந்த நிலையிலும் காட்டப்படாது.</p>
+<div id="adminStudentDetailBody"></div>
+</div></div>
 <div id="languageModal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px">
 <div class="card" style="max-width:480px;width:100%;text-align:center">
 <h2>🌐 தேர்வு மொழியைத் தேர்ந்தெடுக்கவும்</h2>
@@ -1155,10 +809,10 @@ const EXAMS={
  clerical:{title:'📁 Clerical',info:'General Knowledge • Aptitude • Reasoning',subjects:[['gs','📗 General Knowledge'],['apt','📐 Aptitude / Reasoning']]},
  assistant:{title:'📁 Assistant',info:'General Knowledge • Aptitude • Reasoning',subjects:[['gs','📗 General Knowledge'],['apt','📐 Aptitude / Reasoning']]},
  junior_assistant:{title:'📁 Junior Assistant',info:'General Knowledge • Aptitude • Reasoning',subjects:[['gs','📗 General Knowledge'],['apt','📐 Aptitude / Reasoning']]},
- gds_to_mts:{title:'📬 GDS → MTS',info:'Department of Posts • 60 Minutes • Part-A: Basic Postal Knowledge (30 Questions / 60 Marks) • Part-B: General Awareness & Basic Arithmetic (20 Questions / 40 Marks)',subjects:[['gds_postal_a','📮 Part-A: Basic Postal Knowledge'],['gds_ga','📘 Part-B: General Awareness / Knowledge'],['gds_arithmetic','📐 Part-B: Basic Arithmetic']]},
- mts_gds_to_postman_mailguard:{title:'📮 MTS / GDS → Postman / Mail Guard',info:'Department of Posts • MTS / GDS to Postman / Mail Guard Departmental Exam',subjects:[['gs','📗 General Awareness'],['apt','📐 Aptitude / Reasoning']]},
  postal_pa_sa:{title:'📬 Postal Assistant / Sorting Assistant (PA/SA)',info:'Department of Posts • Postal Assistant / Sorting Assistant',subjects:[['gs','📗 General Awareness'],['apt','📐 Aptitude / Reasoning']]},
- pa_to_ipos:{title:'🏤 PA → IPOS',info:'Department of Posts • Postal Assistant to IPOS Departmental Exam',subjects:[['gs','📗 General Awareness'],['apt','📐 Aptitude / Reasoning']]},
+ gds_to_mts:{title:'📬 GDS → MTS',info:'Department of Posts • GDS to MTS Departmental Exam',subjects:[['gs','📗 General Awareness / Basic Postal Knowledge'],['apt','📐 Basic Arithmetic']]},
+ mts_gds_to_postman_mailguard:{title:'📮 MTS / GDS → Postman / Mail Guard',info:'Department of Posts • MTS / GDS to Postman / Mail Guard Departmental Exam',subjects:[['gs','📗 General Awareness / Postal Knowledge'],['apt','📐 Arithmetic / Reasoning']]},
+ pa_to_ipos:{title:'🏤 PA → IPOS',info:'Department of Posts • Postal Assistant to IPOS Departmental Exam',subjects:[['gs','📗 General Awareness / Postal Knowledge'],['apt','📐 Aptitude / Reasoning']]},
  tntet_p1:{title:'👩‍🏫 TNTET Paper I',info:'Child Development • Language • Mathematics • Environmental Studies',subjects:[['gs','📗 Child Development / General'],['apt','📐 Mathematics / Reasoning']]},
  tntet_p2:{title:'👩‍🏫 TNTET Paper II',info:'Child Development • Language • Mathematics / Science / Social Science',subjects:[['gs','📗 Child Development / General'],['apt','📐 Subject Aptitude / Reasoning']]},
  trb:{title:'👩‍🏫 TRB தேர்வுகள்',info:'Teacher Recruitment – பாடத்திட்டம் தேர்வின்படி மாறும்',subjects:[['gs','📗 General / Subject Knowledge'],['apt','📐 Reasoning / Aptitude']]},
@@ -1188,21 +842,7 @@ function backToExam(){renderExamHome();show('examHome');}
 function startSelectedMock(){startMock();}
 function showLastResult(){const r=JSON.parse(localStorage.getItem('tnpsc_last_result')||'null');if(!r){alert('இன்னும் Result இல்லை. முதலில் ஒரு Practice அல்லது Mock Test முடிக்கவும்.');return;}if(r.type==='Mock Test'){showMockResultScreen();setTimeout(()=>window.scrollTo({top:0,behavior:'instant'}),50);return;}document.getElementById('resultText').innerHTML=`<p><b>மாணவர் பெயர்:</b> ${r.student}</p><p><b>தேர்வு:</b> ${r.exam}</p><p><b>வகை:</b> ${r.type}</p><p><b>மொத்த கேள்விகள்:</b> ${r.total}</p><p><b>சரி:</b> ${r.correct} | <b>தவறு:</b> ${r.wrong} | <b>விடையளிக்காதது:</b> ${r.unanswered}</p><p><b>மதிப்பெண்:</b> ${r.score}</p>`;show('result');}
 
-const GDS_POSTAL_TOPICS={
-'Post Office Guide Part-I (23 Questions)':['Organization of the Department','Type of Post Offices','Business Hours','Payment of Postage, Stamps, and Stationery','General Rules for Packing, Sealing, and Posting','Methods of Addressing','Post Boxes and Post Bags','Duties of Letter Box Peon','Official Postal Articles','Prohibited Postal Articles','Products and Services: Mails, Banking & Remittances, Insurance, Stamps, and Business'],
-'Postal Manual Volume V (7 Questions)':['Definitions']
-};
-const GDS_GA_TOPICS={
-'General Awareness / Knowledge (10 Questions)':['Indian Geography','Civics','General Knowledge','Indian Culture & Freedom Struggle','Ethics and Moral Studies']
-};
-const GDS_ARITH_TOPICS={
-'Basic Arithmetic (10 Questions)':['BODMAS (Brackets, Orders, Division, Multiplication, Addition, Subtraction)','Percentage','Profit and Loss','Simple Interest','Average','Time and Work','Time and Distance','Unitary Method']
-};
-
 const data={
-gds_postal_a:{title:'📮 Part-A: Basic Postal Knowledge',topics:GDS_POSTAL_TOPICS},
-gds_ga:{title:'📘 Part-B: General Awareness / Knowledge',topics:GDS_GA_TOPICS},
-gds_arithmetic:{title:'📐 Part-B: Basic Arithmetic',topics:GDS_ARITH_TOPICS},
 tamil:{
 title:'📚 தமிழ்',
 topics:{
@@ -1216,7 +856,6 @@ title:'📗 பொது அறிவு',
 topics:{
 'இந்திய வரலாறு':['பண்டைய இந்தியா','இடைக்கால இந்தியா','நவீன இந்தியா','சுதந்திரப் போராட்டம்'],
 'தமிழ்நாடு வரலாறு':['சங்க காலம்','சோழர்','பாண்டியர்','பல்லவர்','நாயக்கர்'],
-'தமிழக அரசியல்':['தமிழ்நாடு முதலமைச்சர்கள்','அமைச்சர்கள் மற்றும் அமைச்சரவைகள்','தமிழ்நாடு மாவட்டங்கள்','தமிழ்நாடு ஆளுநர்கள்','தமிழ்நாடு சட்டமன்றம்','தமிழ்நாடு தேர்தல்கள் மற்றும் அரசியல் கட்சிகள்'],
 'இந்திய அரசியல்':['அரசியலமைப்பு','அடிப்படை உரிமைகள்','பாராளுமன்றம்','மாநில அரசு','உள்ளாட்சி'],
 'புவியியல்':['இந்தியா','தமிழ்நாடு','ஆறுகள்','மலைகள்','வளங்கள்'],
 'அறிவியல்':['இயற்பியல்','வேதியியல்','உயிரியல்','சுற்றுச்சூழல்'],
@@ -1233,18 +872,11 @@ topics:{
 };
 
 const EN_LABELS={
-gds_postal_a:{title:'📮 Part-A: Basic Postal Knowledge',topics:{
-'Post Office Guide Part-I (23 Questions)':{en:'Post Office Guide Part-I (23 Questions)',subs:{'Organization of the Department':'Organization of the Department','Type of Post Offices':'Type of Post Offices','Business Hours':'Business Hours','Payment of Postage, Stamps, and Stationery':'Payment of Postage, Stamps, and Stationery','General Rules for Packing, Sealing, and Posting':'General Rules for Packing, Sealing, and Posting','Methods of Addressing':'Methods of Addressing','Post Boxes and Post Bags':'Post Boxes and Post Bags','Duties of Letter Box Peon':'Duties of Letter Box Peon','Official Postal Articles':'Official Postal Articles','Prohibited Postal Articles':'Prohibited Postal Articles','Products and Services: Mails, Banking & Remittances, Insurance, Stamps, and Business':'Products and Services: Mails, Banking & Remittances, Insurance, Stamps, and Business'}},
-'Postal Manual Volume V (7 Questions)':{en:'Postal Manual Volume V (7 Questions)',subs:{'Definitions':'Definitions'}}
-}},
-gds_ga:{title:'📘 Part-B: General Awareness / Knowledge',topics:{'General Awareness / Knowledge (10 Questions)':{en:'General Awareness / Knowledge (10 Questions)',subs:{'Indian Geography':'Indian Geography','Civics':'Civics','General Knowledge':'General Knowledge','Indian Culture & Freedom Struggle':'Indian Culture & Freedom Struggle','Ethics and Moral Studies':'Ethics and Moral Studies'}}}},
-gds_arithmetic:{title:'📐 Part-B: Basic Arithmetic',topics:{'Basic Arithmetic (10 Questions)':{en:'Basic Arithmetic (10 Questions)',subs:{'BODMAS (Brackets, Orders, Division, Multiplication, Addition, Subtraction)':'BODMAS (Brackets, Orders, Division, Multiplication, Addition, Subtraction)','Percentage':'Percentage','Profit and Loss':'Profit and Loss','Simple Interest':'Simple Interest','Average':'Average','Time and Work':'Time and Work','Time and Distance':'Time and Distance','Unitary Method':'Unitary Method'}}}},
  gs:{
   title:'📗 General Studies',
   topics:{
    'இந்திய வரலாறு':{'en':'Indian History','subs':{'பண்டைய இந்தியா':'Ancient India','இடைக்கால இந்தியா':'Medieval India','நவீன இந்தியா':'Modern India','சுதந்திரப் போராட்டம்':'Indian Freedom Movement'}},
    'தமிழ்நாடு வரலாறு':{'en':'Tamil Nadu History','subs':{'சங்க காலம்':'Sangam Age','சோழர்':'Cholas','பாண்டியர்':'Pandyas','பல்லவர்':'Pallavas','நாயக்கர்':'Nayaks'}},
-   'தமிழக அரசியல்':{'en':'Tamil Nadu Politics','subs':{'தமிழ்நாடு முதலமைச்சர்கள்':'Tamil Nadu Chief Ministers','அமைச்சர்கள் மற்றும் அமைச்சரவைகள்':'Ministers and Cabinets','தமிழ்நாடு மாவட்டங்கள்':'Tamil Nadu Districts','தமிழ்நாடு ஆளுநர்கள்':'Tamil Nadu Governors','தமிழ்நாடு சட்டமன்றம்':'Tamil Nadu Legislative Assembly','தமிழ்நாடு தேர்தல்கள் மற்றும் அரசியல் கட்சிகள்':'Tamil Nadu Elections and Political Parties'}},
    'இந்திய அரசியல்':{'en':'Indian Polity','subs':{'அரசியலமைப்பு':'Constitution','அடிப்படை உரிமைகள்':'Fundamental Rights','பாராளுமன்றம்':'Parliament','மாநில அரசு':'State Government','உள்ளாட்சி':'Local Government'}},
    'புவியியல்':{'en':'Geography','subs':{'இந்தியா':'India','தமிழ்நாடு':'Tamil Nadu','ஆறுகள்':'Rivers','மலைகள்':'Mountains','வளங்கள்':'Resources'}},
    'அறிவியல்':{'en':'Science','subs':{'இயற்பியல்':'Physics','வேதியியல்':'Chemistry','உயிரியல்':'Biology','சுற்றுச்சூழல்':'Environment'}},
@@ -1263,11 +895,7 @@ gds_arithmetic:{title:'📐 Part-B: Basic Arithmetic',topics:{'Basic Arithmetic 
 };
 function labelForSubject(s){
  if(s==='tamil') return '📚 தமிழ்';
- if(EN_LABELS[s] && contentLanguage==='en') return EN_LABELS[s].title;
- if(s==='gds_postal_a') return '📮 Part-A: Basic Postal Knowledge';
- if(s==='gds_ga') return '📘 Part-B: General Awareness / Knowledge';
- if(s==='gds_arithmetic') return '📐 Part-B: Basic Arithmetic';
- return s==='gs'?'📗 பொது அறிவு':'📐 திறனறிவு / Aptitude';
+ return (contentLanguage==='en' && EN_LABELS[s]) ? EN_LABELS[s].title : (s==='gs'?'📗 பொது அறிவு':'📐 திறனறிவு / Aptitude');
 }
 function labelForTopic(s,t){
  if(contentLanguage==='en' && EN_LABELS[s]?.topics[t]) return EN_LABELS[s].topics[t].en;
@@ -1322,9 +950,7 @@ function show(id){
   if(!el)return;
   el.classList.remove('hidden');
   el.style.display='block';
-  if(id==='importantNews'){
-    setTimeout(()=>{ try{ loadImportantNews(); }catch(e){} },0);
-  }
+
   /* Home is a two-part landing page: keep the original About/intro section
      visible after Logout as it is on the initial load. Other screens remain
      single-section views. */
@@ -1362,15 +988,7 @@ function initContentLanguage(){
   const el=document.getElementById('selectedLanguageLabel');
   if(el) el.textContent=contentLanguage==='en'?'English':'தமிழ்';
 }
-document.addEventListener('DOMContentLoaded',function(){
-  initContentLanguage();
-  try{
-    ['tnpsc_student_users','tnpsc_nanban_user','tnpsc_student_count','tnpsc_last_result','tnpsc_result_history',
-     'thiral_active_student_email','g4login'].forEach(function(k){localStorage.removeItem(k);sessionStorage.removeItem(k);});
-    Object.keys(localStorage).filter(function(k){return /^thiral_practice_used_/.test(k)||/^tnpsc_used_questions_/.test(k);})
-      .forEach(function(k){localStorage.removeItem(k);});
-  }catch(e){}
-});
+document.addEventListener('DOMContentLoaded',initContentLanguage);
 
 /* V137 ONLINE BETA TELEMETRY
    Configure the Google Apps Script Web App URL after deployment.
@@ -1391,7 +1009,7 @@ function thiralTelemetryReady(){
  return /^https:\/\//.test(c.apiBase||'') && !/YOUR-THIRAL-BACKEND/i.test(c.apiBase||'');
 }
 function thiralTelemetryPayload(extra){
- const u=getActiveStudent()||window.thiralV138User||null;
+ const u=getActiveStudent()||JSON.parse(localStorage.getItem('tnpsc_nanban_user')||'null');
  return Object.assign({
    app:'Thiral',version:'V137',
    studentId:u&&u.id||'',name:u&&u.name||'',email:u&&u.email||'',
@@ -1425,36 +1043,42 @@ document.addEventListener('visibilitychange',()=>{
  if(document.visibilityState==='visible'&&getActiveStudent())thiralSendActivity('foreground');
 });
 
-/* Central-data rule: student identity, credentials and account records are never stored
-   in browser localStorage. The backend session is the source of truth. */
-function getStudentUsers(){ return []; }
-function saveStudentUsers(list){ return; }
-function getActiveStudent(){ return (window.thiralV138User && window.thiralV138User.role==='STUDENT') ? window.thiralV138User : null; }
-function setActiveStudent(email){ return; }
-function clearActiveStudent(){ return; }
+function getStudentUsers(){
+ try{
+   const a=JSON.parse(localStorage.getItem('tnpsc_student_users')||'[]');
+   return Array.isArray(a)?a:[];
+ }catch(e){return [];}
+}
+function saveStudentUsers(list){localStorage.setItem('tnpsc_student_users',JSON.stringify(list.slice(0,5000)));}
+function getActiveStudent(){
+ const email=(sessionStorage.getItem('thiral_active_student_email')||'').trim().toLowerCase();
+ if(!email)return null;
+ const list=getStudentUsers();
+ return list.find(u=>u.email===email)||null;
+}
+function setActiveStudent(email){sessionStorage.setItem('thiral_active_student_email',String(email||'').trim().toLowerCase());}
+function clearActiveStudent(){sessionStorage.removeItem('thiral_active_student_email');}
 
 function login(){
-  /* Real login is defined by the V138 secure server bridge below. */
-  if(typeof window.thiralV138Login==='function') return window.thiralV138Login();
-  const msg=document.getElementById('lm');
-  if(msg){msg.className='bad';msg.textContent='Secure server login is not ready.';}
-}
-
-
-
-/*
- * Model Exam frontend entry point.
- * Intentionally inactive for now:
- * - No date is displayed.
- * - Clicking the card currently performs no navigation.
- * - Future activation must be controlled by the secure backend
- *   using the configured start/end time.
- */
-async function openModelExam(){
-  if(typeof window.__THIRAL_MODEL_EXAM_START === 'function'){
-    return window.__THIRAL_MODEL_EXAM_START();
-  }
-  alert('Model Exam module ஏற்றப்படவில்லை.');
+ const list=getStudentUsers();
+ const e=document.getElementById('email').value.trim().toLowerCase();
+ const p=document.getElementById('pass').value;
+ const msg=document.getElementById('lm');
+ const u=list.find(x=>x.email===e);
+ if(!list.length){msg.className='bad';msg.textContent='Account இல்லை. முதலில் New Registration செய்யவும்.';return;}
+ if(u && p===u.pass){
+   u.lastLogin=new Date().toLocaleString('en-IN');
+   saveStudentUsers(list);
+   localStorage.setItem('tnpsc_nanban_user',JSON.stringify(u));
+   setActiveStudent(u.email);
+   sessionStorage.setItem('g4login','1');
+   thiralSendActivity('login',{lastLogin:u.lastLogin});
+   thiralStartHeartbeat();
+   document.getElementById('studentName').textContent=u.name;
+   show('dash');
+ }else{
+   msg.className='bad';msg.textContent='Email அல்லது Password சரியாக இல்லை.';
+ }
 }
 
 function logout(){
@@ -1841,7 +1465,7 @@ function showResultHistory(){
   show('resultHistory');
 }
 function getStudentName(){
- const u=window.thiralV138User || null;
+ const u=JSON.parse(localStorage.getItem('tnpsc_nanban_user')||'null');
  return (u&&u.name)?u.name:'மாணவர்';
 }
 function toggleReview(){
@@ -1879,7 +1503,16 @@ function submitMock(auto=false){
  setTimeout(()=>window.scrollTo(0,0),50);
 }
 
-/* Central-data mode: no student registry is migrated or restored from browser storage. */
+(function migrateStudentRegistry(){
+ try{
+   const existing=getStudentUsers();
+   const legacy=JSON.parse(localStorage.getItem('tnpsc_nanban_user')||'null');
+   if(legacy&&legacy.email&&!existing.some(u=>u.email===legacy.email)){existing.push({...legacy,id:legacy.id||'STU-LEGACY'});saveStudentUsers(existing);}
+   localStorage.setItem('tnpsc_student_count',String(existing.length));
+ }catch(e){}
+})();
+
+window.addEventListener('load',()=>{const u=getActiveStudent() || JSON.parse(localStorage.getItem('tnpsc_nanban_user')||'null');if(sessionStorage.getItem('g4login')==='1'&&u){localStorage.setItem('tnpsc_nanban_user',JSON.stringify(u));document.getElementById('studentName').textContent=u.name;show('dash')}});
 </script>
 
 <script>
@@ -3390,20 +3023,6 @@ window.V91_ADV_NUM=V91_ADV_NUM;
   }
   window.thiralV138Api = api138;
 
-  var usageHeartbeatTimer=null;
-  async function sendUsageHeartbeat(){
-    try{
-      if(!window.thiralV138User) return;
-      await api138('/auth/heartbeat',{method:'POST',body:'{}'});
-    }catch(e){}
-  }
-  function startUsageHeartbeat(){
-    if(usageHeartbeatTimer) clearInterval(usageHeartbeatTimer);
-    sendUsageHeartbeat();
-    usageHeartbeatTimer=setInterval(sendUsageHeartbeat,60000);
-  }
-  window.__startThiralUsageHeartbeat=startUsageHeartbeat;
-
   function setStudentName(u){
     var name = (u && (u.name || u.email)) || '';
     if(el('studentName')) el('studentName').textContent = name;
@@ -3412,10 +3031,8 @@ window.V91_ADV_NUM=V91_ADV_NUM;
 
   function enterV138(u){
     window.thiralV138User = u;
-    if(window.__startThiralUsageHeartbeat) window.__startThiralUsageHeartbeat();
     setStudentName(u);
     if(typeof selectedExam !== 'undefined'){
-      /* Exam preference is UI-only and contains no student identity. */
       localStorage.setItem('tnpsc_selected_exam', selectedExam || 'group4');
     }
     if(typeof renderExamHome === 'function'){
@@ -3435,7 +3052,6 @@ window.V91_ADV_NUM=V91_ADV_NUM;
       var d = await api138('/auth/me');
       window.thiralV138User = d.user || null;
       setStudentName(d.user || null);
-      if(window.thiralV138User && window.__startThiralUsageHeartbeat) window.__startThiralUsageHeartbeat();
     }catch(e){
       window.thiralV138User = null;
       setStudentName(null);
@@ -3454,48 +3070,9 @@ window.V91_ADV_NUM=V91_ADV_NUM;
         })
       });
       if(msg) msg.textContent = '';
-      if(d.user && d.user.role === 'STUDENT' && d.user.must_change_password === true){
-        window.thiralV138User = d.user;
-        setStudentName(d.user);
-        if(window.__startThiralUsageHeartbeat) window.__startThiralUsageHeartbeat();
-        var tempField = el('currentTempPassword');
-        if(tempField) tempField.value = el('pass').value;
-        if(el('forcePasswordMsg')) el('forcePasswordMsg').textContent = '';
-        show('forcePasswordChange');
-        return;
-      }
       enterV138(d.user);
     }catch(e){
       if(msg){ msg.className='bad'; msg.textContent='Login failed: ' + e.message; }
-    }
-  };
-
-  window.changeForcedPassword = async function(){
-    var msg = el('forcePasswordMsg');
-    try{
-      var current = el('currentTempPassword').value;
-      var next = el('newForcePassword').value;
-      var confirmNext = el('confirmForcePassword').value;
-      if(!current || !next || !confirmNext) throw new Error('அனைத்து Password fields-ஐ நிரப்புங்கள்.');
-      if(next.length < 8) throw new Error('New Password குறைந்தது 8 characters இருக்க வேண்டும்.');
-      if(next !== confirmNext) throw new Error('New Password மற்றும் Confirm Password ஒன்றாக இருக்க வேண்டும்.');
-      if(next === current) throw new Error('New Password, Temporary Password-இலிருந்து வேறுபட்டதாக இருக்க வேண்டும்.');
-      var d = await api138('/auth/change-password',{
-        method:'POST',
-        body:JSON.stringify({current_password:current,new_password:next,confirm_password:confirmNext})
-      });
-      if(msg){ msg.className='good'; msg.textContent=d.message || 'Password மாற்றப்பட்டது. மீண்டும் Login செய்யவும்.'; }
-      el('currentTempPassword').value='';
-      el('newForcePassword').value='';
-      el('confirmForcePassword').value='';
-      await new Promise(function(resolve){setTimeout(resolve,700);});
-      await api138('/auth/logout',{method:'POST'});
-      window.thiralV138User=null;
-      setStudentName(null);
-      clearAllLoginFields();
-      show('login');
-    }catch(e){
-      if(msg){ msg.className='bad'; msg.textContent=e.message || 'Password மாற்ற முடியவில்லை.'; }
     }
   };
 
@@ -3536,45 +3113,28 @@ window.V91_ADV_NUM=V91_ADV_NUM;
 
   window.adminLogin = async function(){
     var msg = el('adminMsg');
-    var btn = document.querySelector('#adminLogin button[onclick*="adminLogin"]');
     try{
-      var adminId = el('adminEmail').value.trim();
-      var adminPassword = el('adminPass').value;
-      if(!adminId || !adminPassword) throw new Error('Admin ID மற்றும் Password இரண்டையும் உள்ளிட வேண்டும்.');
-      if(btn){ btn.disabled=true; btn.textContent='Admin Login...'; }
-      if(msg){ msg.className=''; msg.textContent='Login சரிபார்க்கப்படுகிறது...'; }
-
       var d = await api138('/auth/login',{
         method:'POST',
         body:JSON.stringify({
-          email: adminId,
-          password: adminPassword
+          email: el('adminEmail').value.trim(),
+          password: el('adminPass').value
         })
       });
-      if(!d.user || String(d.user.role||'').toUpperCase() !== 'ADMIN'){
-        throw new Error('இந்த Login ID-க்கு Admin அனுமதி இல்லை.');
-      }
-
-      /* Open Admin immediately after authentication. Admin data loading is
-         secondary, so a slow/failing dashboard report API must not block login. */
-      window.thiralV138User = d.user;
-      setStudentName(d.user);
+      if(!d.user || d.user.role !== 'ADMIN') throw new Error('Admin authorization required.');
+      enterV138(d.user);
+      await loadAdminV138();
       show('admin');
-      if(msg){ msg.className=''; msg.textContent=''; }
-      try{ await loadAdminV138(); }catch(adminDataError){
-        if(msg){ msg.className='bad'; msg.textContent='Admin login OK. Dashboard data: '+(adminDataError.message||adminDataError); }
-      }
-      return true;
     }catch(e){
       var denied = String(e && e.message || '').indexOf('ACCESS DENIED') === 0;
       if(msg){
         msg.className='bad';
         msg.textContent = denied ? 'ACCESS DENIED' : ('Admin access: ' + (e && e.message || e));
       }
-      if(denied){ window.thiralV138Students = []; }
+      if(denied){
+        window.thiralV138Students = [];
+      }
       return false;
-    }finally{
-      if(btn){ btn.disabled=false; btn.textContent='Admin Login'; }
     }
   };
 
@@ -3615,18 +3175,6 @@ window.V91_ADV_NUM=V91_ADV_NUM;
     attemptId:null,
     subject:'gs',
     language:'ta'
-  };
-
-  window.__THIRAL_RESET_PRACTICE_SESSION=function(){
-    try{ if(securePractice.timer) clearInterval(securePractice.timer); }catch(e){}
-    securePractice.timer=null;
-    securePractice.questions=[];
-    securePractice.answers={};
-    securePractice.index=0;
-    securePractice.attemptId=null;
-    securePractice.subject='gs';
-    securePractice.language='ta';
-    securePractice.seconds=15;
   };
 
   window.startPractice = async function(n){
@@ -3865,6 +3413,18 @@ window.V91_ADV_NUM=V91_ADV_NUM;
           '<p><b>மதிப்பெண்:</b> '+score+'%</p>';
       }
 
+      localStorage.setItem('tnpsc_last_result',JSON.stringify({
+        student:(window.thiralV138User||{}).name||'',
+        exam:selectedExam,
+        type:'Practice',
+        total:total,
+        correct:correct,
+        wrong:wrong,
+        unanswered:0,
+        score:score+'%',
+        date:new Date().toLocaleString('en-IN')
+      }));
+
       buildPracticeReviewV138();
       show('result');
 
@@ -4096,7 +3656,6 @@ window.V91_ADV_NUM=V91_ADV_NUM;
   async function loadAdminV138(){
     try{
       var s=await api138('/admin/summary');
-      var usage=await api138('/admin/usage-monitor');
       var d=await api138('/admin/students');
       var students=d.students||[];
 
@@ -4108,272 +3667,60 @@ window.V91_ADV_NUM=V91_ADV_NUM;
       if(el('statThird')) el('statThird').textContent=s.students?.third ?? 0;
       if(el('statLogin')) el('statLogin').textContent=s.students?.lastLogin ?? '-';
       if(el('statSuggestions')) el('statSuggestions').textContent='-';
-      if(el('onlineActiveNow')) el('onlineActiveNow').textContent=String(usage.active_now ?? 0);
-      if(el('onlineActiveToday')) el('onlineActiveToday').textContent=String(usage.active_today ?? 0);
-      if(el('onlineActive24h')) el('onlineActive24h').textContent=String(usage.active_24h ?? 0);
-      if(el('onlinePracticeCount')) el('onlinePracticeCount').textContent=String(usage.practice_sessions_24h ?? 0);
-      if(el('onlineMockCount')) el('onlineMockCount').textContent=String(usage.mock_tests_24h ?? 0);
 
       var body=students.map(function(x){
         var active = x.is_active !== false;
         var statusText = active ? 'Active / செயல்பாட்டில்' : 'Inactive / முடக்கப்பட்டது';
         var actionText = active ? '🚫 Deactivate' : '♻️ Reactivate';
         var actionClass = active ? '' : 'secondary';
-        var sid=String(x.student_id||'');
-        var sidEsc=escapeHtml138(sid);
-        var safeId=sid.replace(/[^a-zA-Z0-9_-]/g,'_');
-        return '<tr><td>'+sidEsc+'</td>'+          '<td>'+escapeHtml138(x.name||'')+'</td>'+          '<td>'+escapeHtml138(x.email||'')+'</td>'+          '<td>'+escapeHtml138(x.phone||'')+'</td>'+          '<td>'+escapeHtml138(x.gender||'')+'</td>'+          '<td>'+escapeHtml138(formatAdminDOB138(x.dob))+'</td>'+          '<td>'+escapeHtml138(x.last_login_at?new Date(x.last_login_at).toLocaleString():'-')+'</td>'+          '<td><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;"><input id="tempPass_'+safeId+'" type="password" minlength="8" autocomplete="new-password" placeholder="Temporary Password" style="min-width:170px;max-width:210px;" '+(!active?'disabled':'')+'><button '+(!active?'disabled ':'')+'class="secondary" onclick="setStudentTemporaryPassword(\''+sidEsc+'\',\'tempPass_'+safeId+'\')">🔑 Reset</button></div></td>'+          '<td><button class="'+actionClass+'" onclick="toggleStudentStatus(\''+sidEsc+'\','+(active?'true':'false')+')">'+actionText+'</button>'+          '<button class="secondary" style="margin-left:6px" onclick="deleteStudentAccount(\''+sidEsc+'\')">🗑️ Delete</button>'+          '</td></tr>';
+        return '<tr><td>'+escapeHtml138(x.student_id||'')+'</td>'+
+          '<td>'+escapeHtml138(x.name||'')+'</td>'+
+          '<td>'+escapeHtml138(x.email||'')+'</td>'+
+          '<td>'+escapeHtml138(x.phone||'')+'</td>'+
+          '<td>'+escapeHtml138(x.gender||'')+'</td>'+
+          '<td>'+escapeHtml138(formatAdminDOB138(x.dob))+'</td>'+
+          '<td>'+escapeHtml138(x.last_login_at?new Date(x.last_login_at).toLocaleString():'-')+'</td>'+
+          '<td>'+escapeHtml138(statusText)+'</td>'+
+          '<td><button class="'+actionClass+'" onclick="toggleStudentStatus(\''+escapeHtml138(x.student_id||'')+'\','+(active?'true':'false')+')">'+actionText+'</button></td></tr>';
       }).join('');
       if(el('adminStudentList')) el('adminStudentList').innerHTML=
-        '<p class="small">Default Password Reset-ல் குறைந்தது 8 characters உள்ள Temporary Password கொடுத்து Reset செய்யலாம். Student அடுத்த Login-ல் புதிய Password அமைக்க வேண்டும். Delete செய்தால் அந்த Student account மற்றும் அதனுடன் தொடர்புடைய student history/attempt records நீக்கப்படும்; Questions/Question Bank அழிக்கப்படாது.</p>'+        '<div style="overflow:auto"><table><tr><th>Student ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Gender</th><th>DOB</th><th>Last Login</th><th>Default Password Reset</th><th>Action</th></tr>'+        body+'</table></div>';
+        '<p class="small">Deactivate செய்தால் அந்த Student ID-ன் புதிய Login உடனடியாக தடுக்கப்படும்; பழைய Results/Attempts அழிக்கப்படாது.</p>'+
+        '<table><tr><th>Student ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Gender</th><th>DOB</th><th>Last Login</th><th>Status</th><th>Action</th></tr>'+
+        body+'</table>';
       if(el('students')) el('students').innerHTML=body;
       window.thiralV138Students=students;
-      populateAdminExamSubjects138();
-      bindAdminExamFilterEvents138();
-      populateAdminExamTopics138();
-      await loadAdminExamResults(1);
     }catch(e){
       if(el('adminMsg')) el('adminMsg').textContent='Admin data: '+e.message;
     }
   }
 
   window.admin = loadAdminV138;
-  function group4TopicMap138(){
-    try{ return (typeof data==='object' && data.gs && data.gs.topics) ? data.gs.topics : {}; }catch(e){ return {}; }
-  }
-  function group4AllTopicMap138(){
-    try{ return (typeof data==='object') ? data : {}; }catch(e){ return {}; }
-  }
-  function examUsesGroup4Topics138(exam){
-    return String(exam||'').toLowerCase()==='group4' || /group\s*4/i.test(String(exam||''));
-  }
-  window.populateAdminExamSubjects138=function(){
-    var sel=el('adminExamSubjectFilter');
-    if(!sel)return;
-    var map=group4AllTopicMap138(), current=sel.value||'', keys=[];
-    Object.keys(map).forEach(function(k){ if(k && keys.indexOf(k)<0) keys.push(k); });
-    sel.innerHTML='<option value="">அனைத்து பாடங்களும்</option>'+keys.map(function(x){return '<option value="'+escapeHtml138(x)+'">'+escapeHtml138(x)+'</option>';}).join('');
-    if(current && keys.indexOf(current)>=0) sel.value=current;
-  };
+  window.openAdminStudentView = async function(filter){
+    await loadAdminV138();
+    var list=window.thiralV138Students||[];
+    var title='மாணவர் விவரங்கள்';
+    var now=new Date();
+    if(filter==='today'){
+      list=list.filter(function(x){return x.created_at && new Date(x.created_at).toDateString()===now.toDateString();});
+      title='இன்றைய பதிவுகள்';
+    }else if(filter==='month'){
+      list=list.filter(function(x){var d=x.created_at&&new Date(x.created_at);return d&&d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();});
+      title='இந்த மாத பதிவுகள்';
+    }else if(filter==='male'){list=list.filter(function(x){return x.gender==='ஆண்';});title='ஆண் மாணவர்கள்';}
+    else if(filter==='female'){list=list.filter(function(x){return x.gender==='பெண்';});title='பெண் மாணவர்கள்';}
+    else if(filter==='third'){list=list.filter(function(x){return x.gender==='மூன்றாம் பாலினம்';});title='மூன்றாம் பாலின மாணவர்கள்';}
+    else if(filter==='lastLogin'){list=list.slice().sort(function(a,b){return new Date(b.last_login_at||0)-new Date(a.last_login_at||0);}).slice(0,1);title='கடைசி Login';}
 
-  window.populateAdminExamTopics138=function(){
-    var exam=el('adminExamFilter')?.value||'';
-    var topicSel=el('adminExamTopicFilter');
-    var subSel=el('adminExamSubtopicFilter');
-    if(!topicSel||!subSel)return;
-    var map=(!exam || examUsesGroup4Topics138(exam))?group4AllTopicMap138():{};
-    var selectedSubject=el('adminExamSubjectFilter')?.value||'';
-    var oldTopic=topicSel.value||'';
-    var oldSub=subSel.value||'';
-    topicSel.innerHTML='<option value="">அனைத்து தலைப்புகளும்</option>';
-    Object.keys(map).forEach(function(subjectKey){
-      if(selectedSubject && subjectKey!==selectedSubject)return;
-      var info=map[subjectKey];
-      if(!info||!info.topics)return;
-      Object.keys(info.topics).forEach(function(topicKey){
-        if(topicSel.querySelector('option[value="'+escapeHtml138(topicKey)+'"]'))return;
-        var o=document.createElement('option');o.value=topicKey;o.textContent=topicKey;topicSel.appendChild(o);
-      });
-    });
-    if(oldTopic && Array.from(topicSel.options).some(function(o){return o.value===oldTopic;})) topicSel.value=oldTopic;
-    subSel.innerHTML='<option value="">அனைத்து உள்தலைப்புகளும்</option>';
-    if(topicSel.value) populateAdminExamSubtopics138();
-    if(oldSub && Array.from(subSel.options).some(function(o){return o.value===oldSub;})) subSel.value=oldSub;
-  };
-  window.populateAdminExamSubtopics138=function(){
-    var topic=el('adminExamTopicFilter')?.value||'';
-    var subSel=el('adminExamSubtopicFilter');
-    if(!subSel)return;
-    var map=group4AllTopicMap138(), found=[], selectedSubject=el('adminExamSubjectFilter')?.value||'';
-    Object.keys(map).forEach(function(subjectKey){
-      if(selectedSubject && subjectKey!==selectedSubject)return;
-      var list=map[subjectKey]?.topics?.[topic]||[];
-      list.forEach(function(x){if(found.indexOf(x)<0)found.push(x);});
-    });
-    subSel.innerHTML='<option value="">அனைத்து உள்தலைப்புகளும்</option>'+found.map(function(x){return '<option value="'+escapeHtml138(x)+'">'+escapeHtml138(x)+'</option>';}).join('');
-  };
-  function topicForSubtopics138(raw){
-    var vals=String(raw||'').split(' | ').map(function(x){return x.trim();}).filter(Boolean), out=[];
-    var map=group4AllTopicMap138();
-    Object.keys(map).forEach(function(subjectKey){
-      var topics=map[subjectKey]?.topics||{};
-      Object.keys(topics).forEach(function(topicKey){
-        var subs=topics[topicKey]||[];
-        if(vals.some(function(v){return subs.indexOf(v)>=0;}) && out.indexOf(topicKey)<0)out.push(topicKey);
-      });
-    });
-    return out.join(' | ');
-  }
-
-  function bindAdminExamFilterEvents138(){
-    var ids=['adminExamFilter','adminExamSubjectFilter','adminExamTopicFilter','adminExamSubtopicFilter','adminExamFrom','adminExamTo','adminExamMin','adminExamMax'];
-    ids.forEach(function(id){
-      var node=el(id);
-      if(!node || node.dataset.examBound==='1')return;
-      node.dataset.examBound='1';
-      node.addEventListener('change',function(){
-        if(id==='adminExamSubjectFilter'){ populateAdminExamTopics138(); }
-        if(id==='adminExamTopicFilter'){ populateAdminExamSubtopics138(); }
-      });
-    });
-  }
-
-  function adminExamQueryParams138(){
-    var p=new URLSearchParams();
-    var exam=el('adminExamFilter')?.value||'';
-    var type=el('adminExamTypeFilter')?.value||'';
-    var subject=el('adminExamSubjectFilter')?.value||'';
-    var topic=el('adminExamTopicFilter')?.value||'';
-    var subtopic=el('adminExamSubtopicFilter')?.value||'';
-    var from=el('adminExamFrom')?.value||'';
-    var to=el('adminExamTo')?.value||'';
-    var min=el('adminExamMin')?.value||'';
-    var max=el('adminExamMax')?.value||'';
-    if(exam)p.set('exam',exam);
-    if(type)p.set('type',type);
-    if(subject)p.set('subject',subject);
-    if(topic){
-      var map=group4AllTopicMap138(), subs=[];
-      Object.keys(map).forEach(function(subjectKey){(map[subjectKey]?.topics?.[topic]||[]).forEach(function(x){if(subs.indexOf(x)<0)subs.push(x);});});
-      if(subs.length)p.set('subtopics',subs.join('|'));
-    }
-    if(subtopic)p.set('subtopic',subtopic);
-    if(from)p.set('from',from);
-    if(to)p.set('to',to);
-    if(min!=='')p.set('min_pct',min);
-    if(max!=='')p.set('max_pct',max);
-    return p;
-  }
-
-  window.loadAdminExamResults = async function(page){
-    page=Number(page)||1;
-    var msg=el('adminExamResultsMsg');
-    var list=el('adminExamResultsList');
-    if(msg)msg.textContent='Loading...';
-    try{
-      var p=adminExamQueryParams138();
-      p.set('page',String(page)); p.set('limit',String(el('adminExamPageSize')?.value||100));
-      var d=await api138('/admin/exam-results?'+p.toString());
-      var opts=(d.exams||[]).map(function(x){return '<option value="'+escapeHtml138(x)+'">'+escapeHtml138(x)+'</option>';}).join('');
-      var sel=el('adminExamFilter');
-      if(sel){
-        var current=sel.value;
-        sel.innerHTML='<option value="">அனைத்து தேர்வுகளும்</option>'+opts;
-        if(current && (d.exams||[]).indexOf(current)>=0)sel.value=current;
-      }
-      populateAdminExamTopics138();
-      var sm=d.summary||{};
-      if(el('examOverallParticipants'))el('examOverallParticipants').textContent=String(sm.participants??0);
-      if(el('examOverallAttempts'))el('examOverallAttempts').textContent=String(sm.attempts??0);
-      if(el('examOverallAverage'))el('examOverallAverage').textContent=(sm.average_pct??0)+'%';
-      if(el('examOverallHighest'))el('examOverallHighest').textContent=(sm.highest_pct??0)+'%';
-      if(el('examOverallLowest'))el('examOverallLowest').textContent=(sm.lowest_pct??0)+'%';
-      if(el('examOverallQuestions'))el('examOverallQuestions').textContent=String(sm.total_questions??0);
-      var rows=(d.rows||[]).map(function(r){
-        var topicLabel=r.topic||topicForSubtopics138(r.subtopics||'');
-        return '<tr><td>'+escapeHtml138(r.name||'')+'</td><td>'+escapeHtml138(r.email||'')+'</td><td>'+escapeHtml138(r.exam||'')+'</td><td>'+escapeHtml138(r.exam_type||'')+'</td><td>'+escapeHtml138(topicLabel)+'</td><td>'+escapeHtml138(r.subtopics||'')+'</td><td>'+escapeHtml138(r.date||'-')+'</td><td>'+String(r.questions??0)+'</td><td>'+String(r.marks??0)+'</td><td>'+String(r.total_marks??0)+'</td><td>'+String(r.percentage??0)+'%</td><td><button class="secondary" onclick="viewAdminExamResultDetails138('+Number(r.attempt_id||0)+')">View Details</button></td></tr>';
-      }).join('');
-      if(list)list.innerHTML=rows?'<table><tr><th>Name</th><th>Email</th><th>Exam</th><th>Exam Type</th><th>Topic / தலைப்பு</th><th>Subtopic / உள்தலைப்பு</th><th>Date</th><th>Questions</th><th>Marks</th><th>Total Marks</th><th>%</th><th>View</th></tr>'+rows+'</table>':'<p>இந்த filter-க்கு Result இல்லை.</p>';
-      var pager=el('adminExamResultsPager');
-      var total=Number(d.total||0), limit=Number(d.limit||100), pages=Math.max(1,Math.ceil(total/limit));
-      if(pager)pager.innerHTML=(page>1?'<button class="secondary" onclick="loadAdminExamResults('+(page-1)+')">◀ Previous</button>':'')+(page<pages?'<button class="secondary" onclick="loadAdminExamResults('+(page+1)+')">Next ▶</button>':'')+'<span class="small">Page '+page+' / '+pages+' · '+total+' records</span>';
-      if(msg)msg.textContent='';
-      if(list && rows) list.scrollIntoView({behavior:'smooth',block:'start'});
-    }catch(e){
-      if(msg)msg.textContent=e.message||'Exam results could not be loaded.';
-      if(list)list.innerHTML='';
-    }
-  };
-
-  window.viewAdminExamResultDetails138 = async function(attemptId){
-    if(!attemptId)return;
-    try{
-      var d=await api138('/admin/exam-results/'+encodeURIComponent(attemptId));
-      var r=d.result||{};
-      var old=document.getElementById('adminExamResultDetailModal');
-      if(old)old.remove();
-      var modal=document.createElement('div');
-      modal.id='adminExamResultDetailModal';
-      modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
-      modal.innerHTML='<div style="background:#fff;max-width:760px;width:100%;max-height:90vh;overflow:auto;border-radius:14px;padding:22px">'+
-        '<h3>📋 Exam Result Details / தேர்வு முடிவு விவரம்</h3>'+
-        '<table><tr><th>Name</th><td>'+escapeHtml138(r.name||'')+'</td></tr>'+
-        '<tr><th>Email</th><td>'+escapeHtml138(r.email||'')+'</td></tr>'+
-        '<tr><th>Exam</th><td>'+escapeHtml138(r.exam||'')+'</td></tr>'+
-        '<tr><th>Exam Type</th><td>'+escapeHtml138(r.exam_type||'')+'</td></tr>'+
-        '<tr><th>Topic</th><td>'+escapeHtml138(r.topic||'')+'</td></tr>'+
-        '<tr><th>Subtopic</th><td>'+escapeHtml138(r.subtopics||'')+'</td></tr>'+
-        '<tr><th>Date</th><td>'+escapeHtml138(r.date||'')+'</td></tr>'+
-        '<tr><th>Questions</th><td>'+String(r.questions??0)+'</td></tr>'+
-        '<tr><th>Correct</th><td>'+String(r.correct??0)+'</td></tr>'+
-        '<tr><th>Wrong</th><td>'+String(r.wrong??0)+'</td></tr>'+
-        '<tr><th>Unanswered</th><td>'+String(r.unanswered??0)+'</td></tr>'+
-        '<tr><th>Percentage</th><td>'+String(r.percentage??0)+'%</td></tr></table>'+
-        '<div style="margin-top:14px;text-align:right"><button class="secondary" onclick="document.getElementById(\'adminExamResultDetailModal\').remove()">Close / மூடு</button></div>'+
-        '</div>';
-      document.body.appendChild(modal);
-    }catch(e){alert(e.message||'Result details could not be loaded.');}
-  };
-
-  window.clearAdminExamResults = function(){
-    ['adminExamFilter','adminExamSubjectFilter','adminExamTopicFilter','adminExamSubtopicFilter'].forEach(function(id){if(el(id))el(id).value='';}); if(el('adminExamTypeFilter'))el('adminExamTypeFilter').value='all';
-    ['adminExamFrom','adminExamTo'].forEach(function(id){if(el(id))el(id).value='';});
-    if(el('adminExamMin'))el('adminExamMin').value='0';
-    if(el('adminExamMax'))el('adminExamMax').value='100';
-    populateAdminExamTopics138();
-    if(el('adminExamPageSize'))el('adminExamPageSize').value='100';
-    loadAdminExamResults(1);
-  };
-
-  window.exportAdminExamResults = function(){
-    var p=adminExamQueryParams138();
-    window.open('/api/admin/exam-results/export?'+p.toString(),'_blank');
-  };
-
-  window.setStudentTemporaryPassword = async function(studentId,inputId){
-    var input=inputId ? document.getElementById(inputId) : null;
-    var temp=input ? String(input.value||'').trim() : '';
-    if(!temp){
-      alert('Default Password Reset பகுதியில் Temporary Password உள்ளிடுங்கள்.');
-      if(input) input.focus();
-      return;
-    }
-    if(temp.length < 8){
-      alert('Temporary Password குறைந்தது 8 characters இருக்க வேண்டும்.');
-      if(input) input.focus();
-      return;
-    }
-    if(!confirm('இந்த Student-க்கு Temporary Password அமைத்து, அடுத்த Login-ல் புதிய Password கட்டாயமாக அமைக்கவா?')) return;
-    try{
-      await api138('/admin/students/'+encodeURIComponent(studentId)+'/password',{
-        method:'PATCH',
-        body:JSON.stringify({temporary_password:temp})
-      });
-      if(input) input.value='';
-      alert('Temporary Password அமைக்கப்பட்டது. மாணவர் அடுத்த Login-ல் புதிய Password அமைக்க வேண்டும்.');
-      await loadAdminV138();
-    }catch(e){
-      alert(e.message || 'Temporary Password அமைக்க முடியவில்லை.');
-    }
-  };
-
-  window.deleteStudentAccount = async function(studentId){
-    var sid=String(studentId||'').trim();
-    if(!sid) return;
-    var ok=confirm('Student ID: '+sid+'\n\nஇந்த Student account-ஐ நிரந்தரமாக Delete செய்யவா?\n\nStudent-ன் login/account மற்றும் தொடர்புடைய attempts/history நீக்கப்படும். Questions / Question Bank அழிக்கப்படாது.');
-    if(!ok) return;
-    var confirmId=window.prompt('Delete உறுதிப்படுத்த Student ID-ஐ மீண்டும் உள்ளிடுங்கள்:');
-    if(confirmId===null || String(confirmId).trim()!==sid){
-      alert('Student ID சரியாக பொருந்தவில்லை. Delete செய்யப்படவில்லை.');
-      return;
-    }
-    try{
-      await api138('/admin/students/'+encodeURIComponent(sid),{method:'DELETE'});
-      alert('Student account Delete செய்யப்பட்டது.');
-      await loadAdminV138();
-    }catch(e){
-      alert(e.message || 'Student account Delete செய்ய முடியவில்லை.');
-    }
+    if(el('adminStudentDetailTitle')) el('adminStudentDetailTitle').textContent=title;
+    if(el('adminStudentDetailBody')) el('adminStudentDetailBody').innerHTML=
+      '<table><tr><th>Student ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Gender</th><th>DOB</th><th>Registered</th><th>Last Login</th></tr>'+
+      list.map(function(x){return '<tr><td>'+escapeHtml138(x.student_id||'')+'</td><td>'+escapeHtml138(x.name||'')+
+      '</td><td>'+escapeHtml138(x.email||'')+'</td><td>'+escapeHtml138(x.phone||'')+
+      '</td><td>'+escapeHtml138(x.gender||'')+'</td><td>'+escapeHtml138(x.dob||'')+
+      '</td><td>'+escapeHtml138(x.created_at?new Date(x.created_at).toLocaleString():'-')+
+      '</td><td>'+escapeHtml138(x.last_login_at?new Date(x.last_login_at).toLocaleString():'-')+
+      '</td></tr>';}).join('')+'</table>';
+    if(el('adminStudentDetailModal')){el('adminStudentDetailModal').classList.remove('hidden');el('adminStudentDetailModal').style.display='flex';}
   };
 
   window.toggleStudentStatus = async function(studentId, currentlyActive){
@@ -4394,111 +3741,12 @@ window.V91_ADV_NUM=V91_ADV_NUM;
     }
   };
 
-
-  window.toggleUsageDetail=async function(id){
-    var ids=['onlineStudentList','usageLast24Detail','usagePracticeDetail','usageMockDetail'];
-    var node=document.getElementById(id);
-    if(!node) return;
-    var wasOpen=!node.classList.contains('hidden');
-    ids.forEach(function(x){
-      var n=document.getElementById(x);
-      if(n) n.classList.add('hidden');
-    });
-    if(wasOpen) return;
-    await refreshOnlineMonitor();
-    node.classList.remove('hidden');
+  window.closeAdminStudentView=function(){
+    if(el('adminStudentDetailModal')){el('adminStudentDetailModal').classList.add('hidden');el('adminStudentDetailModal').style.display='none';}
   };
 
-  window.openAdminStudentView = async function(filter){
-    await loadAdminV138();
-    var list=window.thiralV138Students||[];
-    var title='மாணவர் விவரங்கள்';
-    var now=new Date();
-    if(filter==='today'){
-      list=list.filter(function(x){return x.created_at && new Date(x.created_at).toDateString()===now.toDateString();});
-      title='இன்றைய பதிவுகள்';
-    }else if(filter==='month'){
-      list=list.filter(function(x){var d=x.created_at&&new Date(x.created_at);return d&&d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();});
-      title='இந்த மாத பதிவுகள்';
-    }else if(filter==='male'){list=list.filter(function(x){return x.gender==='ஆண்';});title='ஆண் மாணவர்கள்';}
-    else if(filter==='female'){list=list.filter(function(x){return x.gender==='பெண்';});title='பெண் மாணவர்கள்';}
-    else if(filter==='third'){list=list.filter(function(x){return x.gender==='மூன்றாம் பாலினம்';});title='மூன்றாம் பாலின மாணவர்கள்';}
-    else if(filter==='lastLogin'){list=list.slice().sort(function(a,b){return new Date(b.last_login_at||0)-new Date(a.last_login_at||0);}).slice(0,1);title='கடைசி Login';}
-
-    if(el('adminStudentDetailTitle')) el('adminStudentDetailTitle').textContent=title;
-    if(el('adminStudentDetailBody')) el('adminStudentDetailBody').innerHTML=
-      '<p class="small">இந்த பிரிக்கப்பட்ட பட்டியலிலும் Default Password Reset மற்றும் Delete வசதிகள் அதேபோல் இருக்கும். Delete செய்தால் அந்த Student account மற்றும் தொடர்புடைய attempts/history நீக்கப்படும்; Questions / Question Bank பாதிக்கப்படாது.</p>'+      '<div style="overflow:auto"><table><tr><th>Student ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Gender</th><th>DOB</th><th>Registered</th><th>Last Login</th><th>Default Password Reset</th><th>Action</th></tr>'+      list.map(function(x){var sid=String(x.student_id||'');var safeId=sid.replace(/[^a-zA-Z0-9_-]/g,'_');var active=x.is_active!==false;return '<tr><td>'+escapeHtml138(sid)+'</td><td>'+escapeHtml138(x.name||'')+      '</td><td>'+escapeHtml138(x.email||'')+'</td><td>'+escapeHtml138(x.phone||'')+      '</td><td>'+escapeHtml138(x.gender||'')+'</td><td>'+escapeHtml138(formatAdminDOB138(x.dob))+'</td>'+      '<td>'+escapeHtml138(x.created_at?new Date(x.created_at).toLocaleString():'-')+      '</td><td>'+escapeHtml138(x.last_login_at?new Date(x.last_login_at).toLocaleString():'-')+      '</td><td><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;"><input id="detailTempPass_'+safeId+'" type="password" minlength="8" autocomplete="new-password" placeholder="Temporary Password" style="min-width:170px;max-width:210px;" '+(!active?'disabled':'')+'><button class="secondary" '+(!active?'disabled':'')+' onclick="setStudentTemporaryPassword(\''+escapeHtml138(sid)+'\',\'detailTempPass_'+safeId+'\')">🔑 Reset</button></div></td>'+      '<td><button class="secondary" onclick="deleteStudentAccount(\''+escapeHtml138(sid)+'\')">🗑️ Delete</button></td></tr>';}).join('')+'</table></div>';
-    show('adminStudentView');
-  };
-
-  window.refreshOnlineMonitor=async function(){
-    function esc(s){
-      return String(s == null ? '' : s).replace(/[&<>'"]/g,function(c){
-        return {'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c];
-      });
-    }
-    function dt(v){
-      return v ? new Date(v).toLocaleString('en-IN') : '-';
-    }
-    function table(title, headers, rows, emptyText){
-      if(!rows.length) return '<div class="card" style="margin-top:10px"><h4>'+title+'</h4><p class="small">'+emptyText+'</p></div>';
-      var head='<tr>'+headers.map(function(h){return '<th>'+h+'</th>';}).join('')+'</tr>';
-      return '<div class="card" style="margin-top:10px;overflow:auto"><h4>'+title+'</h4><table>'+head+rows.join('')+'</table></div>';
-    }
-
-    try{
-      var d=await api138('/admin/usage-monitor');
-      if(el('onlineActiveNow')) el('onlineActiveNow').textContent=String(d.active_now ?? 0);
-      if(el('onlineActiveToday')) el('onlineActiveToday').textContent=String(d.active_today ?? 0);
-      if(el('onlineActive24h')) el('onlineActive24h').textContent=String(d.active_24h ?? 0);
-      if(el('onlinePracticeCount')) el('onlinePracticeCount').textContent=String(d.practice_sessions_24h ?? 0);
-      if(el('onlineMockCount')) el('onlineMockCount').textContent=String(d.mock_tests_24h ?? 0);
-
-      var onlineRows=(d.online_students||[]).map(function(x){
-        return '<tr><td>'+esc(x.student_id)+'</td><td>'+esc(x.name)+'</td><td>'+esc(x.email)+'</td><td>'+esc(dt(x.last_login_at))+'</td><td>'+esc(dt(x.session_expires_at))+'</td></tr>';
-      }).join('');
-      if(el('onlineStudentList')) el('onlineStudentList').innerHTML=table(
-        '🟢 தற்போது Online-ல் இருப்பவர்கள் ('+(d.online_students||[]).length+')',
-        ['Student ID','Name','Email','Last Login','Session Valid Until'],
-        onlineRows ? [onlineRows] : [],
-        'தற்போது valid session உள்ள Student இல்லை.'
-      );
-
-      var last24Rows=(d.last24_students||[]).map(function(x){
-        return '<tr><td>'+esc(x.student_id)+'</td><td>'+esc(x.name)+'</td><td>'+esc(x.email)+'</td><td>'+esc(dt(x.last_login_at))+'</td><td>'+esc(String(x.activity_count||0))+'</td><td>'+esc(dt(x.last_activity_at))+'</td></tr>';
-      });
-      if(el('usageLast24Detail')) el('usageLast24Detail').innerHTML=table(
-        '🕐 கடந்த 24 மணி நேரத்தில் பயன்படுத்திய மாணவர்கள் ('+(d.last24_students||[]).length+')',
-        ['Student ID','Name','Email','Last Login','Activity / Attempts','Last Activity'],
-        last24Rows,
-        'கடந்த 24 மணி நேரத்தில் பதிவு செய்யப்பட்ட Student activity இல்லை.'
-      );
-
-      var practiceRows=(d.practice_students||[]).map(function(x){
-        return '<tr><td>'+esc(x.student_id)+'</td><td>'+esc(x.name)+'</td><td>'+esc(x.email)+'</td><td><b>'+esc(String(x.session_count||0))+'</b></td><td>'+esc(String(x.completed_count||0))+'</td><td>'+esc(dt(x.last_started_at))+'</td></tr>';
-      });
-      if(el('usagePracticeDetail')) el('usagePracticeDetail').innerHTML=table(
-        '📝 Practice பயன்படுத்திய மாணவர்கள் ('+(d.practice_students||[]).length+')',
-        ['Student ID','Name','Email','Practice Sessions','Completed','Last Started'],
-        practiceRows,
-        'கடந்த 24 மணி நேரத்தில் Practice Session இல்லை.'
-      );
-
-      var mockRows=(d.mock_students||[]).map(function(x){
-        return '<tr><td>'+esc(x.student_id)+'</td><td>'+esc(x.name)+'</td><td>'+esc(x.email)+'</td><td><b>'+esc(String(x.test_count||0))+'</b></td><td>'+esc(String(x.completed_count||0))+'</td><td>'+esc(dt(x.last_started_at))+'</td></tr>';
-      });
-      if(el('usageMockDetail')) el('usageMockDetail').innerHTML=table(
-        '🎯 Mock Test பயன்படுத்திய மாணவர்கள் ('+(d.mock_students||[]).length+')',
-        ['Student ID','Name','Email','Mock Tests','Completed','Last Started'],
-        mockRows,
-        'கடந்த 24 மணி நேரத்தில் Mock Test இல்லை.'
-      );
-
-      if(el('onlineMonitorMsg')) el('onlineMonitorMsg').textContent=
-        'Usage data updated. Server database is the source of truth. Online count = தற்போது valid login session உள்ள unique students. Practice / Mock விவரங்கள் கடந்த 24 மணி நேரத்தை அடிப்படையாகக் கொண்டவை.';
-    }catch(e){
-      if(el('onlineMonitorMsg')) el('onlineMonitorMsg').textContent='Usage Monitor: '+(e.message||'Data கிடைக்கவில்லை.');
-    }
+  window.refreshOnlineMonitor=function(){
+    if(el('onlineMonitorMsg')) el('onlineMonitorMsg').textContent='V138 backend telemetry summary is not exposed by the current API. Passwords are never sent to the browser.';
   };
 
   window.submitSuggestion=function(){
@@ -4514,6 +3762,7 @@ window.V91_ADV_NUM=V91_ADV_NUM;
   window.addEventListener('load', function(){
     setTimeout(bootV138, 50);
   });
+
 })();
 </script>
 
@@ -4668,163 +3917,15 @@ async function answer(value,timeout=false){
     if(!timeout){T.seconds=15;timer(15);T.timer=setInterval(()=>{T.seconds--;timer(T.seconds);if(T.seconds<=0){stop();answer(-1,true);}},1000);}
   }
 }
-function normalizePracticeDifficulty(q){
-  const x={...q};
-  const raw=String(q.difficulty||q.d||q.level||'').trim().toLowerCase();
-  if(raw){
-    if(/மிகக் கடின|very\s*hard/.test(raw)) x.d='மிகக் கடினம்';
-    else if(/கடின|hard|difficult/.test(raw)) x.d='கடினம்';
-    else if(/மிதமான|சாதாரண|moderate|normal/.test(raw)) x.d='மிதமானது';
-    else if(/எளித|easy/.test(raw)) x.d='எளிது';
-  }
-  if(!x.d){
-    const text=String(q.question||q.q||'').replace(/\s+/g,' ').trim();
-    const opts=Array.isArray(q.options)?q.options.map(String).join(' '):String(q.o||'');
-    const all=(text+' '+opts).toLowerCase();
-    const numbers=(all.match(/\d+(?:\.\d+)?/g)||[]).length;
-    const complex=(all.match(/எத்தனை\s+வழிகள்|வாய்ப்பு|probability|சதவீதம்|வட்டி|வேலை|வேகம்|தூரம்|விகிதம்|கூற்று|assert|statement|conclusion|காரணம்|வரிசை|குறியீடு|application|நிகழ்வு|பகுப்பாய்வு|கணக்கிட|calculate|ratio|average|profit|loss|interest|time|distance/g)||[]).length;
-    if(text.length>=220 || complex>=3 || numbers>=4) x.d='மிகக் கடினம்';
-    else if(text.length>=130 || complex>=1 || numbers>=2) x.d='கடினம்';
-    else if(text.length<=80 && numbers===0 && complex===0) x.d='எளிது';
-    else x.d='மிதமானது';
-  }
-  return x;
-}
-
-function practiceDifficultyBucket(q){
-  const d=String(q.d||q.difficulty||q.level||'').toLowerCase();
-  if(/மிகக் கடின|very\s*hard/.test(d)) return 4;
-  if(/கடின|hard|difficult/.test(d)) return 3;
-  if(/மிதமான|சாதாரண|moderate|normal/.test(d)) return 2;
-  return 1;
-}
-
-function practiceQuestionType(q){
-  const raw=String(q.type||q.question_type||q.questionType||'').trim().toLowerCase();
-  if(raw){
-    if(/match|இணை|பொருத்த/.test(raw)) return 'matching';
-    if(/statement|assert|கூற்று|கூற்ற/.test(raw)) return 'statement';
-    if(/sequence|order|வரிச|வரிசைப்படுத்த/.test(raw)) return 'sequence';
-    if(/reason|cause|காரணம்/.test(raw)) return 'reason';
-    if(/application|scenario|case|சூழ்நிலை|நிகழ்வு|பயன்பாடு/.test(raw)) return 'application';
-    if(/analys|data|தரவு|பகுப்பாய்வு/.test(raw)) return 'analysis';
-    if(/concept|கருத்து/.test(raw)) return 'concept';
-    return 'direct';
-  }
-  const text=String(q.question||q.q||'').replace(/\s+/g,' ').trim().toLowerCase();
-  if(/பொருத்துக|பொருத்தவும்|match the|match/.test(text)) return 'matching';
-  if(/கூற்று|கூற்றுகளில்|statement|assertion|conclusion/.test(text)) return 'statement';
-  if(/வரிசைப்படுத்த|வரிசையில்|sequence|arrange|order/.test(text)) return 'sequence';
-  if(/காரணம்|reason|why|because/.test(text)) return 'reason';
-  if(/சூழ்நிலை|நிகழ்வு|பயன்படுத்தி|application|scenario|case study/.test(text)) return 'application';
-  if(/தரவு|அட்டவணை|வரைபடம்|data|graph|table|analyse|analyze/.test(text)) return 'analysis';
-  if(/கருத்து|concept|விளக்க/.test(text)) return 'concept';
-  return 'direct';
-}
-
-function selectPractice100(bank){
-  const pool=bank.map(normalizePracticeDifficulty);
-  const shuffled=pool.slice().sort(()=>Math.random()-0.5);
-  // First 10 are intentionally basic/normal learning questions.
-  const first=shuffled.filter(q=>practiceDifficultyBucket(q)<=2).slice(0,10);
-  const used=new Set(first.map(q=>String(q.id)));
-  if(first.length<10){
-    for(const q of shuffled){ if(first.length>=10) break; const k=String(q.id); if(!used.has(k)){first.push(q);used.add(k);} }
-  }
-  // Remaining 90 are spread across different question formats where the
-  // source text supports that classification. We do not rewrite the question.
-  const types=['matching','statement','sequence','reason','application','analysis','concept','direct'];
-  const remaining=shuffled.filter(q=>!used.has(String(q.id)));
-  const varied=[];
-  for(const type of types){
-    const bucket=remaining.filter(q=>practiceQuestionType(q)===type && !used.has(String(q.id)));
-    bucket.sort(()=>Math.random()-0.5);
-    for(const q of bucket){
-      if(varied.length>=90) break;
-      varied.push(q);used.add(String(q.id));
-    }
-    if(varied.length>=90) break;
-  }
-  if(varied.length<90){
-    const rest=remaining.filter(q=>!used.has(String(q.id))).sort(()=>Math.random()-0.5);
-    varied.push(...rest.slice(0,90-varied.length));
-  }
-  return [...first,...varied].slice(0,100);
-}
-
-function selectPracticeByDifficulty(bank,n){
-  const pool=bank.map(normalizePracticeDifficulty);
-  if(n===10){
-    const easy=pool.filter(q=>practiceDifficultyBucket(q)<=2);
-    return easy.sort(()=>Math.random()-0.5).slice(0,10);
-  }
-  if(n===20){
-    const easy=pool.filter(q=>practiceDifficultyBucket(q)===1);
-    const moderate=pool.filter(q=>practiceDifficultyBucket(q)===2);
-    const hard=pool.filter(q=>practiceDifficultyBucket(q)===3);
-    const selected=[];
-    const take=(arr,count)=>selected.push(...arr.sort(()=>Math.random()-0.5).slice(0,count));
-    take(easy,Math.min(10,easy.length));
-    take(moderate,Math.min(7,moderate.length));
-    take(hard,Math.min(3,hard.length));
-    if(selected.length<20){
-      const used=new Set(selected.map(q=>String(q.id)));
-      const rest=pool.filter(q=>!used.has(String(q.id))).sort(()=>Math.random()-0.5);
-      selected.push(...rest.slice(0,20-selected.length));
-    }
-    return selected;
-  }
-  if(n===50){
-    const hard=pool.filter(q=>practiceDifficultyBucket(q)===3);
-    const veryHard=pool.filter(q=>practiceDifficultyBucket(q)===4);
-    const selected=[];
-    const take=(arr,count)=>selected.push(...arr.sort(()=>Math.random()-0.5).slice(0,count));
-    take(hard,Math.min(25,hard.length));
-    take(veryHard,Math.min(25,veryHard.length));
-    if(selected.length<50){
-      const used=new Set(selected.map(q=>String(q.id)));
-      const rest=pool.filter(q=>!used.has(String(q.id))).sort(()=>Math.random()-0.5);
-      selected.push(...rest.slice(0,50-selected.length));
-    }
-    return selected;
-  }
-  return pool;
-}
-
 async function loadPracticeQuestions(requested){
   const selectedSubtopic=(typeof currentSub!=='undefined'?String(currentSub||'').trim():'');
   if(!selectedSubtopic) throw new Error('Subtopic தேர்வு செய்யப்படவில்லை.');
-  /* தமிழக அரசியல் is displayed inside the GS UI, but its database
-     subject is intentionally separate from the normal பொது அறிவு bank. */
-  const POLITICS_SUBTOPICS = new Set([
-    'தமிழ்நாடு முதலமைச்சர்கள்',
-    'அமைச்சர்கள் மற்றும் அமைச்சரவைகள்',
-    'தமிழ்நாடு மாவட்டங்கள்',
-    'தமிழ்நாடு ஆளுநர்கள்',
-    'தமிழ்நாடு சட்டமன்றம்',
-    'தமிழ்நாடு தேர்தல்கள் மற்றும் அரசியல் கட்சிகள்'
-  ]);
-  const isTamilagaPolitics = currentSubject==='gs' && POLITICS_SUBTOPICS.has(selectedSubtopic);
-
   const dbSubject =
-    currentSubject==='gs' ? (isTamilagaPolitics ? (contentLanguage==='en' ? 'Tamil Nadu Politics' : 'தமிழக அரசியல்') : 'பொது அறிவு') :
+    currentSubject==='gs' ? 'பொது அறிவு' :
     currentSubject==='apt' ? 'apt' :
     currentSubject==='tamil' ? 'tamil' : '';
   let dbSubtopic=selectedSubtopic;
-  /* Tamil Nadu Politics is stored with English subject/subtopic names for
-     the English bank, while the UI keeps the existing Tamil internal keys. */
-  if(isTamilagaPolitics && contentLanguage==='en'){
-    const politicsEnglishSubtopics={
-      'தமிழ்நாடு முதலமைச்சர்கள்':'Tamil Nadu Chief Ministers',
-      'அமைச்சர்கள் மற்றும் அமைச்சரவைகள்':'Ministers and Councils of Ministers',
-      'தமிழ்நாடு மாவட்டங்கள்':'Tamil Nadu Districts',
-      'தமிழ்நாடு ஆளுநர்கள்':'Tamil Nadu Governors',
-      'தமிழ்நாடு சட்டமன்றம்':'Tamil Nadu Legislature',
-      'தமிழ்நாடு தேர்தல்கள் மற்றும் அரசியல் கட்சிகள்':'Tamil Nadu Elections and Political Parties'
-    };
-    dbSubtopic=politicsEnglishSubtopics[selectedSubtopic]||selectedSubtopic;
-  }
-  /* Group 4 database uses Tamil subtopic keys for GK in Tamil,
+  /* Group 4 database uses Tamil subtopic keys for GK in both languages,
      while Aptitude English uses English subtopic keys. */
   if(currentSubject==='apt' && contentLanguage==='en'){
     for(const topicKey of Object.keys(EN_LABELS.apt?.topics||{})){
@@ -4843,7 +3944,7 @@ async function loadPracticeQuestions(requested){
       '&language='+encodeURIComponent(contentLanguage==='en'?'en':'ta')+
       '&subtopic='+encodeURIComponent(dbSubtopic)+
       '&limit=200&offset=0');
-    return Array.isArray(d.questions)?d.questions.map(normalizePracticeDifficulty):[];
+    return Array.isArray(d.questions)?d.questions:[];
   }
 
   const out=[];
@@ -4856,7 +3957,7 @@ async function loadPracticeQuestions(requested){
       '&subtopic='+encodeURIComponent(dbSubtopic)+
       '&limit='+pageSize+'&offset='+offset);
     const rows=Array.isArray(d.questions)?d.questions:[];
-    out.push(...rows.map(normalizePracticeDifficulty));
+    out.push(...rows);
     if(!d.pagination || !d.pagination.hasMore || rows.length===0) break;
     offset=Number(d.pagination.nextOffset ?? (offset+rows.length));
     if(!Number.isFinite(offset)) break;
@@ -4889,8 +3990,8 @@ function savePracticeHistory(keys,bankSize){
 async function startPractice(n){
   stop();
   const requested=Number(n||10);
-  if(![10,20,50,100,9999].includes(requested)){
-    if($('feedback'))$('feedback').textContent='Practice எண்ணிக்கை 10, 20, 50, 100 அல்லது “முழுவதும்” மட்டும்.';
+  if(![10,20,50,9999].includes(requested)){
+    if($('feedback'))$('feedback').textContent='Practice எண்ணிக்கை 10, 20, 50 அல்லது “முழுவதும்” மட்டும்.';
     return;
   }
   T.q=[];T.answers={};T.checks={};T.i=0;T.attempt=null;T.submitted=false;T.busy=false;
@@ -4901,7 +4002,7 @@ async function startPractice(n){
 
     const used=new Set(getPracticeHistory());
     let fresh=bank.filter(q=>!used.has(String(q.id)));
-    fresh=(requested===100)?selectPractice100(fresh):selectPracticeByDifficulty(fresh,requested);
+    fresh.sort(()=>Math.random()-0.5);
 
     let selected;
     if(requested===9999){
@@ -4935,12 +4036,7 @@ async function startPractice(n){
     const a=await api('/attempts',{
       method:'POST',
       body:JSON.stringify({
-        exam:String(selectedExam||'group4'),
-        subject:(currentSubject==='gs'
-          ? (['தமிழ்நாடு முதலமைச்சர்கள்','அமைச்சர்கள் மற்றும் அமைச்சரவைகள்','தமிழ்நாடு மாவட்டங்கள்','தமிழ்நாடு ஆளுநர்கள்','தமிழ்நாடு சட்டமன்றம்','தமிழ்நாடு தேர்தல்கள் மற்றும் அரசியல் கட்சிகள்'].includes(String(currentSub||'')) ? 'தமிழக அரசியல்' : 'பொது அறிவு')
-          : currentSubject==='apt' ? 'apt' : 'tamil'),
-        mode:'practice',
-        language:(contentLanguage==='en'?'en':'ta'),
+        exam:String(selectedExam||'group4'),subject:(currentSubject==='gs'?'பொது அறிவு':currentSubject==='apt'?'apt':'tamil'),mode:'practice',language:(contentLanguage==='en'?'en':'ta'),
         questionIds:T.q.map(q=>Number(q.id))
       })
     });
@@ -5207,7 +4303,7 @@ window.__THIRAL_GROUP4_FINAL_LANGUAGE_FIXED__='TA-GK + EN-GK + TA-APT + EN-APT';
 'use strict';
 window.__THIRAL_GROUP4_FINAL_WEBSITE__={
   exam:'group4',
-  dbSubjects:{tamil:'tamil',gs:'பொது அறிவு',apt:'apt',politics:'தமிழக அரசியல்'},
+  dbSubjects:{tamil:'tamil',gs:'பொது அறிவு',apt:'apt'},
   languages:{tamil:['ta'],gs:['ta','en'],apt:['ta','en']},
   checked:'syntax-only'
 };
@@ -5341,980 +4437,4 @@ window.startPractice=async function(n){
   window.__THIRAL_GROUP4_ONLY_FINAL__=true;
 })();
 </script>
-<script>
-(function(){
-  function escSecurity(v){
-    return String(v ?? '').replace(/[&<>\"']/g,function(c){return ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]);});
-  }
-  var securityEventsCache138=[];
-  var securityStatsCache138={};
-  var securityActiveFilter138='';
-
-  function securityRows138(rows){
-    if(!rows.length) return '<p class="small">இந்த வகை Security events இல்லை.</p>';
-    return '<div style="overflow:auto"><table><thead><tr><th>Date</th><th>Event</th><th>Email</th><th>IP</th><th>Browser</th><th>Details</th></tr></thead><tbody>'+rows.map(function(x){
-      return '<tr><td>'+escSecurity(x.created_at||'')+'</td><td>'+escSecurity(x.event_type||'')+'</td><td>'+escSecurity(x.email||'-')+'</td><td>'+escSecurity(x.ip||'-')+'</td><td>'+escSecurity(x.user_agent||'-')+'</td><td>'+escSecurity(x.details||'')+'</td></tr>';
-    }).join('')+'</tbody></table></div>';
-  }
-
-  window.showSecurityDetail138=function(type){
-    var titles={FAILED_LOGIN:'Failed Logins',ADMIN_LOGIN_SUCCESS:'Successful Admin Logins',UNAUTHORIZED_ADMIN_ACCESS:'Unauthorized Admin Access'};
-    var title=titles[type]||type;
-    var box=document.getElementById('securityDetail138');
-    var msg=document.getElementById('securitySelectMsg138');
-    if(!box) return;
-    if(securityActiveFilter138===type){
-      box.classList.add('hidden');
-      securityActiveFilter138='';
-      if(msg) msg.textContent='மேலுள்ள Security card-ஐ கிளிக் செய்தால் அந்த வகை நிகழ்வுகள் மட்டும் தனியாக காட்டப்படும்.';
-      return;
-    }
-    securityActiveFilter138=type;
-    var rows=securityEventsCache138.filter(function(x){return x.event_type===type;});
-    box.innerHTML='<h4 style="margin:0 0 10px">'+escSecurity(title)+'</h4>'+securityRows138(rows);
-    box.classList.remove('hidden');
-    if(msg) msg.textContent=title+' விவரங்கள் மட்டும் காட்டப்படுகிறது. மீண்டும் அதே card-ஐ கிளிக் செய்தால் மறையும்.';
-    box.scrollIntoView({behavior:'smooth',block:'nearest'});
-  };
-
-  function securityCard138(icon,title,count,type){
-    return '<div class="card admin-stat-card" role="button" tabindex="0" style="cursor:pointer" onclick="showSecurityDetail138(\''+type+'\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \')showSecurityDetail138(\''+type+'\')"><h3>'+icon+' '+title+'</h3><p>'+Number(count||0)+'</p><span class="small">கிளிக் செய்து விவரம் காண்க ▾</span></div>';
-  }
-
-  window.loadSecurityEvents138 = async function(){
-    var msg=document.getElementById('securityMsg138');
-    var stats=document.getElementById('securityStats138');
-    var box=document.getElementById('securityDetail138');
-    if(msg) msg.textContent='Loading...';
-    try{
-      var apiClient=window.thiralV138Api;
-      if(typeof apiClient!=='function') throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
-      var d=await apiClient('/admin/security/events?limit=100');
-      var st=d.stats||{};
-      securityEventsCache138=d.events||[];
-      securityStatsCache138=st;
-      securityActiveFilter138='';
-      if(box){box.classList.add('hidden');box.innerHTML='';}
-      if(stats) stats.innerHTML=
-        securityCard138('🔴','Failed Logins',st.failed_logins,'FAILED_LOGIN')+
-        securityCard138('🟢','Successful Admin Logins',st.successful_admin_logins,'ADMIN_LOGIN_SUCCESS')+
-        securityCard138('🚫','Unauthorized Admin Access',st.unauthorized_admin_access,'UNAUTHORIZED_ADMIN_ACCESS');
-      var selectMsg=document.getElementById('securitySelectMsg138');
-      if(selectMsg) selectMsg.textContent='மேலுள்ள Security card-ஐ கிளிக் செய்தால் அந்த வகை நிகழ்வுகள் மட்டும் தனியாக காட்டப்படும்.';
-      if(msg) msg.textContent='Security data refreshed.';
-    }catch(e){ if(msg) msg.textContent='Security: '+(e&&e.message||e); }
-  };
-})();
-</script>
-
-<script id="thiral-group4-mock-history-final">
-/* THIRAL Group 4 Mock final controller.
-   Server-selected 200 questions + per-student Mock history.
-   Self-contained so it does not depend on variables/functions hidden inside
-   earlier IIFEs. Existing question rows are read only. */
-(function(){
-  'use strict';
-
-  var mockAttemptId=null;
-
-  window.__THIRAL_RESET_MOCK_SESSION=function(){
-    try{ if(typeof mockTimer!=='undefined' && mockTimer) clearInterval(mockTimer); }catch(e){}
-    mockTimer=null;
-    mockQuestions=[];
-    mockAnswers=[];
-    mockIndex=0;
-    mockSeconds=3*60*60;
-    mockFinished=false;
-    mockAttemptId=null;
-  };
-
-  var mockApi=function(path,init){
-    if(typeof window.thiralV138Api==='function') return window.thiralV138Api(path,init||{});
-    throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
-  };
-
-  function escMock(v){
-    return String(v==null?'':v).replace(/[&<>"']/g,function(c){
-      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
-    });
-  }
-
-  function normalizeMockRows(rows){
-    return rows.map(function(r){
-      return Object.assign({},r,{
-        q:String(r.question||r.q||''),
-        o:Array.isArray(r.options)?r.options:(Array.isArray(r.o)?r.o:[]),
-        e:String(r.explanation||r.e||''),
-        a:-1
-      });
-    });
-  }
-
-  function renderServerMock(){
-    if(!Array.isArray(mockQuestions)||!mockQuestions.length) return;
-    if(mockIndex<0) mockIndex=0;
-    if(mockIndex>=mockQuestions.length) mockIndex=mockQuestions.length-1;
-    var q=mockQuestions[mockIndex];
-    if(!q) return;
-
-    var p=document.getElementById('mockProgress');
-    var qe=document.getElementById('mockQuestion');
-    var oe=document.getElementById('mockOptions');
-    if(p) p.textContent=(mockIndex+1)+' / '+mockQuestions.length;
-    var nextBtn=document.getElementById('mockNextBtn');
-    if(nextBtn){
-      nextBtn.style.display=(mockIndex < mockQuestions.length-1)?'inline-block':'none';
-    }
-    if(qe) qe.textContent=(mockIndex+1)+'. '+String(q.q||'');
-    if(oe){
-      var options=Array.isArray(q.o)?q.o:[];
-      oe.innerHTML=options.map(function(x,i){
-        var selected=mockAnswers[mockIndex]===i;
-        return '<button class="option" type="button" style="'+
-          (selected?'outline:3px solid #123f70;':'')+
-          '" onclick="window.__THIRAL_FINAL_MOCK_ANSWER('+i+')">'+
-          String.fromCharCode(65+i)+'. '+escMock(x)+'</button>';
-      }).join('');
-    }
-  }
-
-  window.renderMock=renderServerMock;
-
-  // Expose the private Mock state so later UI-only wrappers use the same live attempt.
-  window.__THIRAL_MOCK_STATE={
-    get questions(){return mockQuestions;},
-    get answers(){return mockAnswers;},
-    get index(){return mockIndex;},
-    get attemptId(){return mockAttemptId;},
-    get finished(){return mockFinished;}
-  };
-
-  window.__THIRAL_FINAL_MOCK_ANSWER=function(i){
-    if(mockFinished || !mockQuestions.length) return;
-    mockAnswers[mockIndex]=Number(i);
-    renderServerMock();
-  };
-
-  window.mockNext=function(){
-    if(mockIndex<mockQuestions.length-1){mockIndex++;renderServerMock();}
-  };
-
-  window.mockPrev=function(){
-    if(mockIndex>0){mockIndex--;renderServerMock();}
-  };
-
-  function chooseMockLanguage(){
-    return new Promise(function(resolve){
-      var old=document.getElementById('thiralMockLanguagePicker');
-      if(old) old.remove();
-
-      var defaultLang=(typeof contentLanguage!=='undefined' && contentLanguage==='en')?'en':'ta';
-      var wrap=document.createElement('div');
-      wrap.id='thiralMockLanguagePicker';
-      wrap.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
-      wrap.innerHTML=''
-        +'<div style="width:min(430px,94vw);background:#fff;border-radius:18px;padding:26px;box-shadow:0 18px 50px rgba(0,0,0,.25);text-align:center;">'
-        +'<h3 style="margin:0 0 8px;font-size:24px;color:#123f70;">Mock Test மொழி</h3>'
-        +'<p style="margin:0 0 20px;color:#555;">தேர்வு எழுதும் மொழியைத் தேர்வு செய்யவும்</p>'
-        +'<button type="button" data-lang="ta" style="display:block;width:100%;padding:14px;margin:10px 0;border:1px solid #cbd5e1;border-radius:12px;background:'+(defaultLang==='ta'?'#eaf2ff':'#fff')+';font-size:18px;font-weight:700;color:#123f70;cursor:pointer;">தமிழ்</button>'
-        +'<button type="button" data-lang="en" style="display:block;width:100%;padding:14px;margin:10px 0;border:1px solid #cbd5e1;border-radius:12px;background:'+(defaultLang==='en'?'#eaf2ff':'#fff')+';font-size:18px;font-weight:700;color:#123f70;cursor:pointer;">English</button>'
-        +'<button type="button" data-cancel="1" style="margin-top:8px;border:0;background:transparent;color:#666;font-size:15px;cursor:pointer;">Cancel</button>'
-        +'</div>';
-      document.body.appendChild(wrap);
-
-      wrap.querySelectorAll('[data-lang]').forEach(function(btn){
-        btn.addEventListener('click',function(){
-          var L=btn.getAttribute('data-lang');
-          try{ contentLanguage=L; }catch(_){ }
-          try{ localStorage.setItem('tnpsc_content_language',L); }catch(_){ }
-          wrap.remove();
-          resolve(L);
-        });
-      });
-      var cancel=wrap.querySelector('[data-cancel]');
-      if(cancel) cancel.addEventListener('click',function(){wrap.remove();resolve(null);});
-    });
-  }
-
-  window.startMock=async function(){
-    try{
-      var selectedMockLanguage=await chooseMockLanguage();
-      if(!selectedMockLanguage) return;
-      try{ selectedExam='group4'; }catch(_){ }
-      try{ localStorage.setItem('tnpsc_selected_exam','group4'); }catch(_){ }
-
-      if(typeof mockTimer!=='undefined' && mockTimer) clearInterval(mockTimer);
-      mockQuestions=[];
-      mockAnswers=[];
-      mockIndex=0;
-      mockSeconds=3*60*60;
-      mockFinished=false;
-      mockAttemptId=null;
-
-      var qe=document.getElementById('mockQuestion');
-      if(qe) qe.textContent='200 Mock கேள்விகள் ஏற்றப்படுகிறது...';
-
-      var L=selectedMockLanguage;
-      var d=await mockApi('/mock/questions?exam=group4&language='+encodeURIComponent(L));
-      var rows=Array.isArray(d.questions)?d.questions:[];
-
-      if(rows.length!==200){
-        throw new Error('Mock Test-க்கு 200 கேள்விகள் கிடைக்கவில்லை. கிடைத்தது: '+rows.length);
-      }
-
-      mockQuestions=normalizeMockRows(rows);
-      mockAnswers=new Array(mockQuestions.length).fill(-1);
-      mockIndex=0;
-      mockAttemptId=Number(d.attemptId||0);
-      if(!mockAttemptId) throw new Error('Mock attempt உருவாக்கப்படவில்லை.');
-      mockSeconds=3*60*60;
-      mockFinished=false;
-
-      var result=document.getElementById('mockResult');
-      var review=document.getElementById('screenReview');
-      if(result) result.classList.add('hidden');
-      if(review) review.classList.add('screen-review');
-
-      var ex=(typeof EXAMS!=='undefined' && (EXAMS[selectedExam]||EXAMS.group4))||null;
-      var title=ex&&ex.title?ex.title:'Group 4';
-      var h=document.querySelector('#mockTest h2');
-      if(h) h.textContent=title+' – Mock Test • 200 கேள்விகள் • 3 மணி நேரம்';
-
-      if(typeof show==='function') show('mockTest');
-      if(typeof renderMockTimer==='function') renderMockTimer();
-      renderServerMock();
-
-      mockTimer=setInterval(function(){
-        mockSeconds--;
-        if(typeof renderMockTimer==='function') renderMockTimer();
-        if(mockSeconds<=0){
-          clearInterval(mockTimer);
-          window.submitMock(true);
-        }
-      },1000);
-    }catch(e){
-      if(qe) qe.textContent='Mock Test தொடங்க முடியவில்லை: '+String(e&&e.message||e);
-    }
-  };
-
-  window.submitMock=async function(auto){
-    if(mockFinished || !mockQuestions.length || !mockAttemptId) return;
-    mockFinished=true;
-    if(typeof mockTimer!=='undefined' && mockTimer) clearInterval(mockTimer);
-
-    try{
-      var answers={};
-      mockQuestions.forEach(function(q,i){
-        answers[String(q.id)]=Number(mockAnswers[i]);
-      });
-
-      var d=await mockApi('/attempts/'+mockAttemptId+'/submit',{
-        method:'POST',
-        body:JSON.stringify({answers:answers})
-      });
-
-      var total=Number(d.total||mockQuestions.length);
-      var correct=Number(d.correct||0);
-      var unanswered=Number(d.unanswered||0);
-      var score=Number(d.score||0);
-      var wrong=Math.max(0,total-correct-unanswered);
-      var summary=document.getElementById('mockSummary');
-      if(summary){
-        summary.innerHTML=
-          '<p><b>மொத்த கேள்விகள்:</b> '+total+'</p>'+
-          '<p><b>சரி:</b> '+correct+'</p>'+
-          '<p><b>தவறு:</b> '+wrong+'</p>'+
-          '<p><b>விடையளிக்காதது:</b> '+unanswered+'</p>'+
-          '<p><b>மதிப்பெண்:</b> '+score+'%</p>';
-      }
-      if(typeof showMockResultScreen==='function') showMockResultScreen();
-      else if(typeof show==='function') show('mockResult');
-    }catch(e){
-      mockFinished=false;
-      var summary2=document.getElementById('mockSummary');
-      if(summary2) summary2.textContent='Mock Result சேமிக்க முடியவில்லை: '+String(e&&e.message||e);
-    }
-  };
-
-  window.__THIRAL_SERVER_MOCK_SUBMIT=window.submitMock;
-
-  window.__THIRAL_GROUP4_MOCK_HISTORY__={
-    version:'server-rotated-v3',target:200,durationSeconds:10800,
-    source:'database',historyMode:'mock'
-  };
-})();
-</script>
-
-<script id="thiral-group4-mock-review-200-final">
-/* Final Mock-only frontend fix:
-   1) Hide Next on 200/200.
-   2) Submit through the existing server attempt endpoint.
-   3) Always open the Mock Result screen after a successful submit.
-   4) Render all 200 questions in Review.
-   Practice/Admin/server logic is not changed here.
-*/
-(function(){
-  'use strict';
-
-  function esc(v){
-    return String(v==null?'':v).replace(/[&<>"']/g,function(c){
-      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
-    });
-  }
-
-  function state(){return window.__THIRAL_MOCK_STATE||null;}
-  function getQuestions(){
-    var st=state();
-    return st && Array.isArray(st.questions)?st.questions:[];
-  }
-  function getAnswers(){
-    var st=state();
-    return st && Array.isArray(st.answers)?st.answers:[];
-  }
-
-  function syncNextButton(){
-    var btn=document.getElementById('mockNextBtn');
-    if(!btn){
-      var buttons=document.querySelectorAll('#mockTest button');
-      for(var i=0;i<buttons.length;i++){
-        if(String(buttons[i].textContent||'').trim().toLowerCase().indexOf('next')===0){
-          btn=buttons[i];
-          break;
-        }
-      }
-    }
-    if(!btn) return;
-    var qs=getQuestions();
-    var st=state();
-    var idx=Number(st?st.index:0);
-    btn.style.display=(qs.length && idx<qs.length-1)?'inline-block':'none';
-  }
-
-  function buildFullReview(){
-    var qs=getQuestions(), ans=getAnswers();
-    var root=document.getElementById('screenReview');
-    var legacy=document.getElementById('mockReview');
-    if(!qs.length) return;
-
-    var html=qs.map(function(q,i){
-      var opts=Array.isArray(q.o)?q.o:(Array.isArray(q.options)?q.options:[]);
-      var a=Number(ans[i]);
-      var your=(a>=0 && a<opts.length)?String(opts[a]):'விடையளிக்கவில்லை';
-      var explanation=String(q.e||q.explanation||'').trim();
-      return '<div class="card" style="box-shadow:none;border:1px solid #e5e7eb;margin-bottom:12px;">'
-        +'<div><b>'+esc(i+1)+'. '+esc(q.q||q.question||'')+'</b></div>'
-        +'<p>உங்கள் விடை: <b>'+esc(your)+'</b></p>'
-        +(explanation?'<p class="small"><b>விளக்கம்:</b> '+esc(explanation)+'</p>':'')
-        +'</div>';
-    }).join('');
-
-    if(legacy) legacy.innerHTML=html;
-    if(root){
-      root.innerHTML='<h3 style="margin-top:0;">Mock Test Review – '+qs.length+' கேள்விகள்</h3>'+html;
-      root.classList.add('screen-review');
-    }
-  }
-
-  function openResult(){
-    var result=document.getElementById('mockResult');
-    document.querySelectorAll('section').forEach(function(sec){
-      sec.classList.add('hidden');
-      sec.style.display='none';
-    });
-    if(result){
-      result.classList.remove('hidden');
-      result.style.display='block';
-    }
-    var review=document.getElementById('screenReview');
-    if(review) review.classList.add('screen-review');
-    window.scrollTo({top:0,behavior:'instant'});
-  }
-
-  var oldRender=window.renderMock;
-  window.renderMock=function(){
-    if(typeof oldRender==='function') oldRender.apply(this,arguments);
-    syncNextButton();
-  };
-
-  window.submitMock=async function(auto){
-    var qs=getQuestions();
-    var st=state();
-    var attemptId=Number(st?st.attemptId:0);
-    if(!qs.length || !attemptId){
-      var s=document.getElementById('mockSummary');
-      if(s) s.innerHTML='<p style="color:#b91c1c;"><b>Mock attempt கிடைக்கவில்லை.</b> தயவுசெய்து Mock Test-ஐ மீண்டும் தொடங்கவும்.</p>';
-      return;
-    }
-
-    var btns=document.querySelectorAll('#mockTest button');
-    btns.forEach(function(b){
-      if(String(b.textContent||'').trim().toLowerCase().indexOf('submit')===0) b.disabled=true;
-    });
-
-    try{
-      // The original Mock controller owns the real attempt id and answer state.
-      // Reuse that controller instead of creating a second submit implementation.
-      var realSubmit=window.__THIRAL_SERVER_MOCK_SUBMIT;
-      if(typeof realSubmit!=='function') throw new Error('Mock submit controller கிடைக்கவில்லை.');
-      await realSubmit(auto);
-
-      buildFullReview();
-      openResult();
-    }catch(e){
-      btns.forEach(function(b){ b.disabled=false; });
-      var summary2=document.getElementById('mockSummary');
-      if(summary2){
-        summary2.innerHTML='<p style="color:#b91c1c;"><b>Result பெற முடியவில்லை:</b> '+esc(e&&e.message||e)+'</p>';
-      }
-    }
-  };
-
-  syncNextButton();
-})();
-</script>
-
-<script id="thiral-mock-submit-hard-final">
-(function(){
-  'use strict';
-  var submitting=false;
-  function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
-  function getState(){return window.__THIRAL_MOCK_STATE||null;}
-  function getQs(){var s=getState();return s&&Array.isArray(s.questions)?s.questions:[];}
-  function getAns(){var s=getState();return s&&Array.isArray(s.answers)?s.answers:[];}
-  function showResult(){
-    var result=document.getElementById('mockResult');
-    document.querySelectorAll('section').forEach(function(sec){sec.classList.add('hidden');sec.style.display='none';});
-    if(result){result.classList.remove('hidden');result.style.display='block';}
-    window.scrollTo({top:0,behavior:'instant'});
-  }
-  function renderReview(){
-    var qs=getQs(), ans=getAns(), root=document.getElementById('screenReview'), legacy=document.getElementById('mockReview');
-    if(!qs.length) return;
-    var html=qs.map(function(q,i){
-      var opts=Array.isArray(q.o)?q.o:(Array.isArray(q.options)?q.options:[]);
-      var a=Number(ans[i]);
-      var your=(a>=0&&a<opts.length)?String(opts[a]):'விடையளிக்கவில்லை';
-      var ex=String(q.e||q.explanation||'').trim();
-      return '<div class="card" style="box-shadow:none;border:1px solid #e5e7eb;margin-bottom:12px;">'+
-        '<div><b>'+esc(i+1)+'. '+esc(q.q||q.question||'')+'</b></div>'+
-        '<p>உங்கள் விடை: <b>'+esc(your)+'</b></p>'+
-        (ex?'<p class="small"><b>விளக்கம்:</b> '+esc(ex)+'</p>':'')+'</div>';
-    }).join('');
-    if(legacy) legacy.innerHTML=html;
-    if(root) root.innerHTML='<h3>Mock Test Review – '+qs.length+' கேள்விகள்</h3>'+html;
-  }
-  window.submitMock=async function(auto){
-    if(submitting) return;
-    var qs=getQs(), ans=getAns(), st=getState(), attemptId=Number(st&&st.attemptId||0);
-    if(!qs.length||!attemptId){
-      var no=document.getElementById('mockSummary');
-      if(no) no.innerHTML='<p style="color:#b91c1c"><b>Mock attempt கிடைக்கவில்லை.</b> Mock Test-ஐ மீண்டும் தொடங்கவும்.</p>';
-      return;
-    }
-    submitting=true;
-    var buttons=document.querySelectorAll('#mockTest button');
-    buttons.forEach(function(b){if(/submit/i.test(String(b.textContent||''))){b.disabled=true;b.dataset.oldText=b.textContent;b.textContent='Submitting...';}});
-    try{
-      var answers={};
-      qs.forEach(function(q,i){ if(q&&q.id!=null) answers[String(q.id)]=Number(ans[i]); });
-      var api=window.thiralV138Api;
-      if(typeof api!=='function') throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
-      var d=await api('/attempts/'+encodeURIComponent(attemptId)+'/submit',{method:'POST',body:JSON.stringify({answers:answers})});
-      var total=Number(d.total||qs.length), correct=Number(d.correct||0), unanswered=Number(d.unanswered||0), score=Number(d.score||0), wrong=Math.max(0,total-correct-unanswered);
-      var summary=document.getElementById('mockSummary');
-      if(summary) summary.innerHTML='<p><b>மொத்த கேள்விகள்:</b> '+total+'</p><p><b>சரி:</b> '+correct+'</p><p><b>தவறு:</b> '+wrong+'</p><p><b>விடையளிக்காதது:</b> '+unanswered+'</p><p><b>மதிப்பெண்:</b> '+score+'%</p>';
-      var student=document.getElementById('studentResultSummary');
-      if(student) student.innerHTML='<p><b>Mock Test முடிந்தது.</b></p><p>மொத்தம்: '+total+' | சரி: '+correct+' | தவறு: '+wrong+' | விடையளிக்காதது: '+unanswered+' | மதிப்பெண்: '+score+'%</p>';
-      try{localStorage.setItem('tnpsc_last_result',JSON.stringify({type:'Mock Test',total:total,correct:correct,wrong:wrong,unanswered:unanswered,score:score}));}catch(e){}
-      renderReview();
-      showResult();
-    }catch(e){
-      submitting=false;
-      buttons.forEach(function(b){if(b.dataset.oldText){b.disabled=false;b.textContent=b.dataset.oldText;}});
-      var err=document.getElementById('mockSummary');
-      if(err) err.innerHTML='<p style="color:#b91c1c"><b>Result பெற முடியவில்லை:</b> '+esc(e&&e.message||e)+'</p>';
-    }
-  };
-})();
-</script>
-
-<script id="thiral-daily-content-script-v1">
-(function(){
-  const items=[
-    {type:'📖 இன்றைய திருக்குறள்',title:'கற்க கசடறக் கற்பவை கற்றபின்',text:'நிற்க அதற்குத் தக.\n— திருக்குறள் 391',explain:'கற்க வேண்டியவற்றைத் தெளிவாகவும் குற்றமின்றியும் கற்று, கற்ற அறிவுக்கு ஏற்றவாறு வாழ்க்கையில் நடந்து கொள்ள வேண்டும்.'},
-    {type:'💭 இன்றைய சிந்தனை',title:'சிறிய முன்னேற்றமும் முன்னேற்றமே',text:'தினமும் நேற்று செய்ததைவிட சிறிதளவு சிறப்பாகச் செய்வதே நீண்ட பயணத்தின் உண்மையான வெற்றி.',explain:'பெரிய மாற்றத்தை ஒரே நாளில் எதிர்பார்ப்பதைவிட, தொடர்ந்து செய்யக்கூடிய சிறிய முன்னேற்றங்களை உருவாக்குவது பயனுள்ளதாக இருக்கும்.'},
-    {type:'🌱 இன்றைய அறிவுரை',title:'ஒரு நேரத்தில் ஒரு இலக்கு',text:'ஒரே நாளில் எல்லாவற்றையும் முடிக்க முயலாதீர்கள். முக்கியமான ஒன்றை முதலில் முடிக்குங்கள்.',explain:'முன்னுரிமையைத் தீர்மானித்து செயல்பட்டால் கவனச்சிதறல் குறைந்து வேலை முடிக்கும் திறன் அதிகரிக்கும்.'},
-    {type:'🧠 இன்றைய அறிவுத் துளி',title:'நினைவில் நிற்கும் ஒரு வழி',text:'படித்ததை புத்தகத்தை மூடி உங்கள் சொந்த வார்த்தைகளில் சொல்லிப் பாருங்கள்.',explain:'நினைவிலிருந்து மீட்டெடுத்து சொல்லும் பயிற்சி, வெறுமனே மீண்டும் வாசிப்பதைவிட கற்றதை உறுதிப்படுத்த உதவும்.'},
-    {type:'❤️ இன்றைய மனிதநேயம்',title:'ஒரு சிறிய உதவி',text:'உங்களால் முடிந்த ஒரு சிறிய உதவியை இன்று எதிர்பார்ப்பில்லாமல் செய்யுங்கள்.',explain:'சிறிய உதவிகளும் ஒருவரின் நாளை மாற்றக்கூடும். நல்ல செயல் அளவில் அல்ல, அதன் நோக்கத்தில் தொடங்குகிறது.'},
-    {type:'💪 இன்றைய ஊக்கவுரை',title:'தொடர்ந்து முயற்சி செய்',text:'மெதுவாகச் சென்றாலும் நின்றுவிடாத பயணம் முன்னேற்றத்தை உருவாக்கும்.',explain:'வேகம் குறைவாக இருப்பது தோல்வி அல்ல. தொடர்ந்து செயல்படுவது தான் இலக்கை அடைவதற்கான முக்கியமான பழக்கம்.'},
-    {type:'🌿 இன்றைய நல்ல பழக்கம்',title:'10 நிமிட மீள்பார்வை',text:'இன்று கற்றதை இரவு 10 நிமிடங்கள் திரும்பப் பாருங்கள்.',explain:'சிறிய இடைவெளியில் மீள்பார்வை செய்வது முக்கியமான தகவல்களை நினைவில் வைத்திருக்க உதவும்.'},
-    {type:'✨ இன்றைய வாழ்க்கைப் பாடம்',title:'ஒப்பிடுவதை குறை',text:'உங்கள் பயணத்தை மற்றவர்களின் பயணத்துடன் ஒப்பிடாமல், நேற்று இருந்த உங்களுடன் ஒப்பிடுங்கள்.',explain:'ஒவ்வொருவருக்கும் தொடக்கநிலையும் சூழலும் வேறுபடும். தனிப்பட்ட முன்னேற்றத்தை அளவிடுவது தெளிவான இலக்கை உருவாக்க உதவும்.'},
-    {type:'📚 இன்றைய கற்றல் குறிப்பு',title:'படித்ததை எழுதிப் பாருங்கள்',text:'ஒரு கருத்தை இரண்டு அல்லது மூன்று வரிகளில் எழுதிப் பாருங்கள்.',explain:'சுருக்கமாக எழுதுவது கருத்தின் முக்கிய அம்சங்களை அடையாளம் காணவும் புரிதலைச் சரிபார்க்கவும் உதவும்.'},
-    {type:'🌟 இன்றைய சிறப்பு சிந்தனை',title:'வாய்ப்பை காத்திருக்க வேண்டாம்',text:'கிடைக்கும் நேரத்தில் சிறிய படியைத் தொடங்குங்கள்.',explain:'சரியான நேரம் வரும் வரை காத்திருப்பதைவிட, கிடைக்கும் வளங்களுடன் தொடங்குவது செயல்பாட்டை உருவாக்கும்.'},
-    {type:'📖 இன்றைய திருக்குறள்',title:'எண்ணித் துணிக கருமம் துணிந்தபின்',text:'எண்ணுவம் என்பது இழுக்கு.\n— திருக்குறள் 467',explain:'ஒரு செயலைத் தொடங்குவதற்கு முன் அதன் விளைவுகளைச் சிந்தித்து முடிவு செய்ய வேண்டும்.'},
-    {type:'💭 இன்றைய சிந்தனை',title:'கவனம் ஒரு வளம்',text:'நேரம் மட்டும் அல்ல, கவனமும் வரம்புடைய வளம்.',explain:'முக்கியமான வேலையின் போது தேவையற்ற அறிவிப்புகள் மற்றும் கவனச்சிதறல்களை குறைப்பது பயனளிக்கும்.'},
-    {type:'🌱 இன்றைய அறிவுரை',title:'கேள்வி கேட்கத் தயங்காதீர்கள்',text:'புரியாததை கேட்பது பலவீனம் அல்ல; புரிந்து கொள்ளும் முயற்சி.',explain:'சந்தேகத்தை தெளிவுபடுத்துவது தவறான புரிதலை நீக்கி கற்றலை வேகப்படுத்தும்.'},
-    {type:'🧠 இன்றைய அறிவுத் துளி',title:'சிறு இடைவெளி உதவும்',text:'நீண்ட நேரம் இடைவிடாமல் படிப்பதைவிட திட்டமிட்ட சிறு இடைவெளிகள் உதவியாக இருக்கலாம்.',explain:'கவனம் குறையும் முன் குறுகிய இடைவெளி எடுத்தால் மீண்டும் பணியில் திரும்புவது எளிதாகும்.'},
-    {type:'❤️ இன்றைய மனிதநேயம்',title:'மரியாதையுடன் பேசுங்கள்',text:'ஒருவரின் நிலைமை தெரியாமல் அவரை மதிப்பிடாதீர்கள்.',explain:'மற்றவர்களின் சூழலை அறியாமல் தீர்ப்பு வழங்குவதைத் தவிர்ப்பது நல்ல உறவுகளுக்கு உதவும்.'},
-    {type:'💪 இன்றைய ஊக்கவுரை',title:'தோல்வி ஒரு தரவு',text:'எது வேலை செய்யவில்லை என்பதை அறிந்தால் அடுத்த முயற்சி சிறப்பாகலாம்.',explain:'தவறை மறைப்பதைவிட அதிலிருந்து காரணத்தை கண்டுபிடித்து முறையை மாற்றுவது முன்னேற்றத்திற்கு உதவும்.'},
-    {type:'🌿 இன்றைய நல்ல பழக்கம்',title:'தினசரி ஒரு பக்கம்',text:'ஒரு நல்ல புத்தகத்தில் தினமும் குறைந்தது ஒரு பக்கம் படியுங்கள்.',explain:'சிறிய அளவில் தொடங்கும் வாசிப்பு பழக்கம் காலப்போக்கில் பெரிய அறிவுத் தொகுப்பாக மாறலாம்.'},
-    {type:'✨ இன்றைய வாழ்க்கைப் பாடம்',title:'சொல்லும் முன் சிந்தி',text:'ஒரு வார்த்தையைச் சொல்ல சில வினாடிகள் போதும்; அதன் தாக்கம் நீண்டதாக இருக்கலாம்.',explain:'கோபம் அல்லது அவசரத்தில் பதிலளிப்பதற்கு முன் சிறிது இடைவெளி கொடுப்பது பயனுள்ளதாக இருக்கும்.'},
-    {type:'📚 இன்றைய கற்றல் குறிப்பு',title:'தெரிந்ததை மற்றொருவருக்குச் சொல்லுங்கள்',text:'ஒரு கருத்தை எளிமையாக விளக்கிப் பாருங்கள்.',explain:'மற்றொருவருக்குப் புரியும்படி விளக்க முயற்சிப்பது உங்கள் சொந்த புரிதலில் உள்ள இடைவெளிகளை கண்டுபிடிக்க உதவும்.'},
-    {type:'🌟 இன்றைய சிறப்பு சிந்தனை',title:'நன்றி சொல்லும் பழக்கம்',text:'இன்று உங்களுக்கு உதவிய ஒருவருக்கு நன்றி சொல்லுங்கள்.',explain:'நன்றியை வெளிப்படுத்துவது உறவுகளில் நேர்மறையான தொடர்பை வளர்க்கும்.'},
-    {type:'📖 இன்றைய திருக்குறள்',title:'வெள்ளத் தனைய மலர்நீட்டம் மாந்தர்தம்',text:'உள்ளத் தனையது உயர்வு.\n— திருக்குறள் 595',explain:'மனிதனின் உயர்வு அவனுடைய உள்ளத்தின் உயர்வோடு தொடர்புடையது என்பதே இந்தக் குறளின் கருத்து.'},
-    {type:'💭 இன்றைய சிந்தனை',title:'நேர்மை எளிமையானது',text:'சரியானதைச் செய்வது எப்போதும் எளிதாக இருக்காது; ஆனால் முடிவில் மன அமைதியைத் தரும்.',explain:'நேர்மையான முடிவுகள் நம்பிக்கையை உருவாக்குகின்றன.'},
-    {type:'🌱 இன்றைய அறிவுரை',title:'திட்டத்தை எழுதுங்கள்',text:'நாளைய முக்கியமான மூன்று பணிகளை இன்றே எழுதிவையுங்கள்.',explain:'எழுதப்பட்ட சிறிய திட்டம் அடுத்த நாள் தொடங்குவதற்கான தயக்கத்தை குறைக்க உதவும்.'},
-    {type:'🧠 இன்றைய அறிவுத் துளி',title:'கற்றதை இடைவெளியில் நினைவுகூருங்கள்',text:'ஒரே நாளில் முழுவதையும் படிப்பதைவிட இடைவெளிகளுடன் மீள்பார்வை செய்வது பயனுள்ளதாக இருக்கும்.',explain:'மீள்பார்வையை பல நாட்களாகப் பிரிப்பது நீண்டகால நினைவாற்றலுக்கு உதவக்கூடும்.'},
-    {type:'❤️ இன்றைய மனிதநேயம்',title:'கேட்பதும் ஒரு உதவி',text:'சில நேரங்களில் ஒருவருக்கு தீர்வு அல்ல, கவனமாகக் கேட்பவரே தேவை.',explain:'அவசரமாக அறிவுரை வழங்காமல் கேட்பது மற்றவரின் உணர்வுகளையும் தேவையையும் புரிந்து கொள்ள உதவும்.'},
-    {type:'💪 இன்றைய ஊக்கவுரை',title:'இன்று தொடங்கு',text:'முழுமையாகத் தயாரான பிறகே தொடங்க வேண்டும் என்ற எண்ணம் பல தொடக்கங்களை தாமதப்படுத்தும்.',explain:'சிறிய அளவில் தொடங்கி அனுபவத்தின் அடிப்படையில் மேம்படுத்துவது பல செயல்களுக்கு நடைமுறை வழியாகும்.'},
-    {type:'🌿 இன்றைய நல்ல பழக்கம்',title:'படிக்கும் இடத்தை ஒழுங்குபடுத்து',text:'படிக்கத் தொடங்கும் முன் மேசையில் தேவையானவற்றை மட்டும் வைத்துக்கொள்ளுங்கள்.',explain:'சுற்றுப்புற ஒழுங்கு கவனச்சிதறலை குறைத்து படிப்பைத் தொடங்க உதவும்.'},
-    {type:'✨ இன்றைய வாழ்க்கைப் பாடம்',title:'பொறுமைக்கு மதிப்பு உண்டு',text:'சில முடிவுகள் நேரம் எடுத்துக்கொள்ளும். உடனடி முடிவு இல்லாததால் முயற்சியை நிறுத்த வேண்டாம்.',explain:'நீண்டகால இலக்குகளுக்கு தொடர்ச்சியான முயற்சியும் பொறுமையும் தேவைப்படலாம்.'},
-    {type:'📚 இன்றைய கற்றல் குறிப்பு',title:'தவறான விடையையும் கவனியுங்கள்',text:'ஒரு தேர்வில் தவறிய கேள்வியை மட்டும் கடந்து செல்லாமல், ஏன் தவறியது என்று கண்டுபிடியுங்கள்.',explain:'தவறின் காரணத்தை அறிந்தால் அதே வகைத் தவறு மீண்டும் நடப்பதை குறைக்க முடியும்.'},
-    {type:'🌟 இன்றைய சிறப்பு சிந்தனை',title:'உங்கள் முயற்சிக்கு மதிப்பு கொடுங்கள்',text:'முடிவை மட்டும் பார்க்காமல், நீங்கள் செய்த ஒழுங்கான முயற்சியையும் கவனியுங்கள்.',explain:'முயற்சியின் தரத்தை மதிப்பிடுவது அடுத்த கட்டத்தை திட்டமிட உதவும்.'}
-  ];
-  function dayIndex(){
-    const now=new Date();
-    const utc=Date.UTC(now.getFullYear(),now.getMonth(),now.getDate());
-    const base=Date.UTC(2026,0,1);
-    return Math.floor((utc-base)/86400000)%items.length;
-  }
-  function render(){
-    const x=items[(dayIndex()+items.length)%items.length];
-    const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
-    set('thiralDailyType',x.type);set('thiralDailyTitle',x.title);set('thiralDailyText',x.text);set('thiralDailyExplanation',x.explain);
-  }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',render); else render();
-})();
-</script>
-
-<script id="thiral-important-news-display">
-async function loadImportantNews(){
-  const box=document.getElementById('importantNewsList');
-  if(!box)return;
-  box.innerHTML='<div class="card" style="text-align:center;"><p class="small">முக்கிய அறிவிப்புகள் ஏற்றப்படுகிறது...</p></div>';
-  try{
-    if(typeof window.thiralV138Api!=='function') throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
-    const data=await window.thiralV138Api('/important-news');
-    // Student view: show only the latest published Important News. Older announcements remain in DB but are not displayed here.
-    const items=(Array.isArray(data.news)?data.news:[]).slice(0,1);
-    if(!items.length){
-      box.innerHTML='<div class="card" style="text-align:center;"><p>📢 தற்போது முக்கிய அறிவிப்பு எதுவும் இல்லை.</p></div>';
-      return;
-    }
-    box.innerHTML=items.map(n=>{
-      const title=escapeHtmlAdmin(n.title||'முக்கிய அறிவிப்பு');
-      const content=escapeHtmlAdmin(n.content||'').replace(/\n/g,'<br>');
-      const date=n.published_at||n.created_at;
-      let dateText='';
-      if(date){try{dateText=new Date(date).toLocaleString('ta-IN');}catch(e){dateText=String(date);}}
-      return '<div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,#eef6ff,#f5fbff);border:1px solid rgba(18,63,112,.12);text-align:left;">'+
-        '<h3 style="margin:0 0 12px;color:#123f70;">'+title+'</h3>'+
-        '<div style="font-size:17px;line-height:1.8;">'+content+'</div>'+
-        (dateText?'<p class="small" style="margin:14px 0 0;">📅 '+escapeHtmlAdmin(dateText)+'</p>':'')+
-      '</div>';
-    }).join('');
-  }catch(e){
-    box.innerHTML='<div class="card" style="text-align:center;border:1px solid #fecaca;"><p>❌ முக்கிய அறிவிப்பை ஏற்ற முடியவில்லை.</p><p class="small">'+escapeHtmlAdmin(e?.message||e)+'</p><button type="button" onclick="loadImportantNews()">🔄 மீண்டும் முயற்சி</button></div>';
-  }
-}
-
-const __originalShowForImportantNews = window.show;
-if(typeof __originalShowForImportantNews==='function'){
-  window.show=function(id){
-    __originalShowForImportantNews(id);
-    if(id==='importantNews') loadImportantNews();
-  };
-}
-</script>
-<script id="thiral-admin-model-tools">
-function toggleAdminTool(id){
-  const el=document.getElementById(id);
-  if(!el)return;
-  el.classList.toggle('hidden');
-  if(!el.classList.contains('hidden')){
-    setTimeout(()=>el.scrollIntoView({behavior:'smooth',block:'start'}),30);
-  }
-}
-function clearAdminNewsForm(){
-  ['adminNewsTitle','adminNewsBody'].forEach(id=>{
-    const e=document.getElementById(id); if(e)e.value='';
-  });
-  const s=document.getElementById('adminNewsStatus'); if(s)s.value='draft';
-  const p=document.getElementById('adminNewsPreview'); if(p){p.classList.add('hidden');p.innerHTML='';}
-}
-function previewAdminNews(){
-  const title=(document.getElementById('adminNewsTitle')?.value||'').trim();
-  const body=(document.getElementById('adminNewsBody')?.value||'').trim();
-  const status=document.getElementById('adminNewsStatus')?.value||'draft';
-  const p=document.getElementById('adminNewsPreview');
-  if(!p)return;
-  if(!title && !body){
-    p.classList.remove('hidden');
-    p.innerHTML='<p class="small">முன்னோட்டத்திற்கு Title அல்லது News உள்ளிடுங்கள்.</p>';
-    return;
-  }
-  p.classList.remove('hidden');
-  p.innerHTML='<h3 style="margin-top:0">'+escapeHtmlAdmin(title||'Untitled')+'</h3>'+
-    '<p class="small">Status: '+(status==='published'?'Published / வெளியிடப்பட்டது':'Draft / வரைவு')+'</p>'+
-    '<div style="white-space:pre-wrap;line-height:1.7">'+escapeHtmlAdmin(body)+'</div>';
-}
-function clearModelExamForm(){
-  ['adminModelExamId','adminModelExamTitle','adminModelExamDate','adminModelExamTime','adminModelExamQuestions'].forEach(id=>{
-    const e=document.getElementById(id); if(e)e.value='';
-  });
-  const d=document.getElementById('adminModelExamDuration'); if(d)d.value='180';
-  const f=document.getElementById('adminModelExamFile'); if(f)f.value='';
-  const m=document.getElementById('adminModelExamFileMsg'); if(m)m.textContent='';
-  const p=document.getElementById('adminModelExamPreview'); if(p){p.classList.add('hidden');p.innerHTML='';}
-}
-function previewModelExamFile(input){
-  const msg=document.getElementById('adminModelExamFileMsg');
-  if(!msg)return;
-  const file=input?.files?.[0];
-  if(!file){msg.textContent='';return;}
-  msg.textContent='தேர்ந்தெடுக்கப்பட்ட கோப்பு: '+file.name+' ('+Math.round(file.size/1024)+' KB). இப்போது upload செய்யப்படவில்லை; backend இணைப்பு அடுத்த கட்டத்தில்.';
-}
-function previewModelExam(){
-  const id=(document.getElementById('adminModelExamId')?.value||'').trim();
-  const title=(document.getElementById('adminModelExamTitle')?.value||'').trim();
-  const date=document.getElementById('adminModelExamDate')?.value||'';
-  const time=document.getElementById('adminModelExamTime')?.value||'';
-  const duration=document.getElementById('adminModelExamDuration')?.value||'180';
-  const q=(document.getElementById('adminModelExamQuestions')?.value||'').trim();
-  const p=document.getElementById('adminModelExamPreview');
-  if(!p)return;
-  p.classList.remove('hidden');
-  p.innerHTML='<h3 style="margin-top:0">Model Exam Preview</h3>'+
-    '<p><strong>ID:</strong> '+escapeHtmlAdmin(id||'—')+'</p>'+
-    '<p><strong>Title:</strong> '+escapeHtmlAdmin(title||'—')+'</p>'+
-    '<p><strong>Date:</strong> '+escapeHtmlAdmin(date||'—')+' &nbsp; <strong>Start:</strong> '+escapeHtmlAdmin(time||'—')+'</p>'+
-    '<p><strong>Availability:</strong> 24 Hours &nbsp; <strong>Duration:</strong> '+escapeHtmlAdmin(duration)+' minutes</p>'+
-    '<hr><p><strong>Question data preview:</strong></p>'+
-    '<pre style="white-space:pre-wrap;max-height:360px;overflow:auto">'+escapeHtmlAdmin(q||'Question data இன்னும் உள்ளிடப்படவில்லை.')+'</pre>';
-}
-
-async function saveAdminNews(){
-  const title=(document.getElementById('adminNewsTitle')?.value||'').trim();
-  const content=(document.getElementById('adminNewsBody')?.value||'').trim();
-  const status=document.getElementById('adminNewsStatus')?.value||'draft';
-  const msg=document.getElementById('adminNewsSaveMsg');
-  if(!title || !content){
-    if(msg) msg.textContent='Title மற்றும் News இரண்டும் தேவை.';
-    return;
-  }
-  if(msg) msg.textContent='Saving...';
-  try{
-    if(typeof window.thiralV138Api!=='function'){
-      throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
-    }
-    const result=await window.thiralV138Api('/admin/important-news',{
-      method:'POST',
-      body:JSON.stringify({title,content,status})
-    });
-    if(msg) msg.textContent='✅ Important News சேமிக்கப்பட்டது. ID: '+(result.news?.id ?? '');
-  }catch(e){
-    if(msg) msg.textContent='❌ Save failed: '+(e?.message||e);
-  }
-}
-
-async function deleteCurrentAdminNews(){
-  const msg=document.getElementById('adminNewsSaveMsg');
-  if(!confirm('தற்போது மாணவர்களுக்கு காட்டப்படும் Latest Published Important News-ஐ நிரந்தரமாக Delete செய்யவா?')) return;
-  if(msg) msg.textContent='Deleting...';
-  try{
-    if(typeof window.thiralV138Api!=='function'){
-      throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
-    }
-    const result=await window.thiralV138Api('/admin/important-news/current',{
-      method:'DELETE'
-    });
-    if(msg) msg.textContent='🗑️ Current Important News நீக்கப்பட்டது. ID: '+(result.news?.id ?? '');
-    const box=document.getElementById('importantNewsList');
-    if(box) box.innerHTML='<div class="card" style="text-align:center;"><p>📢 தற்போது முக்கிய அறிவிப்பு எதுவும் இல்லை.</p></div>';
-  }catch(e){
-    if(msg) msg.textContent='❌ Delete failed: '+(e?.message||e);
-  }
-}
-
-function escapeHtmlAdmin(v){
-  return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-}
-</script>
-<section id="modelExamStudent" class="card hidden">
-  <div class="me-head">
-    <h2 id="meTitle">📝 Model Exam</h2>
-    <div class="me-head-right">
-      <div class="timer">⏱️ <span id="meTimer">03:00:00</span></div>
-      <button type="button" class="secondary" onclick="window.thiralLogoutFromActivity()">Logout</button>
-    </div>
-  </div>
-  <div class="me-progress-head">
-    <span class="badge" id="meProgress">1 / 200</span>
-    <span class="small" id="meExamInfo">200 கேள்விகள் • 3 மணி நேரம்</span>
-  </div>
-  <div class="bar"><div id="meBar"></div></div>
-
-  <div id="meSinglePanel" class="me-single-panel">
-    <div id="meQuestionBox"></div>
-    <div id="meOptions"></div>
-  </div>
-
-  <div id="meBiPanel" class="me-bi-panel hidden">
-    <div class="me-lang-column">
-      <div class="me-lang-title">தமிழ்</div>
-      <div id="meTamilQuestion" class="me-question-text"></div>
-      <div id="meTamilOptions"></div>
-    </div>
-    <div class="me-lang-column">
-      <div class="me-lang-title">English</div>
-      <div id="meEnglishQuestion" class="me-question-text"></div>
-      <div id="meEnglishOptions"></div>
-    </div>
-  </div>
-
-  <p class="small" id="meSaveStatus"></p>
-  <p id="meMessage"></p>
-
-  <div class="me-navigation">
-    <button type="button" class="secondary" id="mePrev" onclick="window.__THIRAL_MODEL_EXAM_PREV()">← Previous</button>
-    <button type="button" class="secondary" id="meNext" onclick="window.__THIRAL_MODEL_EXAM_NEXT()">Next →</button>
-    <button type="button" id="meSubmit" onclick="window.__THIRAL_MODEL_EXAM_SUBMIT(false)">Submit Test</button>
-  </div>
-</section>
-
-<section id="modelExamResult" class="card hidden">
-  <h2>📊 Model Exam Result</h2>
-  <div id="meResultText"></div>
-  <div class="top" style="margin-top:16px;">
-    <button type="button" class="secondary" onclick="show('dash')">← Dashboard</button>
-    <button type="button" class="secondary" id="meReviewBtn" onclick="window.__THIRAL_MODEL_EXAM_REVIEW()">📋 விடை மதிப்பாய்வு</button>
-  </div>
-</section>
-
-<section id="modelExamReview" class="card hidden">
-  <h2>📋 Model Exam விடை மதிப்பாய்வு</h2>
-  <p class="small">தேர்வு முடிந்த பிறகு மட்டும் சரி / தவறு மற்றும் சரியான விடை காட்டப்படும்.</p>
-  <div id="meReviewSummary"></div>
-  <div id="meReviewList"></div>
-  <button type="button" class="secondary" onclick="show('modelExamResult')">← Result</button>
-</section>
-
-<style id="thiral-model-exam-student-adaptive-style">
-#modelExamStudent .me-head{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;}
-#modelExamStudent .me-head-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
-#modelExamStudent .me-progress-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:8px 0 10px;}
-#modelExamStudent .me-single-panel{display:block;}
-#modelExamStudent .me-bi-panel{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin-top:14px;}
-#modelExamStudent .me-lang-column{background:#fff;border:1px solid #dbe3ef;border-radius:14px;padding:14px;min-width:0;}
-#modelExamStudent .me-lang-title{background:#1677e8;color:#fff;border-radius:10px;padding:12px;text-align:center;font-size:28px;font-weight:900;margin-bottom:14px;}
-#modelExamStudent .me-question-text{font-size:22px;font-weight:800;line-height:1.65;margin:10px 4px 16px;}
-#modelExamStudent .option{display:block;width:100%;text-align:left;margin:8px 0;box-sizing:border-box;}
-#modelExamStudent .option.selected{font-weight:800;outline:3px solid rgba(37,99,235,.25);}
-#modelExamStudent #meSubmit{display:inline-block;}
-#modelExamStudent #meBar{height:8px;transition:width .2s ease;}
-#modelExamStudent #meQuestionBox h3{line-height:1.65;margin:18px 0;}
-#modelExamStudent .me-navigation{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;align-items:center;margin-top:20px;padding-top:14px;border-top:1px solid #e2e8f0;}
-#modelExamStudent .me-navigation button{margin:0;min-height:54px;}
-#modelExamStudent .me-navigation #meNext{text-align:center;}
-#modelExamStudent .me-navigation #meSubmit{text-align:center;}
-#modelExamStudent .me-bilingual-missing{color:#64748b;font-weight:600;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:10px;padding:14px;}
-#modelExamReview .review-item{border:1px solid #dbe3ef;border-radius:12px;padding:14px;margin:12px 0;}
-#modelExamReview .review-item.correct{border-left:6px solid #16a34a;}
-#modelExamReview .review-item.wrong{border-left:6px solid #dc2626;}
-#modelExamReview .review-item.not_attempted{border-left:6px solid #64748b;}
-#modelExamReview .review-status{font-weight:800;margin-bottom:8px;}
-#modelExamReview .review-option{margin:4px 0;}
-@media(max-width:760px){
-  #modelExamStudent .me-bi-panel{grid-template-columns:1fr;}
-  #modelExamStudent .me-lang-title{font-size:23px;}
-  #modelExamStudent .me-question-text{font-size:19px;}
-  #modelExamStudent .me-navigation{grid-template-columns:1fr 1fr 1fr;gap:6px;}
-  #modelExamStudent .me-navigation button{font-size:14px;padding:12px 7px;}
-}
-</style>
-<script id="thiral-model-exam-student-adaptive-final">
-(function(){
-  'use strict';
-  var M={questions:[],answers:{},index:0,attemptId:0,startedAt:null,durationMinutes:180,timer:null,submitting:false,examTitle:'',layout:'single'};
-  function $(id){return document.getElementById(id);}
-  function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
-  function api(path,opt){
-    if(typeof window.thiralV138Api!=='function') throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
-    return window.thiralV138Api(path,opt||{});
-  }
-  function stopTimer(){if(M.timer){clearInterval(M.timer);M.timer=null;}}
-  function fmt(sec){
-    sec=Math.max(0,Number(sec)||0);
-    var h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60),s=sec%60;
-    return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
-  }
-  function val(q,names){
-    for(var i=0;i<names.length;i++){
-      var v=q&&q[names[i]];
-      if(v!==undefined&&v!==null&&String(v)!=='') return v;
-    }
-    return null;
-  }
-  function arr(v){return Array.isArray(v)?v:[];}
-  function langOf(q){return String(q&&q.language||'').trim().toLowerCase();}
-  function hasPair(q){
-    return !!(val(q,['tamil_question','question_ta','ta_question','questionTamil','question_tamil','taQuestion']) ||
-               val(q,['english_question','question_en','en_question','questionEnglish','question_english','enQuestion']) ||
-               q&&q.tamil&&q.english);
-  }
-  function pairData(q){
-    var t=val(q,['tamil_question','question_ta','ta_question','questionTamil','question_tamil','taQuestion']);
-    var e=val(q,['english_question','question_en','en_question','questionEnglish','question_english','enQuestion']);
-    var to=val(q,['tamil_options','options_ta','ta_options','optionsTamil','options_tamil','taOptions']);
-    var eo=val(q,['english_options','options_en','en_options','optionsEnglish','options_english','enOptions']);
-    if(q&&q.tamil){t=t||q.tamil.question;to=to||q.tamil.options;}
-    if(q&&q.english){e=e||q.english.question;eo=eo||q.english.options;}
-    return {t:t,e:e,to:arr(to),eo:arr(eo)};
-  }
-  function determineLayout(qs){
-    if(!qs.length)return 'single';
-    var allTamil=qs.every(function(q){return langOf(q)==='ta'||langOf(q)==='tamil';});
-    if(allTamil&&!qs.some(hasPair))return 'single-ta';
-    var explicitPair=qs.some(hasPair);
-    var bilingualFlag=qs.some(function(q){var l=langOf(q);return ['bilingual','bi','ta-en','en-ta','both','ta_en','en_ta'].indexOf(l)>=0;});
-    if(explicitPair||bilingualFlag)return 'bilingual';
-    var allEnglish=qs.every(function(q){return langOf(q)==='en'||langOf(q)==='english';});
-    if(allEnglish)return 'single-en';
-    var mixed=qs.some(function(q){var l=langOf(q);return l==='en'||l==='english';})&&qs.some(function(q){var l=langOf(q);return l==='ta'||l==='tamil';});
-    if(mixed)return 'bilingual';
-    return 'single';
-  }
-  function renderOptions(containerId,opts,selected){
-    var box=$(containerId);if(!box)return;
-    box.innerHTML=arr(opts).map(function(o,i){
-      var letter=String.fromCharCode(65+i);
-      return '<button type="button" class="option '+(selected===letter?'selected':'')+'" onclick="window.__THIRAL_MODEL_EXAM_ANSWER(\''+letter+'\')">'+letter+'. '+esc(o)+'</button>';
-    }).join('');
-  }
-  function render(){
-    var q=M.questions[M.index];if(!q)return;
-    var total=M.questions.length;
-    $('meTitle').textContent='📝 '+(M.examTitle||'Model Exam');
-    $('meExamInfo').textContent=(total===200?'200 கேள்விகள்':'கேள்விகள்: '+total)+' • 3 மணி நேரம்';
-    $('meProgress').textContent=(M.index+1)+' / '+total;
-    $('meBar').style.width=((M.index+1)/total*100)+'%';
-    var selected=M.answers[String(q.id)]||'';
-    if(M.layout==='bilingual'){
-      $('meSinglePanel').classList.add('hidden');
-      $('meBiPanel').classList.remove('hidden');
-      var p=pairData(q);
-      var tq=p.t||((langOf(q)==='ta'||langOf(q)==='tamil')?q.question:'');
-      var eq=p.e||((langOf(q)==='en'||langOf(q)==='english')?q.question:'');
-      $('meTamilQuestion').innerHTML=tq?'<h3 style="margin:0">'+esc(tq)+'</h3>':'<div class="me-bilingual-missing">தமிழ் கேள்வி வழங்கப்படவில்லை.</div>';
-      $('meEnglishQuestion').innerHTML=eq?'<h3 style="margin:0">'+esc(eq)+'</h3>':'<div class="me-bilingual-missing">English question not provided.</div>';
-      var optsTa=p.to.length?p.to:((langOf(q)==='ta'||langOf(q)==='tamil')?arr(q.options):[]);
-      var optsEn=p.eo.length?p.eo:((langOf(q)==='en'||langOf(q)==='english')?arr(q.options):[]);
-      renderOptions('meTamilOptions',optsTa,selected);
-      renderOptions('meEnglishOptions',optsEn,selected);
-    }else{
-      $('meSinglePanel').classList.remove('hidden');
-      $('meBiPanel').classList.add('hidden');
-      $('meQuestionBox').innerHTML='<h3>'+esc(q.question)+'</h3>';
-      renderOptions('meOptions',arr(q.options),selected);
-    }
-    $('mePrev').disabled=M.index===0;
-    $('meNext').style.display=M.index===total-1?'none':'inline-block';
-    $('meSubmit').style.display='inline-block';
-    $('meSaveStatus').textContent=selected?'✓ விடை தேர்வு செய்யப்பட்டுள்ளது':'';
-    $('meMessage').textContent='';
-  }
-  function startTimer(){
-    stopTimer();
-    var started=new Date(M.startedAt).getTime();
-    var deadline=started+(Number(M.durationMinutes||180)*60000);
-    function tick(){
-      var left=Math.ceil((deadline-Date.now())/1000);
-      $('meTimer').textContent=fmt(left);
-      if(left<=0){stopTimer();window.__THIRAL_MODEL_EXAM_SUBMIT(true);}
-    }
-    tick();M.timer=setInterval(tick,1000);
-  }
-  async function start(){
-    if(M.submitting)return;
-    M.submitting=false;
-    try{
-      var d=await api('/model-exams/start',{method:'POST',body:'{}'});
-      var qs=Array.isArray(d.questions)?d.questions:[];
-      if(qs.length!==200) throw new Error('Model Exam-க்கு 200 கேள்விகள் இல்லை. கிடைத்தது: '+qs.length);
-      M.questions=qs;M.answers={};
-      (Array.isArray(d.answers)?d.answers:[]).forEach(function(a){
-        if(a&&a.question_id)M.answers[String(a.question_id)]=String(a.answer||'').toUpperCase();
-      });
-      M.index=0;M.attemptId=Number(d.attemptId||0);M.startedAt=d.startedAt;M.durationMinutes=Number(d.durationMinutes||180);M.examTitle=d.exam&&d.exam.title||'Model Exam';
-      if(!M.attemptId)throw new Error('Model Exam attempt உருவாக்கப்படவில்லை.');
-      M.layout=determineLayout(qs);
-      show('modelExamStudent');render();startTimer();window.scrollTo({top:0,behavior:'instant'});
-    }catch(e){alert(e&&e.message?e.message:'Model Exam தற்போது கிடைக்கவில்லை.');}
-  }
-  async function answer(letter){
-    if(M.submitting)return;
-    var q=M.questions[M.index];if(!q)return;
-    M.answers[String(q.id)]=letter;render();$('meSaveStatus').textContent='சேமிக்கிறது...';
-    try{
-      await api('/model-exams/attempt/'+M.attemptId+'/answer',{method:'POST',body:JSON.stringify({questionId:Number(q.id),answer:letter})});
-      $('meSaveStatus').textContent='✓ விடை சேமிக்கப்பட்டது';
-    }catch(e){delete M.answers[String(q.id)];render();$('meMessage').textContent=e&&e.message?e.message:'விடை சேமிக்க முடியவில்லை.';}
-  }
-  function prev(){if(M.index>0){M.index--;render();window.scrollTo({top:0,behavior:'instant'});}}
-  function next(){if(M.index<M.questions.length-1){M.index++;render();window.scrollTo({top:0,behavior:'instant'});}}
-  async function submit(autoExpired){
-    if(M.submitting||!M.attemptId)return;
-    M.submitting=true;stopTimer();$('meSubmit').disabled=true;
-    try{
-      var d=await api('/model-exams/attempt/'+M.attemptId+'/submit',{method:'POST',body:'{}'});
-      var r=d.result||{};
-      $('meResultText').innerHTML='<p><b>மொத்த கேள்விகள்:</b> '+Number(r.total_questions||0)+'</p><p><b>விடையளித்தது:</b> '+Number(r.attempted||0)+'</p><p><b>விடையளிக்காதது:</b> '+Number(r.not_attempted||0)+'</p><p><b>மதிப்பெண்:</b> '+Number(r.marks||0)+'</p><p><b>சதவீதம்:</b> '+Number(r.percentage||0)+'%</p>';
-      show('modelExamResult');window.scrollTo({top:0,behavior:'instant'});
-    }catch(e){M.submitting=false;$('meSubmit').disabled=false;$('meMessage').textContent=e&&e.message?e.message:'Model Exam submit முடியவில்லை.';}
-  }
-  async function review(){
-    if(!M.attemptId)return;
-    var btn=$('meReviewBtn');if(btn)btn.disabled=true;
-    try{
-      var d=await api('/model-exams/attempt/'+M.attemptId+'/review',{method:'GET'});
-      var rows=Array.isArray(d.review)?d.review:[];
-      var correct=rows.filter(function(x){return x.status==='correct';}).length;
-      var wrong=rows.filter(function(x){return x.status==='wrong';}).length;
-      var na=rows.filter(function(x){return x.status==='not_attempted';}).length;
-      $('meReviewSummary').innerHTML='<div class="top"><p><b>மொத்த கேள்விகள்:</b> '+rows.length+'</p><p>✅ <b>சரி:</b> '+correct+'</p><p>❌ <b>தவறு:</b> '+wrong+'</p><p>⚪ <b>விடையளிக்கவில்லை:</b> '+na+'</p></div>';
-      $('meReviewList').innerHTML=rows.map(function(r){
-        var cls=r.status;var label=r.status==='correct'?'✅ சரி':(r.status==='wrong'?'❌ தவறு':'⚪ விடையளிக்கவில்லை');
-        var opts=Array.isArray(r.options)?r.options:[];
-        var optionHtml=opts.map(function(o,i){return '<div class="review-option">'+String.fromCharCode(65+i)+'. '+esc(o)+'</div>';}).join('');
-        return '<div class="review-item '+cls+'"><div class="review-status">Q'+esc(r.question_no)+' · '+label+'</div><div><b>'+esc(r.question)+'</b></div><div style="margin-top:8px;">'+optionHtml+'</div><div style="margin-top:8px;"><b>உங்கள் விடை:</b> '+esc(r.user_answer||'விடையளிக்கவில்லை')+'</div><div><b>சரியான விடை:</b> '+esc(r.correct_answer||'-')+'</div></div>';
-      }).join('');
-      show('modelExamReview');window.scrollTo({top:0,behavior:'instant'});
-    }catch(e){alert(e&&e.message?e.message:'விடை மதிப்பாய்வு கிடைக்கவில்லை.');}finally{if(btn)btn.disabled=false;}
-  }
-  window.__THIRAL_MODEL_EXAM_START=start;
-  window.__THIRAL_MODEL_EXAM_ANSWER=answer;
-  window.__THIRAL_MODEL_EXAM_PREV=prev;
-  window.__THIRAL_MODEL_EXAM_NEXT=next;
-  window.__THIRAL_MODEL_EXAM_SUBMIT=submit;
-  window.__THIRAL_MODEL_EXAM_REVIEW=review;
-  window.__THIRAL_RESET_MODEL_EXAM_SESSION=function(){stopTimer();M.questions=[];M.answers={};M.index=0;M.attemptId=0;M.submitting=false;M.layout='single';};
-})();
-</script>
-
 </body></html>
-
-
-<script id="thiral-activity-logout-final">
-(function(){
-  'use strict';
-  window.thiralLogoutFromActivity=async function(){
-    try{ if(typeof window.__THIRAL_RESET_PRACTICE_SESSION==='function') window.__THIRAL_RESET_PRACTICE_SESSION(); }catch(e){}
-    try{ if(typeof window.__THIRAL_RESET_MOCK_SESSION==='function') window.__THIRAL_RESET_MOCK_SESSION(); }catch(e){}
-    window.pendingPracticeStart=null;
-    window.pendingMockStart=null;
-    window._practiceReentry=false;
-    try{ var picker=document.getElementById('thiralMockLanguagePicker'); if(picker) picker.remove(); }catch(e){}
-    try{ if(typeof window.logout==='function') await window.logout(); else show('home'); }catch(e){ try{ show('home'); }catch(_){ } }
-  };
-})();
-</script>
