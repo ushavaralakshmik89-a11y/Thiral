@@ -4766,6 +4766,47 @@ async function loadPracticeQuestions(requested){
     currentSubject==='gs' ? 'பொது அறிவு' :
     currentSubject==='apt' ? 'apt' :
     currentSubject==='tamil' ? 'tamil' : '';
+
+  /* Tamil Nadu History is shown as one Topic-level practice page.
+     Keep the existing five subtopics plus the new post-Nayak key as the
+     database sources. No existing question rows are changed. */
+  if(currentSubject==='gs' && currentTopic==='தமிழ்நாடு வரலாறு' && selectedSubtopic==='தமிழ்நாடு வரலாறு'){
+    const subtopics=['சங்க காலம்','சோழர்','பாண்டியர்','பல்லவர்','நாயக்கர்','நாயக்கருக்குப் பிந்தைய தமிழ்நாடு வரலாறு'];
+    const out=[];
+    const pageSize=requested===9999?200:Math.max(20,requested*2);
+    for(const st of subtopics){
+      let offset=0;
+      const d=await api('/questions?exam='+encodeURIComponent(String(selectedExam||'group4'))+
+        '&subject='+encodeURIComponent(dbSubject)+
+        '&language='+encodeURIComponent(contentLanguage==='en'?'en':'ta')+
+        '&subtopic='+encodeURIComponent(st)+
+        '&limit='+pageSize+'&offset='+offset);
+      if(Array.isArray(d.questions)) out.push(...d.questions.map(normalizePracticeDifficulty));
+      if(requested===9999 && d.pagination && d.pagination.hasMore){
+        while(d.pagination.hasMore){
+          offset=Number(d.pagination.nextOffset||0);
+          if(!Number.isFinite(offset)) break;
+          const more=await api('/questions?exam='+encodeURIComponent(String(selectedExam||'group4'))+
+            '&subject='+encodeURIComponent(dbSubject)+
+            '&language='+encodeURIComponent(contentLanguage==='en'?'en':'ta')+
+            '&subtopic='+encodeURIComponent(st)+
+            '&limit='+pageSize+'&offset='+offset);
+          const rows=Array.isArray(more.questions)?more.questions:[];
+          out.push(...rows.map(normalizePracticeDifficulty));
+          if(!more.pagination || !more.pagination.hasMore || !rows.length) break;
+          d.pagination=more.pagination;
+        }
+      }
+    }
+    const seen=new Set(),unique=[];
+    for(const q of out){
+      const k=String(q.id||'')||practiceQuestionKey(q);
+      if(seen.has(k)) continue;
+      seen.add(k); unique.push(q);
+    }
+    return unique;
+  }
+
   let dbSubtopic=selectedSubtopic;
   /* Group 4 database uses Tamil subtopic keys for GK in both languages,
      while Aptitude English uses English subtopic keys. */
@@ -5099,6 +5140,26 @@ window.subject=function(s){
    The actual question request later sends the selected Tamil subtopic key. */
 window.topic=function(t){
   currentTopic=String(t||'');
+
+  /* Tamil Nadu History uses the same Practice card style shown in the UI:
+     the Topic opens directly to 10/20/50/100/Question Bank. */
+  if(currentSubject==='gs' && currentTopic==='தமிழ்நாடு வரலாறு'){
+    currentSub='தமிழ்நாடு வரலாறு';
+    const title=document.getElementById('topicTitle');
+    const grid=document.getElementById('subtopicGrid');
+    if(title) title.textContent='தமிழ்நாடு வரலாறு';
+    if(grid){
+      grid.innerHTML=
+        `<button type="button" onclick="startPractice(10)">📝 10 கேள்விகள்</button>`+
+        `<button type="button" onclick="startPractice(20)">📝 20 கேள்விகள்</button>`+
+        `<button type="button" onclick="startPractice(50)">📝 50 கேள்விகள்</button>`+
+        `<button type="button" onclick="startPractice(100)">📝 100 கேள்விகள்</button>`+
+        `<button type="button" onclick="startPractice(9999)">♾️ முழு கேள்விகள்</button>`;
+    }
+    show('subtopics');
+    return;
+  }
+
   const info=data[currentSubject];
   const list=info?.topics?.[currentTopic]||[];
   const title=document.getElementById('topicTitle');
@@ -6255,4 +6316,9 @@ function escapeHtmlAdmin(v){
     try{ if(typeof window.logout==='function') await window.logout(); else show('home'); }catch(e){ try{ show('home'); }catch(_){ } }
   };
 })();
+</script>
+
+<script id="thiral-tamil-nadu-history-topic-final">
+/* THIRAL: Tamil Nadu History topic-level Practice. Existing bank rows are untouched. */
+window.__THIRAL_TN_HISTORY_TOPIC_FINAL__={title:'தமிழ்நாடு வரலாறு',mode:'topic-level',counts:[10,20,50,100,9999]};
 </script>
