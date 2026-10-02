@@ -1374,11 +1374,197 @@ api.get('/admin/exam-results', requireAdmin, async (req,res)=>{
     const maxPct = req.query.max_pct === undefined || req.query.max_pct === '' ? 100 : Number(req.query.max_pct);
     const page = Math.max(parseInt(req.query.page || '1',10) || 1,1);
     const limit = Math.min(Math.max(parseInt(req.query.limit || '100',10) || 100,1),200);
+
     if(!Number.isFinite(minPct) || !Number.isFinite(maxPct) || minPct<0 || maxPct>100 || minPct>maxPct){
       return sendError(res,400,'Invalid percentage range.');
     }
 
-    if(type === 'model'){
+    /*
+     * ALL EXAM TYPES:
+     * The legacy attempts table contains Practice / Mock / Question Bank /
+     * 10/20/50/100-question results, while Model Exam results live in
+     * model_exam_results. Previously type="" queried only attempts, so Model
+     * Exam disappeared when "அனைத்தும்" was selected.
+     *
+     * Keep the existing type-specific branches unchanged. When type is empty,
+     * fetch both sources, normalize them to the same row shape, merge, sort,
+     * paginate, and combine their summaries.
+     */
+    if(!type){
+      // ---------- Legacy attempts ----------
+      const legacyWhere=[`a.status='SUBMITTED'`];
+      const legacyParams=[];
+      const addLegacy=(sql,val)=>{legacyParams.push(val);legacyWhere.push(sql.replace('?', '$'+legacyParams.length));};
+
+      if(exam) addLegacy(`a.exam=?`,exam);
+      if(subjectFilter){
+        const subjectList=subjectCandidates(subjectFilter);
+        legacyWhere.push(`a.subject = ANY($${legacyParams.length+1}::text[])`);
+        legacyParams.push(subjectList);
+      }
+      if(from) addLegacy(`a.submitted_at::date >= ?::date`,from);
+      if(to) addLegacy(`a.submitted_at::date <= ?::date`,to);
+
+      if(requestedSubtopic){
+        legacyWhere.push(`EXISTS (
+          SELECT 1 FROM unnest(a.question_ids) AS aqid
+          JOIN questions qq ON qq.id=aqid
+          WHERE qq.subtopic = ANY($${legacyParams.length+1}::text[])
+        )`);
+        legacyParams.push(requestedSubtopicCandidatesSingle);
+      }else if(requestedSubtopics.length){
+        legacyWhere.push(`EXISTS (
+          SELECT 1 FROM unnest(a.question_ids) AS aqid
+          JOIN questions qq ON qq.id=aqid
+          WHERE qq.subtopic = ANY($${legacyParams.length+1}::text[])
+        )`);
+        legacyParams.push(requestedSubtopicCandidates);
+      }
+
+      legacyWhere.push(`COALESCE(a.score,0) >= $${legacyParams.length+1}`); legacyParams.push(minPct);
+      legacyWhere.push(`COALESCE(a.score,0) <= $${legacyParams.length+1}`); legacyParams.push(maxPct);
+
+      const legacySql=legacyWhere.join(' AND ');
+      const legacyRowsQ=await pool.query(`
+        SELECT
+          a.id AS attempt_id,
+          u.name,u.email,
+          a.exam,
+          CASE
+            WHEN lower(a.exam) LIKE '%model%' THEN 'Model Exam'
+            WHEN a.mode='mock' THEN 'Mock Test'
+            WHEN a.mode='bank' THEN 'Question Bank'
+            WHEN a.total_count=10 THEN '10 Questions'
+            WHEN a.total_count=20 THEN '20 Questions'
+            WHEN a.total_count=50 THEN '50 Questions'
+            WHEN a.total_count=100 THEN '100 Questions'
+            ELSE 'Practice'
+          END AS exam_type,
+          to_char(COALESCE(a.submitted_at,a.started_at),'DD-MM-YYYY HH24:MI') AS date,
+          COALESCE(a.total_count,0)::int AS questions,
+          COALESCE(a.correct_count,0)::int AS marks,
+          COALESCE(a.total_count,0)::int AS total_marks,
+          COALESCE(a.score,0)::numeric(10,2) AS percentage,
+          COALESCE((
+            SELECT string_agg(DISTINCT qq.subtopic, ' | ' ORDER BY qq.subtopic)
+            FROM unnest(a.question_ids) AS aqid
+            JOIN questions qq ON qq.id=aqid
+          ),'') AS subtopics,
+          COALESCE(a.submitted_at,a.started_at) AS sort_date
+        FROM attempts a
+        JOIN users u ON u.id=a.user_id
+        WHERE ${legacySql}
+      `,legacyParams);
+
+      // ---------- Model Exam results ----------
+      const modelWhere=[];
+      const modelParams=[];
+      const addModel=(sql,val)=>{modelParams.push(val);modelWhere.push(sql.replace('?', '$'+modelParams.length));};
+
+      if(exam) addModel(`(r.exam_id=? OR me.title=?)`,exam);
+      if(subjectFilter){
+        modelWhere.push(`EXISTS (
+          SELECT 1 FROM model_exam_questions mq
+          WHERE mq.exam_id=r.exam_id AND mq.subject = ANY($${modelParams.length+1}::text[])
+        )`);
+        modelParams.push(subjectCandidates(subjectFilter));
+      }
+      if(from) addModel(`r.submitted_at::date >= ?::date`,from);
+      if(to) addModel(`r.submitted_at::date <= ?::date`,to);
+
+      if(requestedSubtopic){
+        modelWhere.push(`EXISTS (
+          SELECT 1
+          FROM model_exam_questions mq
+          WHERE mq.exam_id=r.exam_id
+            AND mq.topic IS NOT NULL
+            AND (mq.topic = ANY($${modelParams.length+1}::text[]) OR mq.subject = ANY($${modelParams.length+1}::text[]))
+        )`);
+        modelParams.push(requestedSubtopicCandidatesSingle);
+      }else if(requestedSubtopics.length){
+        modelWhere.push(`EXISTS (
+          SELECT 1
+          FROM model_exam_questions mq
+          WHERE mq.exam_id=r.exam_id
+            AND (mq.topic = ANY($${modelParams.length+1}::text[]) OR mq.subject = ANY($${modelParams.length+1}::text[]))
+        )`);
+        modelParams.push(requestedSubtopicCandidates);
+      }
+
+      modelWhere.push(`COALESCE(r.percentage,0) >= $${modelParams.length+1}`); modelParams.push(minPct);
+      modelWhere.push(`COALESCE(r.percentage,0) <= $${modelParams.length+1}`); modelParams.push(maxPct);
+
+      const modelSql=modelWhere.length ? 'WHERE '+modelWhere.join(' AND ') : '';
+      const modelRowsQ=await pool.query(`
+        SELECT
+          r.attempt_id,
+          u.name,u.email,
+          me.title AS exam,
+          'Model Exam' AS exam_type,
+          to_char(r.submitted_at,'DD-MM-YYYY HH24:MI') AS date,
+          r.total_questions::int AS questions,
+          r.marks::numeric AS marks,
+          r.total_questions::numeric AS total_marks,
+          r.percentage::numeric(10,2) AS percentage,
+          '' AS subtopics,
+          r.submitted_at AS sort_date
+        FROM model_exam_results r
+        JOIN model_exams me ON me.exam_id=r.exam_id
+        JOIN users u ON u.id=r.user_id
+        ${modelSql}
+      `,modelParams);
+
+      const allRows=[
+        ...legacyRowsQ.rows.map(r=>({
+          ...r,
+          topic:[...new Set(String(r.subtopics||'').split(' | ').map(group4TopicForSubtopic).filter(Boolean))].join(' | ')
+        })),
+        ...modelRowsQ.rows.map(r=>({...r,topic:''}))
+      ].sort((a,b)=>new Date(b.sort_date||0)-new Date(a.sort_date||0));
+
+      const total=allRows.length;
+      const participants=new Set(allRows.map(r=>String(r.email||'').toLowerCase()).filter(Boolean)).size;
+      const totalQuestions=allRows.reduce((n,r)=>n+Number(r.questions||0),0);
+      const averagePct=total ? allRows.reduce((n,r)=>n+Number(r.percentage||0),0)/total : 0;
+      const highestPct=total ? Math.max(...allRows.map(r=>Number(r.percentage||0))) : 0;
+      const lowestPct=total ? Math.min(...allRows.map(r=>Number(r.percentage||0))) : 0;
+
+      const offset=(page-1)*limit;
+      const rows=allRows.slice(offset,offset+limit).map(({sort_date,...r})=>r);
+
+      // Union the exam dropdown values from both result stores.
+      const legacyExams=await pool.query(`SELECT DISTINCT a.exam FROM attempts a WHERE a.status='SUBMITTED' ORDER BY a.exam`);
+      const modelExams=await pool.query(`
+        SELECT DISTINCT me.exam_id,me.title
+        FROM model_exam_results r
+        JOIN model_exams me ON me.exam_id=r.exam_id
+        ORDER BY me.title
+      `);
+      const exams=[...new Set([
+        ...legacyExams.rows.map(x=>x.exam).filter(Boolean),
+        ...modelExams.rows.map(x=>x.exam_id||x.title).filter(Boolean)
+      ])];
+
+      return res.json({
+        ok:true,
+        rows,
+        total,
+        limit,
+        page,
+        exams,
+        summary:{
+          participants,
+          attempts:total,
+          total_questions:totalQuestions,
+          average_pct:Number(averagePct.toFixed(2)),
+          highest_pct:Number(highestPct.toFixed(2)),
+          lowest_pct:Number(lowestPct.toFixed(2))
+        }
+      });
+    }
+
+    // ---------- Existing type-specific result handling ----------
+    if(type === 'model' || type === ''){
       const w=[];
       const p=[];
       if(exam){
@@ -1481,6 +1667,7 @@ api.get('/admin/exam-results', requireAdmin, async (req,res)=>{
       WHEN a.total_count=10 THEN '10 Questions'
       WHEN a.total_count=20 THEN '20 Questions'
       WHEN a.total_count=50 THEN '50 Questions'
+      WHEN a.total_count=100 THEN '100 Questions'
       ELSE 'Practice'
     END`;
     if(type && ['model','mock','practice','bank','10','20','50','100'].includes(type)){
@@ -1553,6 +1740,78 @@ api.get('/admin/exam-results/export', requireAdmin, async (req,res)=>{
         ORDER BY r.submitted_at DESC,r.id DESC
       `,p);
 
+      /*
+       * When Exam Type = All, append the legacy result sources to the same
+       * export. Model-only export remains unchanged when type='model'.
+       */
+      if(type === ''){
+        const legacyWhere=[`a.status='SUBMITTED'`];
+        const legacyParams=[];
+        const addLegacy=(sql,val)=>{legacyParams.push(val);legacyWhere.push(sql.replace('?', '$'+legacyParams.length));};
+
+        if(exam) addLegacy(`a.exam=?`,exam);
+        if(subjectFilter){
+          const subjectList=subjectCandidates(subjectFilter);
+          legacyWhere.push(`a.subject = ANY($${legacyParams.length+1}::text[])`);
+          legacyParams.push(subjectList);
+        }
+        if(from) addLegacy(`a.submitted_at::date >= ?::date`,from);
+        if(to) addLegacy(`a.submitted_at::date <= ?::date`,to);
+        if(requestedSubtopic){
+          legacyWhere.push(`EXISTS (
+            SELECT 1 FROM unnest(a.question_ids) AS aqid
+            JOIN questions qq ON qq.id=aqid
+            WHERE qq.subtopic = ANY($${legacyParams.length+1}::text[])
+          )`);
+          legacyParams.push(requestedSubtopicCandidatesSingle);
+        }else if(requestedSubtopics.length){
+          legacyWhere.push(`EXISTS (
+            SELECT 1 FROM unnest(a.question_ids) AS aqid
+            JOIN questions qq ON qq.id=aqid
+            WHERE qq.subtopic = ANY($${legacyParams.length+1}::text[])
+          )`);
+          legacyParams.push(requestedSubtopicCandidates);
+        }
+        legacyWhere.push(`COALESCE(a.score,0) >= $${legacyParams.length+1}`); legacyParams.push(minPct);
+        legacyWhere.push(`COALESCE(a.score,0) <= $${legacyParams.length+1}`); legacyParams.push(maxPct);
+
+        const legacyTypeSql=`CASE
+          WHEN lower(a.exam) LIKE '%model%' THEN 'Model Exam'
+          WHEN a.mode='mock' THEN 'Mock Test'
+          WHEN a.mode='bank' THEN 'Question Bank'
+          WHEN a.total_count=10 THEN '10 Questions'
+          WHEN a.total_count=20 THEN '20 Questions'
+          WHEN a.total_count=50 THEN '50 Questions'
+          WHEN a.total_count=100 THEN '100 Questions'
+          ELSE 'Practice'
+        END`;
+
+        const legacyQ=await pool.query(`
+          SELECT u.name,u.email,a.exam,
+                 ${legacyTypeSql} AS exam_type,
+                 '' AS topic,
+                 COALESCE((
+                   SELECT string_agg(DISTINCT qq.subtopic, ' | ' ORDER BY qq.subtopic)
+                   FROM unnest(a.question_ids) AS aqid
+                   JOIN questions qq ON qq.id=aqid
+                 ),'') AS subtopics,
+                 to_char(COALESCE(a.submitted_at,a.started_at),'DD-MM-YYYY HH24:MI') AS date,
+                 COALESCE(a.total_count,0)::int AS questions,
+                 COALESCE(a.correct_count,0)::int AS marks,
+                 COALESCE(a.total_count,0)::int AS total_marks,
+                 COALESCE(a.score,0)::numeric(10,2) AS percentage
+          FROM attempts a
+          JOIN users u ON u.id=a.user_id
+          WHERE ${legacyWhere.join(' AND ')}
+          ORDER BY COALESCE(a.submitted_at,a.started_at) DESC,a.id DESC
+        `,legacyParams);
+
+        for(const r of legacyQ.rows){
+          r.topic=[...new Set(String(r.subtopics||'').split(' | ').map(group4TopicForSubtopic).filter(Boolean))].join(' | ');
+          q.rows.push(r);
+        }
+      }
+
       /* Jump directly to the shared XLSX generator below. */
       const escXml=v=>String(v??'')
         .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
@@ -1619,7 +1878,7 @@ api.get('/admin/exam-results/export', requireAdmin, async (req,res)=>{
       }
       const centralBuf=Buffer.concat(central);const end=Buffer.alloc(22);end.writeUInt32LE(0x06054b50,0);end.writeUInt16LE(0,4);end.writeUInt16LE(0,6);end.writeUInt16LE(files.length,8);end.writeUInt16LE(files.length,10);end.writeUInt32LE(centralBuf.length,12);end.writeUInt32LE(offset,16);
       const xlsx=Buffer.concat([...zipParts,centralBuf,end]);
-      const filename='thiral_model_exam_results_'+new Date().toISOString().slice(0,10)+'.xlsx';
+      const filename=(type===''?'thiral_all_exam_results_':'thiral_model_exam_results_')+new Date().toISOString().slice(0,10)+'.xlsx';
       res.setHeader('Content-Type','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition',`attachment; filename="${filename}"`);
       res.setHeader('Content-Length',String(xlsx.length));
