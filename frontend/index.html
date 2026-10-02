@@ -618,7 +618,7 @@ a{
 <input id="email" type="email" name="thiral_student_login_id" autocomplete="off" autocapitalize="none" spellcheck="false" readonly onfocus="this.value=''; this.removeAttribute('readonly')" placeholder="Email ID / மின்னஞ்சல்">
 <input id="pass" type="password" name="thiral_student_login_password" autocomplete="new-password" readonly onfocus="this.value=''; this.removeAttribute('readonly')" placeholder="Password / கடவுச்சொல்">
 <p id="lm"></p>
-<button onclick="login()">Login</button>
+<button type="button" onclick="window.thiralV138Login()">Login</button>
 <button class="secondary" onclick="show('register')">New Registration</button>
 </section>
 
@@ -3437,6 +3437,9 @@ window.V91_ADV_NUM=V91_ADV_NUM;
       if(msg){ msg.className='bad'; msg.textContent='Login failed: ' + e.message; }
     }
   };
+
+  /* V138 Student Login bridge: keep the button and legacy login() path on the same secure handler. */
+  window.thiralV138Login = window.login;
 
   window.changeForcedPassword = async function(){
     var msg = el('forcePasswordMsg');
