@@ -685,9 +685,13 @@ a{
 <button onclick="openExam('assistant')">📁 Assistant</button>
 <button onclick="openExam('junior_assistant')">📁 Junior Assistant</button>
 </div>
-<h3>📮 Postal</h3>
-<div class="grid">
-<button onclick="openExam('postal_pa_sa')">📮 Postal PA / SA</button>
+<h3>📮 Department of Posts</h3>
+<button class="secondary" type="button" onclick="toggleDepartmentPosts()" aria-expanded="false">📮 Department of Posts ▾</button>
+<div id="departmentPostsOptions" class="grid hidden" style="margin-top:8px">
+<button onclick="openExam('gds_to_mts')">📬 GDS → MTS</button>
+<button onclick="openExam('mts_gds_to_postman_mailguard')">📮 MTS / GDS → Postman / Mail Guard</button>
+<button onclick="openExam('postal_pa_sa')">📬 Postal Assistant / Sorting Assistant (PA/SA)</button>
+<button onclick="openExam('pa_to_ipos')">🏤 PA → IPOS</button>
 </div>
 <hr>
 <button class="secondary" onclick="showLastResult()">📊 என் Result</button><button class="secondary" onclick="showResultHistory()">🗂️ என் Result History</button><button class="secondary" onclick="openSuggestionPage()">💡 Suggestion / Feedback</button>
@@ -1152,7 +1156,10 @@ const EXAMS={
  clerical:{title:'📁 Clerical',info:'General Knowledge • Aptitude • Reasoning',subjects:[['gs','📗 General Knowledge'],['apt','📐 Aptitude / Reasoning']]},
  assistant:{title:'📁 Assistant',info:'General Knowledge • Aptitude • Reasoning',subjects:[['gs','📗 General Knowledge'],['apt','📐 Aptitude / Reasoning']]},
  junior_assistant:{title:'📁 Junior Assistant',info:'General Knowledge • Aptitude • Reasoning',subjects:[['gs','📗 General Knowledge'],['apt','📐 Aptitude / Reasoning']]},
- postal_pa_sa:{title:'📮 Postal PA / SA',info:'General Awareness • Aptitude • Reasoning',subjects:[['gs','📗 General Awareness'],['apt','📐 Aptitude / Reasoning']]},
+ gds_to_mts:{title:'📬 GDS → MTS',info:'Department of Posts • GDS to MTS Departmental Exam',subjects:[['gs','📗 General Awareness'],['apt','📐 Basic Arithmetic / Reasoning']]},
+ mts_gds_to_postman_mailguard:{title:'📮 MTS / GDS → Postman / Mail Guard',info:'Department of Posts • MTS / GDS to Postman / Mail Guard Departmental Exam',subjects:[['gs','📗 General Awareness'],['apt','📐 Basic Arithmetic / Reasoning']]},
+ postal_pa_sa:{title:'📬 Postal Assistant / Sorting Assistant (PA/SA)',info:'Department of Posts • Postal Assistant / Sorting Assistant',subjects:[['gs','📗 General Awareness'],['apt','📐 Aptitude / Reasoning']]},
+ pa_to_ipos:{title:'🏤 PA → IPOS',info:'Department of Posts • Postal Assistant to IPOS Departmental Exam',subjects:[['gs','📗 General Awareness'],['apt','📐 Aptitude / Reasoning']]},
  tntet_p1:{title:'👩‍🏫 TNTET Paper I',info:'Child Development • Language • Mathematics • Environmental Studies',subjects:[['gs','📗 Child Development / General'],['apt','📐 Mathematics / Reasoning']]},
  tntet_p2:{title:'👩‍🏫 TNTET Paper II',info:'Child Development • Language • Mathematics / Science / Social Science',subjects:[['gs','📗 Child Development / General'],['apt','📐 Subject Aptitude / Reasoning']]},
  trb:{title:'👩‍🏫 TRB தேர்வுகள்',info:'Teacher Recruitment – பாடத்திட்டம் தேர்வின்படி மாறும்',subjects:[['gs','📗 General / Subject Knowledge'],['apt','📐 Reasoning / Aptitude']]},
@@ -1177,6 +1184,13 @@ function examOwnsQuestion(q){
 
 let selectedExam=localStorage.getItem('tnpsc_selected_exam')||'group4';
 function openExam(id){selectedExam=id;localStorage.setItem('tnpsc_selected_exam',id);renderExamHome();show('examHome');}
+function toggleDepartmentPosts(){
+  var box=document.getElementById('departmentPostsOptions');
+  if(!box) return;
+  var hidden=box.classList.toggle('hidden');
+  var btn=box.previousElementSibling;
+  if(btn){btn.setAttribute('aria-expanded',String(!hidden));btn.textContent=hidden?'📮 Department of Posts ▾':'📮 Department of Posts ▴';}
+}
 function renderExamHome(){const ex=EXAMS[selectedExam]||EXAMS.group4;document.getElementById('examTitle').textContent=ex.title;document.getElementById('examInfo').textContent=ex.info;document.getElementById('headerSub').textContent='';document.getElementById('examSubjects').innerHTML=ex.subjects.map(([id,label])=>`<button onclick="subject('${id}')">${label}</button>`).join('');}
 function backToExam(){renderExamHome();show('examHome');}
 function startSelectedMock(){startMock();}
@@ -5239,6 +5253,8 @@ window.startPractice=async function(n){
 (function(){
   'use strict';
   var G4='group4';
+  var POSTAL_EXAMS=['gds_to_mts','mts_gds_to_postman_mailguard','postal_pa_sa','pa_to_ipos'];
+  function isEnabledExam(id){ return String(id)===G4 || POSTAL_EXAMS.indexOf(String(id))!==-1; }
   function forceGroup4(){
     try{ selectedExam=G4; }catch(e){}
     try{ localStorage.setItem('tnpsc_selected_exam',G4); }catch(e){}
@@ -5247,11 +5263,12 @@ window.startPractice=async function(n){
 
   /* Final authority for exam navigation. */
   window.openExam=function(id){
-    if(String(id)!==G4){
+    if(!isEnabledExam(id)){
       forceGroup4();
       return false;
     }
-    forceGroup4();
+    try{ selectedExam=String(id); }catch(e){}
+    try{ localStorage.setItem('tnpsc_selected_exam',String(id)); }catch(e){}
     if(typeof renderExamHome==='function') renderExamHome();
     show('examHome');
     return false;
@@ -5262,7 +5279,7 @@ window.startPractice=async function(n){
   if(typeof window.renderExamHome==='function'){
     var oldRenderExamHome=window.renderExamHome;
     window.renderExamHome=function(){
-      forceGroup4();
+      if(!isEnabledExam(selectedExam)) forceGroup4();
       return oldRenderExamHome.apply(this,arguments);
     };
   }
@@ -5291,7 +5308,7 @@ window.startPractice=async function(n){
   function lockOtherExamButtons(){
     document.querySelectorAll('button[onclick]').forEach(function(btn){
       var m=String(btn.getAttribute('onclick')||'').match(/openExam\(['"]([^'"]+)['"]\)/);
-      if(m && m[1]!==G4){
+      if(m && !isEnabledExam(m[1])){
         btn.disabled=true;
         btn.setAttribute('aria-disabled','true');
         btn.title='தற்போது TNPSC Group 4 மட்டும் செயல்பாட்டில் உள்ளது';
@@ -5305,8 +5322,14 @@ window.startPractice=async function(n){
   window.addEventListener('load',lockOtherExamButtons);
 
   /* Guard against an old saved exam value after reload. */
-  window.addEventListener('pageshow',forceGroup4);
-  window.addEventListener('visibilitychange',function(){ if(document.visibilityState==='visible') forceGroup4(); });
+  function restoreEnabledExam(){
+    var saved='group4';
+    try{ saved=localStorage.getItem('tnpsc_selected_exam')||'group4'; }catch(e){}
+    if(!isEnabledExam(saved)) saved='group4';
+    try{ selectedExam=saved; localStorage.setItem('tnpsc_selected_exam',saved); }catch(e){}
+  }
+  window.addEventListener('pageshow',restoreEnabledExam);
+  window.addEventListener('visibilitychange',function(){ if(document.visibilityState==='visible') restoreEnabledExam(); });
 
   window.__THIRAL_GROUP4_ONLY_FINAL__=true;
 })();
