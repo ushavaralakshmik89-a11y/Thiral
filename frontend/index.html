@@ -618,7 +618,7 @@ a{
 <input id="email" type="email" name="thiral_student_login_id" autocomplete="off" autocapitalize="none" spellcheck="false" readonly onfocus="this.value=''; this.removeAttribute('readonly')" placeholder="Email ID / மின்னஞ்சல்">
 <input id="pass" type="password" name="thiral_student_login_password" autocomplete="new-password" readonly onfocus="this.value=''; this.removeAttribute('readonly')" placeholder="Password / கடவுச்சொல்">
 <p id="lm"></p>
-<button type="button" onclick="window.thiralV138Login()">Login</button>
+<button onclick="login()">Login</button>
 <button class="secondary" onclick="show('register')">New Registration</button>
 </section>
 
@@ -1195,7 +1195,8 @@ gs:{
 title:'📗 பொது அறிவு',
 topics:{
 'இந்திய வரலாறு':['பண்டைய இந்தியா','இடைக்கால இந்தியா','நவீன இந்தியா','சுதந்திரப் போராட்டம்'],
-'தமிழ்நாடு வரலாறு':['சங்க காலம்','சோழர்','பாண்டியர்','பல்லவர்','நாயக்கர்','நாயக்கருக்கு பிறகு தமிழக அரசியல்'],
+'தமிழ்நாடு வரலாறு':['சங்க காலம்','சோழர்','பாண்டியர்','பல்லவர்','நாயக்கர்'],
+'தமிழக அரசியல்':['தமிழ்நாடு முதலமைச்சர்கள்','அமைச்சர்கள் மற்றும் அமைச்சரவைகள்','தமிழ்நாடு மாவட்டங்கள்','தமிழ்நாடு ஆளுநர்கள்','தமிழ்நாடு சட்டமன்றம்','தமிழ்நாடு தேர்தல்கள் மற்றும் அரசியல் கட்சிகள்'],
 'இந்திய அரசியல்':['அரசியலமைப்பு','அடிப்படை உரிமைகள்','பாராளுமன்றம்','மாநில அரசு','உள்ளாட்சி'],
 'புவியியல்':['இந்தியா','தமிழ்நாடு','ஆறுகள்','மலைகள்','வளங்கள்'],
 'அறிவியல்':['இயற்பியல்','வேதியியல்','உயிரியல்','சுற்றுச்சூழல்'],
@@ -1216,7 +1217,8 @@ const EN_LABELS={
   title:'📗 General Studies',
   topics:{
    'இந்திய வரலாறு':{'en':'Indian History','subs':{'பண்டைய இந்தியா':'Ancient India','இடைக்கால இந்தியா':'Medieval India','நவீன இந்தியா':'Modern India','சுதந்திரப் போராட்டம்':'Indian Freedom Movement'}},
-   'தமிழ்நாடு வரலாறு':{'en':'Tamil Nadu History','subs':{'சங்க காலம்':'Sangam Age','சோழர்':'Cholas','பாண்டியர்':'Pandyas','பல்லவர்':'Pallavas','நாயக்கர்':'Nayaks','நாயக்கருக்கு பிறகு தமிழக அரசியல்':'Tamil Nadu Politics After Nayaks'}},
+   'தமிழ்நாடு வரலாறு':{'en':'Tamil Nadu History','subs':{'சங்க காலம்':'Sangam Age','சோழர்':'Cholas','பாண்டியர்':'Pandyas','பல்லவர்':'Pallavas','நாயக்கர்':'Nayaks'}},
+   'தமிழக அரசியல்':{'en':'Tamil Nadu Politics','subs':{'தமிழ்நாடு முதலமைச்சர்கள்':'Tamil Nadu Chief Ministers','அமைச்சர்கள் மற்றும் அமைச்சரவைகள்':'Ministers and Cabinets','தமிழ்நாடு மாவட்டங்கள்':'Tamil Nadu Districts','தமிழ்நாடு ஆளுநர்கள்':'Tamil Nadu Governors','தமிழ்நாடு சட்டமன்றம்':'Tamil Nadu Legislative Assembly','தமிழ்நாடு தேர்தல்கள் மற்றும் அரசியல் கட்சிகள்':'Tamil Nadu Elections and Political Parties'}},
    'இந்திய அரசியல்':{'en':'Indian Polity','subs':{'அரசியலமைப்பு':'Constitution','அடிப்படை உரிமைகள்':'Fundamental Rights','பாராளுமன்றம்':'Parliament','மாநில அரசு':'State Government','உள்ளாட்சி':'Local Government'}},
    'புவியியல்':{'en':'Geography','subs':{'இந்தியா':'India','தமிழ்நாடு':'Tamil Nadu','ஆறுகள்':'Rivers','மலைகள்':'Mountains','வளங்கள்':'Resources'}},
    'அறிவியல்':{'en':'Science','subs':{'இயற்பியல்':'Physics','வேதியியல்':'Chemistry','உயிரியல்':'Biology','சுற்றுச்சூழல்':'Environment'}},
@@ -3438,9 +3440,6 @@ window.V91_ADV_NUM=V91_ADV_NUM;
     }
   };
 
-  /* V138 Student Login bridge: keep the button and legacy login() path on the same secure handler. */
-  window.thiralV138Login = window.login;
-
   window.changeForcedPassword = async function(){
     var msg = el('forcePasswordMsg');
     try{
@@ -4765,12 +4764,37 @@ function selectPracticeByDifficulty(bank,n){
 async function loadPracticeQuestions(requested){
   const selectedSubtopic=(typeof currentSub!=='undefined'?String(currentSub||'').trim():'');
   if(!selectedSubtopic) throw new Error('Subtopic தேர்வு செய்யப்படவில்லை.');
+  /* தமிழக அரசியல் is displayed inside the GS UI, but its database
+     subject is intentionally separate from the normal பொது அறிவு bank. */
+  const POLITICS_SUBTOPICS = new Set([
+    'தமிழ்நாடு முதலமைச்சர்கள்',
+    'அமைச்சர்கள் மற்றும் அமைச்சரவைகள்',
+    'தமிழ்நாடு மாவட்டங்கள்',
+    'தமிழ்நாடு ஆளுநர்கள்',
+    'தமிழ்நாடு சட்டமன்றம்',
+    'தமிழ்நாடு தேர்தல்கள் மற்றும் அரசியல் கட்சிகள்'
+  ]);
+  const isTamilagaPolitics = currentSubject==='gs' && POLITICS_SUBTOPICS.has(selectedSubtopic);
+
   const dbSubject =
-    currentSubject==='gs' ? 'பொது அறிவு' :
+    currentSubject==='gs' ? (isTamilagaPolitics ? (contentLanguage==='en' ? 'Tamil Nadu Politics' : 'தமிழக அரசியல்') : 'பொது அறிவு') :
     currentSubject==='apt' ? 'apt' :
     currentSubject==='tamil' ? 'tamil' : '';
   let dbSubtopic=selectedSubtopic;
-  /* Group 4 database uses Tamil subtopic keys for GK in both languages,
+  /* Tamil Nadu Politics is stored with English subject/subtopic names for
+     the English bank, while the UI keeps the existing Tamil internal keys. */
+  if(isTamilagaPolitics && contentLanguage==='en'){
+    const politicsEnglishSubtopics={
+      'தமிழ்நாடு முதலமைச்சர்கள்':'Tamil Nadu Chief Ministers',
+      'அமைச்சர்கள் மற்றும் அமைச்சரவைகள்':'Ministers and Councils of Ministers',
+      'தமிழ்நாடு மாவட்டங்கள்':'Tamil Nadu Districts',
+      'தமிழ்நாடு ஆளுநர்கள்':'Tamil Nadu Governors',
+      'தமிழ்நாடு சட்டமன்றம்':'Tamil Nadu Legislature',
+      'தமிழ்நாடு தேர்தல்கள் மற்றும் அரசியல் கட்சிகள்':'Tamil Nadu Elections and Political Parties'
+    };
+    dbSubtopic=politicsEnglishSubtopics[selectedSubtopic]||selectedSubtopic;
+  }
+  /* Group 4 database uses Tamil subtopic keys for GK in Tamil,
      while Aptitude English uses English subtopic keys. */
   if(currentSubject==='apt' && contentLanguage==='en'){
     for(const topicKey of Object.keys(EN_LABELS.apt?.topics||{})){
@@ -4881,7 +4905,12 @@ async function startPractice(n){
     const a=await api('/attempts',{
       method:'POST',
       body:JSON.stringify({
-        exam:String(selectedExam||'group4'),subject:(currentSubject==='gs'?'பொது அறிவு':currentSubject==='apt'?'apt':'tamil'),mode:'practice',language:(contentLanguage==='en'?'en':'ta'),
+        exam:String(selectedExam||'group4'),
+        subject:(currentSubject==='gs'
+          ? (['தமிழ்நாடு முதலமைச்சர்கள்','அமைச்சர்கள் மற்றும் அமைச்சரவைகள்','தமிழ்நாடு மாவட்டங்கள்','தமிழ்நாடு ஆளுநர்கள்','தமிழ்நாடு சட்டமன்றம்','தமிழ்நாடு தேர்தல்கள் மற்றும் அரசியல் கட்சிகள்'].includes(String(currentSub||'')) ? 'தமிழக அரசியல்' : 'பொது அறிவு')
+          : currentSubject==='apt' ? 'apt' : 'tamil'),
+        mode:'practice',
+        language:(contentLanguage==='en'?'en':'ta'),
         questionIds:T.q.map(q=>Number(q.id))
       })
     });
@@ -5148,7 +5177,7 @@ window.__THIRAL_GROUP4_FINAL_LANGUAGE_FIXED__='TA-GK + EN-GK + TA-APT + EN-APT';
 'use strict';
 window.__THIRAL_GROUP4_FINAL_WEBSITE__={
   exam:'group4',
-  dbSubjects:{tamil:'tamil',gs:'பொது அறிவு',apt:'apt'},
+  dbSubjects:{tamil:'tamil',gs:'பொது அறிவு',apt:'apt',politics:'தமிழக அரசியல்'},
   languages:{tamil:['ta'],gs:['ta','en'],apt:['ta','en']},
   checked:'syntax-only'
 };
@@ -6209,10 +6238,12 @@ function escapeHtmlAdmin(v){
     try{
       var d=await api('/model-exams/attempt/'+M.attemptId+'/submit',{method:'POST',body:'{}'});
       var r=d.result||{};
-      var correct=Number(r.marks||0);
+      var totalQuestions=Number(r.total_questions||0);
       var attempted=Number(r.attempted||0);
+      var notAttempted=Number(r.not_attempted||0);
+      var correct=Number(r.correct||r.marks||0);
       var wrong=Math.max(0,attempted-correct);
-      $('meResultText').innerHTML='<p><b>மொத்த கேள்விகள்:</b> '+Number(r.total_questions||0)+'</p><p><b>விடையளித்தது:</b> '+attempted+'</p><p><b>விடையளிக்காதது:</b> '+Number(r.not_attempted||0)+'</p><p><b>சரி:</b> '+correct+'</p><p><b>தவறு:</b> '+wrong+'</p><p><b>மதிப்பெண்:</b> '+correct+'</p><p><b>சதவீதம்:</b> '+Number(r.percentage||0)+'%</p>';
+      $('meResultText').innerHTML='<p><b>மொத்த கேள்விகள்:</b> '+totalQuestions+'</p><p><b>விடையளித்தது:</b> '+attempted+'</p><p><b>விடையளிக்காதது:</b> '+notAttempted+'</p><p><b>சரி:</b> '+correct+'</p><p><b>தவறு:</b> '+wrong+'</p><p><b>மதிப்பெண்:</b> '+Number(r.marks||0)+'</p><p><b>சதவீதம்:</b> '+Number(r.percentage||0)+'%</p>';
       show('modelExamResult');window.scrollTo({top:0,behavior:'instant'});
     }catch(e){M.submitting=false;$('meSubmit').disabled=false;$('meMessage').textContent=e&&e.message?e.message:'Model Exam submit முடியவில்லை.';}
   }
