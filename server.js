@@ -2561,64 +2561,138 @@ api.post('/model-exams/attempt/:attemptId/submit', requirePasswordReady, async (
   try{
     const attemptId=Number(req.params.attemptId);
     if(!Number.isInteger(attemptId)) return sendError(res,400,'Invalid attempt ID.');
+
     const a=await getModelExamAttemptForUser(attemptId,req.user.id);
     if(!a) return sendError(res,404,'Model Exam attempt not found.');
-    if(a.status==='submitted'){
-      const r=await pool.query(`SELECT total_questions,attempted,not_attempted,marks,percentage FROM model_exam_results WHERE attempt_id=$1`,[attemptId]);
-      if(r.rowCount)return res.json({ok:true,result:r.rows[0],alreadySubmitted:true});
+
+    if(a.status!=='in_progress'){
+      const existing=await client.query(`
+        SELECT total_questions,attempted,not_attempted,marks,percentage
+        FROM model_exam_results
+        WHERE attempt_id=$1
+        ORDER BY id DESC LIMIT 1`,[attemptId]);
+      if(existing.rowCount){
+        return res.json({ok:true,result:existing.rows[0],alreadySubmitted:true});
+      }
+      return sendError(res,409,'Model Exam attempt is closed.');
     }
-    if(a.status!=='in_progress') return sendError(res,409,'Model Exam attempt is closed.');
+
     const expired=attemptExpired(a);
     await client.query('BEGIN');
-    if(expired) await client.query(`UPDATE model_exam_attempts SET status='expired' WHERE id=$1`,[attemptId]);
+
+    if(expired){
+      await client.query(
+        `UPDATE model_exam_attempts SET status='expired',submitted_at=now() WHERE id=$1`,
+        [attemptId]
+      );
+    }
+
     const rows=await client.query(`
       SELECT q.id,q.correct_option,q.correct_answer,a.answer
       FROM model_exam_questions q
-      LEFT JOIN model_exam_answers a ON a.question_id=q.id AND a.attempt_id=$1
-      WHERE q.exam_id=$2 ORDER BY q.question_no`,[attemptId,a.exam_id]);
+      LEFT JOIN model_exam_answers a
+        ON a.question_id=q.id AND a.attempt_id=$1
+      WHERE q.exam_id=$2
+      ORDER BY q.question_no`,[attemptId,a.exam_id]);
+
     const total=rows.rowCount;
-    const attempted=rows.rows.filter(r=>r.answer).length;
-    const correct=rows.rows.filter(r=>r.answer && String(r.answer).toUpperCase()===String(r.correct_option||r.correct_answer).toUpperCase()).length;
-    const notAttempted=total-attempted;
-    const pct=total?Number(((correct/total)*100).toFixed(2)):0;
+    const attempted=rows.rows.filter(r=>r.answer!==null && r.answer!=='').length;
+    const correct=rows.rows.filter(r=>
+      r.answer &&
+      String(r.answer).toUpperCase()===
+      String(r.correct_option ?? r.correct_answer ?? '').toUpperCase()
+    ).length;
+    const notAttempted=Math.max(0,total-attempted);
+    const pct=total ? Number(((correct/total)*100).toFixed(2)) : 0;
     const finalStatus=expired?'expired':'submitted';
+
     await client.query(`
-      UPDATE model_exam_attempts SET submitted_at=now(),status=$1,total_questions=$2,attempted=$3,not_attempted=$4,marks=$5,percentage=$6 WHERE id=$7`,
-      [finalStatus,total,attempted,notAttempted,correct,pct,attemptId]);
-    await client.query(`
-      INSERT INTO model_exam_results(attempt_id,exam_id,user_id,total_questions,attempted,not_attempted,marks,percentage,submitted_at)
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8,now())
-      ON CONFLICT(attempt_id) DO NOTHING`,[attemptId,a.exam_id,req.user.id,total,attempted,notAttempted,correct,pct]);
+      UPDATE model_exam_attempts
+      SET submitted_at=now(),
+          status=$1,
+          total_questions=$2,
+          attempted=$3,
+          not_attempted=$4,
+          marks=$5,
+          percentage=$6
+      WHERE id=$7`,
+      [finalStatus,total,attempted,notAttempted,correct,pct,attemptId]
+    );
+
+    /*
+      Do not depend on ON CONFLICT(attempt_id).
+      Older databases may not have a unique constraint on attempt_id.
+      Update an existing result; otherwise insert a new one.
+    */
+    const existing=await client.query(`
+      SELECT id
+      FROM model_exam_results
+      WHERE attempt_id=$1
+      ORDER BY id DESC
+      LIMIT 1
+      FOR UPDATE`,[attemptId]);
+
+    if(existing.rowCount){
+      await client.query(`
+        UPDATE model_exam_results
+        SET exam_id=$1,
+            user_id=$2,
+            total_questions=$3,
+            attempted=$4,
+            not_attempted=$5,
+            marks=$6,
+            percentage=$7,
+            submitted_at=now()
+        WHERE id=$8`,
+        [a.exam_id,req.user.id,total,attempted,notAttempted,correct,pct,existing.rows[0].id]
+      );
+    }else{
+      await client.query(`
+        INSERT INTO model_exam_results
+          (attempt_id,exam_id,user_id,total_questions,attempted,not_attempted,marks,percentage,submitted_at)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,now())`,
+        [attemptId,a.exam_id,req.user.id,total,attempted,notAttempted,correct,pct]
+      );
+    }
+
     await client.query('COMMIT');
-    res.json({ok:true,result:{total_questions:total,attempted,not_attempted,marks:correct,percentage:pct}});
+
+    res.json({
+      ok:true,
+      result:{
+        total_questions:total,
+        attempted,
+        not_attempted:notAttempted,
+        marks:correct,
+        percentage:pct
+      }
+    });
   }catch(e){
-    try{await client.query('ROLLBACK');}catch(_){ }
+    try{await client.query('ROLLBACK');}catch(_){}
     console.error('[MODEL EXAM] submit error:',e);
     sendError(res,500,'Model Exam submit service error.');
-  }finally{client.release();}
+  }finally{
+    client.release();
+  }
 });
 
-/* ===== MODEL EXAM FINAL SCHEMA MIGRATION =====
-   Existing Model Exam data is preserved.
-   This only adds missing columns/indexes required by the student submit flow.
+/* ===== MODEL EXAM SUBMIT FINAL MIGRATION =====
+   Non-destructive: only adds missing columns required by the submit/result flow.
 */
-async function ensureModelExamFinalSchema(){
+async function ensureModelExamSubmitSchema(){
   await pool.query(`
     ALTER TABLE model_exam_attempts
-      ADD COLUMN IF NOT EXISTS question_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
       ADD COLUMN IF NOT EXISTS total_questions INTEGER NOT NULL DEFAULT 0,
       ADD COLUMN IF NOT EXISTS attempted INTEGER NOT NULL DEFAULT 0,
       ADD COLUMN IF NOT EXISTS not_attempted INTEGER NOT NULL DEFAULT 0,
       ADD COLUMN IF NOT EXISTS marks NUMERIC(10,2) NOT NULL DEFAULT 0,
       ADD COLUMN IF NOT EXISTS percentage NUMERIC(6,2) NOT NULL DEFAULT 0
   `);
-
   await pool.query(`
     ALTER TABLE model_exam_answers
       ADD COLUMN IF NOT EXISTS answer CHAR(1) NULL,
       ADD COLUMN IF NOT EXISTS answered_at TIMESTAMPTZ NOT NULL DEFAULT now()
   `);
-
   await pool.query(`
     ALTER TABLE model_exam_results
       ADD COLUMN IF NOT EXISTS attempt_id BIGINT,
@@ -2630,17 +2704,6 @@ async function ensureModelExamFinalSchema(){
       ADD COLUMN IF NOT EXISTS marks NUMERIC(10,2) NOT NULL DEFAULT 0,
       ADD COLUMN IF NOT EXISTS percentage NUMERIC(6,2) NOT NULL DEFAULT 0,
       ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMPTZ NOT NULL DEFAULT now()
-  `);
-
-  await pool.query(`
-    CREATE UNIQUE INDEX IF NOT EXISTS model_exam_results_attempt_uidx
-    ON model_exam_results(attempt_id)
-    WHERE attempt_id IS NOT NULL
-  `);
-
-  await pool.query(`
-    CREATE UNIQUE INDEX IF NOT EXISTS model_exam_answers_attempt_question_uidx
-    ON model_exam_answers(attempt_id, question_id)
   `);
 }
 
@@ -2860,7 +2923,7 @@ async function start(){
     await ensureImportantNewsTable();
     await ensureModelExamTables();
     await ensureModelExamStudentTables();
-    await ensureModelExamFinalSchema();
+    await ensureModelExamSubmitSchema();
     await backfillLastLoginFromAudit();
     await ensureAdmin();
     app.listen(PORT,'0.0.0.0',()=>console.log(`Thiral V171 Secure Temporary Password + Gender Summary + Detailed Usage Monitor listening on port ${PORT}`));
