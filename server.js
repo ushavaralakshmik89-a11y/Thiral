@@ -1390,7 +1390,7 @@ api.get('/admin/exam-results', requireAdmin, async (req,res)=>{
      * fetch both sources, normalize them to the same row shape, merge, sort,
      * paginate, and combine their summaries.
      */
-    if(!type){
+    if(!type || type==='all'){
       // ---------- Legacy attempts ----------
       const legacyWhere=[`a.status='SUBMITTED'`];
       const legacyParams=[];
@@ -1564,7 +1564,7 @@ api.get('/admin/exam-results', requireAdmin, async (req,res)=>{
     }
 
     // ---------- Existing type-specific result handling ----------
-    if(type === 'model' || type === ''){
+    if(type === 'model'){
       const w=[];
       const p=[];
       if(exam){
@@ -1744,7 +1744,7 @@ api.get('/admin/exam-results/export', requireAdmin, async (req,res)=>{
        * When Exam Type = All, append the legacy result sources to the same
        * export. Model-only export remains unchanged when type='model'.
        */
-      if(type === ''){
+      if(type === '' || type === 'all'){
         const legacyWhere=[`a.status='SUBMITTED'`];
         const legacyParams=[];
         const addLegacy=(sql,val)=>{legacyParams.push(val);legacyWhere.push(sql.replace('?', '$'+legacyParams.length));};
