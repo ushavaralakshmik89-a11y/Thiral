@@ -215,6 +215,11 @@ function clearSessionCookie(res) {
   res.clearCookie('thiral_session', { httpOnly: true, secure: isProd, sameSite: 'strict', path: '/' });
 }
 
+/* ===== LEGACY DEVICE-BINDING DATA =====
+   login_device_hash / thiral_device are retained for backward compatibility,
+   but Student Login no longer rejects a correct password because of device
+   binding. Do not call enforceStudentDeviceBinding() from /auth/login.
+*/
 /* ===== ONE-STUDENT / ONE-DEVICE ACCOUNT BINDING =====
    Student credentials alone are not enough to move an account to another
    browser/device. The first successful student registration/login binds the
@@ -440,22 +445,15 @@ api.post('/auth/login', authLimiter, async (req, res) => {
       return sendError(res, 401, 'Invalid ID/email or password.');
     }
 
-    /* One student account = one registered browser/device. A second device
-       with the same email + password is rejected before a new session is made. */
-    if(u.role === 'STUDENT'){
-      const deviceCheck=await enforceStudentDeviceBinding({req,res,user:u});
-      if(!deviceCheck.ok){
-        await logSecurityEvent({
-          req,
-          eventType:'DEVICE_BINDING_BLOCKED',
-          userId:u.id,
-          email:u.email,
-          details:'Correct password used from an unregistered browser/device',
-          sendAlert:true
-        });
-        return sendError(res,403,'இந்த கணக்கு ஏற்கனவே ஒரு சாதனத்தில் பதிவு செய்யப்பட்டுள்ளது. வேறு சாதனத்தில் இந்த Email ID + Password மூலம் Login செய்ய முடியாது.');
-      }
-    }
+    /*
+     * Student login policy:
+     * Password verification is sufficient for Student Login.
+     * Do NOT block a correct password because of a previous browser/device.
+     *
+     * The old one-student/one-device check has intentionally been removed
+     * from the login path. Existing login_device_hash values may remain in
+     * the database, but they are no longer used to deny Student Login.
+     */
 
     const sid = newSessionId();
     await pool.query(`DELETE FROM sessions WHERE expires_at <= now()`);
