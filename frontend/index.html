@@ -6003,7 +6003,18 @@ function escapeHtmlAdmin(v){
 <section id="modelExamResult" class="card hidden">
   <h2>📊 Model Exam Result</h2>
   <div id="meResultText"></div>
-  <button type="button" class="secondary" onclick="show('dash')">← Dashboard</button>
+  <div class="top" style="margin-top:16px;">
+    <button type="button" id="meReviewBtn" onclick="window.__THIRAL_MODEL_EXAM_REVIEW()">📋 விடை மதிப்பாய்வு</button>
+    <button type="button" class="secondary" onclick="show('dash')">← Dashboard</button>
+  </div>
+</section>
+
+<section id="modelExamReview" class="card hidden">
+  <h2>📋 Model Exam விடை மதிப்பாய்வு</h2>
+  <p class="small">தேர்வு முடிந்த பிறகு மட்டும் சரி / தவறு மற்றும் சரியான விடை காட்டப்படும்.</p>
+  <div id="meReviewSummary"></div>
+  <div id="meReviewList"></div>
+  <button type="button" class="secondary" onclick="show('modelExamResult')">← Result</button>
 </section>
 
 <style id="thiral-model-exam-student-style">
@@ -6012,6 +6023,13 @@ function escapeHtmlAdmin(v){
 #modelExamStudent #meSubmit{display:inline-block;}
 #modelExamStudent #meBar{height:8px;transition:width .2s ease;}
 #modelExamStudent #meQuestionBox h3{line-height:1.65;margin:18px 0;}
+
+#modelExamReview .review-item{border:1px solid #dbe3ef;border-radius:12px;padding:14px;margin:12px 0;}
+#modelExamReview .review-item.correct{border-left:6px solid #16a34a;}
+#modelExamReview .review-item.wrong{border-left:6px solid #dc2626;}
+#modelExamReview .review-item.not_attempted{border-left:6px solid #64748b;}
+#modelExamReview .review-status{font-weight:800;margin-bottom:8px;}
+#modelExamReview .review-option{margin:4px 0;}
 </style>
 
 <script id="thiral-model-exam-student-final">
@@ -6110,11 +6128,57 @@ function escapeHtmlAdmin(v){
       M.submitting=false;$('meSubmit').disabled=false;$('meMessage').textContent=e&&e.message?e.message:'Model Exam submit முடியவில்லை.';
     }
   }
+
+  async function review(){
+    if(!M.attemptId)return;
+    var btn=$('meReviewBtn');
+    if(btn)btn.disabled=true;
+    try{
+      var d=await api('/model-exams/attempt/'+M.attemptId+'/review',{method:'GET'});
+      var rows=Array.isArray(d.review)?d.review:[];
+      var correct=rows.filter(function(x){return x.status==='correct';}).length;
+      var wrong=rows.filter(function(x){return x.status==='wrong';}).length;
+      var na=rows.filter(function(x){return x.status==='not_attempted';}).length;
+
+      $('meReviewSummary').innerHTML=
+        '<div class="top">'+
+        '<p><b>மொத்த கேள்விகள்:</b> '+rows.length+'</p>'+
+        '<p>✅ <b>சரி:</b> '+correct+'</p>'+
+        '<p>❌ <b>தவறு:</b> '+wrong+'</p>'+
+        '<p>⚪ <b>விடையளிக்கவில்லை:</b> '+na+'</p>'+
+        '</div>';
+
+      $('meReviewList').innerHTML=rows.map(function(r){
+        var cls=r.status;
+        var label=r.status==='correct'?'✅ சரி':(r.status==='wrong'?'❌ தவறு':'⚪ விடையளிக்கவில்லை');
+        var opts=Array.isArray(r.options)?r.options:[];
+        var optionHtml=opts.map(function(o,i){
+          var letter=String.fromCharCode(65+i);
+          return '<div class="review-option">'+letter+'. '+esc(o)+'</div>';
+        }).join('');
+        return '<div class="review-item '+cls+'">'+
+          '<div class="review-status">Q'+esc(r.question_no)+' · '+label+'</div>'+
+          '<div><b>'+esc(r.question)+'</b></div>'+
+          '<div style="margin-top:8px;">'+optionHtml+'</div>'+
+          '<div style="margin-top:8px;"><b>உங்கள் விடை:</b> '+esc(r.user_answer||'விடையளிக்கவில்லை')+'</div>'+
+          '<div><b>சரியான விடை:</b> '+esc(r.correct_answer||'-')+'</div>'+
+        '</div>';
+      }).join('');
+
+      show('modelExamReview');window.scrollTo({top:0,behavior:'instant'});
+    }catch(e){
+      alert(e&&e.message?e.message:'விடை மதிப்பாய்வு கிடைக்கவில்லை.');
+    }finally{
+      if(btn)btn.disabled=false;
+    }
+  }
+
   window.__THIRAL_MODEL_EXAM_START=start;
   window.__THIRAL_MODEL_EXAM_ANSWER=answer;
   window.__THIRAL_MODEL_EXAM_PREV=prev;
   window.__THIRAL_MODEL_EXAM_NEXT=next;
   window.__THIRAL_MODEL_EXAM_SUBMIT=submit;
+  window.__THIRAL_MODEL_EXAM_REVIEW=review;
   window.__THIRAL_RESET_MODEL_EXAM_SESSION=function(){stopTimer();M.questions=[];M.answers={};M.index=0;M.attemptId=0;M.submitting=false;};
 })();
 </script>
