@@ -6906,4 +6906,42 @@ function escapeHtmlAdmin(v){
   window.__THIRAL_POSTAL_PRACTICE_V23__={exam:EXAM,subject:DB_SUBJECT,part1:PART1,volume5:V,counts:COUNTS};
 })();
 </script>
+<script id="thiral-v24-backend-fallback">
+/* THIRAL V24: Postal Volume I / V backend-safe bridge.
+   Does not change DB data or question content. If the V138 bridge is not
+   present, use the same-origin /api endpoint with the authenticated cookie. */
+(function(){
+  'use strict';
+  function directApi(path,opt){
+    opt=opt||{};
+    var headers=Object.assign({'Content-Type':'application/json'},opt.headers||{});
+    return fetch('/api'+path,Object.assign({},opt,{credentials:'include',headers:headers}))
+      .then(async function(r){
+        var d={}; try{d=await r.json();}catch(e){}
+        if(!r.ok) throw new Error(d.error||('HTTP '+r.status));
+        return d;
+      });
+  }
+  if(typeof window.thiralV138Api!=='function') window.thiralV138Api=directApi;
+
+  /* Older Volume-V button handlers in previous patches are redirected to the
+     final V23 controller, so an obsolete handler cannot produce the old API
+     error dialog. */
+  if(typeof window.__thiralPostalPracticeV23==='function'){
+    window.startPostalManualVPractice=function(n){
+      return window.__thiralPostalPracticeV23(Number(n),'v');
+    };
+    window.startPostalManualVPracticeV23=window.startPostalManualVPractice;
+  }
+
+  /* If an old Part-I handler is still attached, keep the final postal router
+     authoritative without touching Group-4's practice engine. */
+  window.__THIRAL_POSTAL_BACKEND_V24__={
+    apiReady:typeof window.thiralV138Api==='function',
+    endpoint:'/api',
+    volumes:['Post Office Guide Part-I','Postal Manual Volume V'],
+    counts:[10,20,50,100]
+  };
+})();
+</script>
 </body></html>
