@@ -765,7 +765,7 @@ a{
 <div class="top"><h2>📝 Practice</h2><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><div class="timer">⏱️ <span id="timer">15</span>s</div><button type="button" id="practiceLogoutBtn" class="secondary" onclick="window.thiralLogoutFromActivity()">Logout</button></div></div>
 <p><span class="badge" id="level"></span> <span class="badge" id="progress"></span></p>
 <div class="bar"><div id="bar"></div></div>
-<h3 id="question"></h3><div id="options"></div><p id="feedback"></p><button id="stopInfinitePractice" class="secondary hidden" onclick="stopInfinitePractice()">⏹ Practice நிறுத்தி Result பார்க்க</button>
+<h3 id="question"></h3><div id="options"></div><p id="feedback"></p><div id="practiceNavigation" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:14px"><button type="button" class="secondary" id="practicePrevBtn">← Previous</button><button type="button" class="secondary" id="practiceMarkBtn">🔖 Mark for Review</button><button type="button" class="secondary" id="practiceNextBtn">Next →</button><button type="button" id="practiceSubmitBtn">Submit Test</button></div><div id="practiceQuestionPalette" class="card" style="margin-top:14px;padding:12px;max-height:260px;overflow:auto"><div style="font-weight:800;margin-bottom:8px" id="practicePaletteTitle">📋 Question Navigation</div><div id="practicePalette" style="display:flex;flex-wrap:wrap;gap:6px"></div><p class="small" id="practicePaletteLegend">⬜ Unanswered &nbsp; ✓ Answered &nbsp; 🔖 Marked</p></div><button id="stopInfinitePractice" class="secondary hidden" onclick="stopInfinitePractice()">⏹ Practice நிறுத்தி Result பார்க்க</button>
 </section>
 
 <section id="result" class="card hidden">
@@ -4608,7 +4608,7 @@ window.V91_ADV_NUM=V91_ADV_NUM;
 /* ===== Stable Practice Controller: V132 proven flow + V138 server API ===== */
 (function(){
 'use strict';
-const P={questions:[],answers:{},checks:{},index:0,attemptId:null,timer:null,seconds:15,busy:false,submitted:false,count:10};
+const P={questions:[],answers:{},checks:{},marked:{},index:0,attemptId:null,timer:null,seconds:15,busy:false,submitted:false,count:10};
 const $=id=>document.getElementById(id);
 const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const qtext=q=>q&&(q.question||q.q||'')||'';
@@ -4618,6 +4618,26 @@ function stop(){if(P.timer){clearInterval(P.timer);P.timer=null;}}
 function tick(n){if($('timer'))$('timer').textContent=String(Math.max(0,n));}
 function startTimer(){stop();P.seconds=15;tick(15);P.timer=setInterval(()=>{P.seconds--;tick(P.seconds);if(P.seconds<=0){stop();answer(-1,true);}},1000);}
 function lockButtons(v){if(!$('options'))return;$('options').querySelectorAll('button').forEach(b=>b.disabled=v);}
+function updatePalette(){
+ const box=$('practicePalette'); if(!box)return;
+ box.innerHTML=P.questions.map((q,i)=>{
+   const key=String(q.id),answered=Object.prototype.hasOwnProperty.call(P.checks,key),marked=!!P.marked[key],cur=i===P.index;
+   const bg=cur?'#dbeafe':marked?'#fef3c7':answered?'#dcfce7':'#f3f4f6';
+   const label=(i+1)+(marked?' 🔖':'');
+   return '<button type="button" class="secondary" data-qidx="'+i+'" style="min-width:42px;padding:7px 8px;background:'+bg+';border:1px solid #cbd5e1;font-weight:800">'+label+'</button>';
+ }).join('');
+ box.querySelectorAll('[data-qidx]').forEach(b=>b.addEventListener('click',function(){
+   const i=Number(this.getAttribute('data-qidx')); if(Number.isInteger(i)&&i>=0&&i<P.questions.length){P.index=i;render();}
+ }));
+}
+function syncPracticeNav(){
+ const prev=$('practicePrevBtn'),next=$('practiceNextBtn'),mark=$('practiceMarkBtn'),submit=$('practiceSubmitBtn');
+ if(prev)prev.disabled=P.index<=0||P.busy;
+ if(next)next.disabled=P.busy;
+ if(mark){mark.disabled=P.busy;const en=(typeof contentLanguage!=='undefined'&&contentLanguage==='en');mark.textContent=P.marked[String(P.questions[P.index]?.id)]?(en?'🔖 Unmark Review':'🔖 மதிப்பாய்வு குறியை நீக்கு'):(en?'🔖 Mark for Review':'🔖 மதிப்பாய்வுக்கு குறியிடு');}
+ if(submit)submit.disabled=P.busy||P.submitted;
+ updatePalette();const en=(typeof contentLanguage!=='undefined'&&contentLanguage==='en');if($('practicePaletteTitle'))$('practicePaletteTitle').textContent=en?'📋 Question Navigation':'📋 கேள்வி வழிசெலுத்தல்';if($('practicePaletteLegend'))$('practicePaletteLegend').textContent=en?'⬜ Unanswered   ✓ Answered   🔖 Marked':'⬜ விடையளிக்கவில்லை   ✓ விடையளித்தது   🔖 மதிப்பாய்வு குறி';
+}
 function render(){
  const q=P.questions[P.index];if(!q)return;stop();P.busy=false;
  if($('level'))$('level').textContent=q.difficulty||q.d||'சாதாரணம்';
@@ -4626,7 +4646,18 @@ function render(){
  if($('question'))$('question').textContent=qtext(q);
  if($('feedback'))$('feedback').innerHTML='';
  if($('options'))$('options').innerHTML=opts(q).map((o,i)=>'<button class="option" type="button" onclick="window.__thiralPracticeAnswer('+i+',false)">'+String.fromCharCode(65+i)+'. '+esc(o)+'</button>').join('');
- startTimer();
+ const key=String(q.id),checked=P.checks[key],chosen=P.answers[key];
+ if(checked){
+   lockButtons(true);
+   const o=opts(q),ci=Number(checked.correct_option),your=Number(chosen)===-1?'விடையளிக்கவில்லை':(o[Number(chosen)]||''),status=Number(chosen)===-1?'⏱️ விடையளிக்கவில்லை':checked.correct===true?'✓ சரி':'✗ தவறு';
+   let h='<div style="font-size:19px;font-weight:800">'+status+'</div><div style="margin-top:7px"><b>உங்கள் விடை:</b> '+esc(your)+'</div><div style="margin-top:7px"><b>சரியான பதில்:</b> '+esc(o[ci]||'')+'</div>';
+   if(checked.explanation)h+='<div style="margin-top:7px"><b>விளக்கம்:</b> '+esc(checked.explanation)+'</div>';
+   if($('feedback'))$('feedback').innerHTML=h;
+ }else{
+   lockButtons(false);
+   startTimer();
+ }
+ syncPracticeNav();
 }
 async function answer(n,timedOut){
  if(P.submitted||P.busy)return;const q=P.questions[P.index];if(!q)return;const key=String(q.id);if(Object.prototype.hasOwnProperty.call(P.checks,key))return;
@@ -4640,15 +4671,13 @@ async function answer(n,timedOut){
   else h+='<div class="bad" style="font-size:20px;font-weight:800">✗ தவறு</div>';
   const o=opts(q),ci=Number(d.correct_option);h+='<div style="margin-top:8px"><b>சரியான பதில்:</b> '+esc(o[ci]||'')+'</div>';
   if(d.explanation)h+='<div style="margin-top:8px"><b>விளக்கம்:</b> '+esc(d.explanation)+'</div>';
-  h+='<div style="margin-top:14px;font-size:14px;opacity:.75">'+(P.index===P.questions.length-1?'முடிவுக்கு செல்கிறது...':'அடுத்த கேள்விக்கு செல்கிறது...')+'</div>';
-  if($('feedback'))$('feedback').innerHTML=h;P.busy=false;
-  setTimeout(function(){ window.__thiralPracticeNext(); },1200);
+  if($('feedback'))$('feedback').innerHTML=h;P.busy=false;syncPracticeNav();
  }catch(e){P.busy=false;delete P.answers[key];lockButtons(false);if($('feedback'))$('feedback').innerHTML='<b>விடை சரிபார்க்க முடியவில்லை.</b><br>'+esc(e.message);if(!timedOut)startTimer();}
 }
 async function start(n){
  stop();let count=Number(n||10);if(count===9999)count=200;if([10,20,30,50,100,200].indexOf(count)<0){alert('Practice எண்ணிக்கை 10, 20, 30, 50, 100 அல்லது Question Bank ஆக இருக்க வேண்டும்.');return;}
  const subject=(typeof currentSubject!=='undefined'&&currentSubject)||'gs';const language=(typeof contentLanguage!=='undefined'&&contentLanguage==='en')?'en':'ta';const exam=(typeof selectedExam!=='undefined'&&selectedExam)||'group4';
- P.questions=[];P.answers={};P.checks={};P.index=0;P.attemptId=null;P.submitted=false;P.count=count;P.busy=false;
+ P.questions=[];P.answers={};P.checks={};P.marked={};P.index=0;P.attemptId=null;P.submitted=false;P.count=count;P.busy=false;
  if($('feedback'))$('feedback').innerHTML='<b>கேள்விகள் ஏற்றப்படுகின்றன...</b>';
  try{
   const d=await api()('/questions?exam='+encodeURIComponent(exam)+'&subject='+encodeURIComponent(subject)+'&language='+encodeURIComponent(language)+'&limit='+count);
@@ -4664,7 +4693,11 @@ async function start(n){
 }
 window.startPractice=start;
 window.__thiralPracticeAnswer=answer;
-window.__thiralPracticeNext=function(){if(P.busy||P.submitted)return;const q=P.questions[P.index];if(!q||!P.checks[String(q.id)])return;if(P.index<P.questions.length-1){P.index++;render();}else submit();};
+window.__thiralPracticeNext=function(){if(P.busy||P.submitted)return;if(P.index<P.questions.length-1){P.index++;render();}else submit();};
+window.__thiralPracticePrev=function(){if(P.busy||P.submitted)return;if(P.index>0){P.index--;render();}};
+window.__thiralPracticeToggleMark=function(){if(P.busy||P.submitted)return;const q=P.questions[P.index];if(!q)return;const k=String(q.id);P.marked[k]=!P.marked[k];syncPracticeNav();};
+window.__thiralPracticeSubmit=function(){if(P.busy||P.submitted)return;submit();};
+
 async function submit(){if(P.submitted||!P.attemptId)return;P.submitted=true;stop();try{
  const d=await api()('/attempts/'+P.attemptId+'/submit',{method:'POST',body:JSON.stringify({answers:P.answers})});
  const total=Number(d.total||P.questions.length),correct=Number(d.correct||0),unanswered=Object.values(P.answers).filter(v=>Number(v)===-1).length,wrong=Math.max(0,total-correct-unanswered),score=d.score!=null?Number(d.score):Math.round(correct*100/Math.max(1,total));
@@ -4686,7 +4719,7 @@ window.buildPracticeReview=buildReview;window.togglePracticeReview=function(){co
 'use strict';
 
 const T={
-  q:[], answers:{}, checks:{}, i:0, attempt:null, timer:null,
+  q:[], answers:{}, checks:{}, marked:{}, i:0, attempt:null, timer:null,
   seconds:15, busy:false, submitted:false
 };
 const $=id=>document.getElementById(id);
@@ -4704,6 +4737,30 @@ async function api(path,init={}){
 function stop(){if(T.timer){clearInterval(T.timer);T.timer=null;}}
 function timer(n){if($('timer'))$('timer').textContent=String(Math.max(0,n));}
 function lock(v){if($('options'))$('options').querySelectorAll('button').forEach(b=>b.disabled=v);}
+function updatePracticePalette(){
+  const box=$('practicePalette'); if(!box)return;
+  box.innerHTML=T.q.map((q,i)=>{
+    const k=String(q.id),answered=Object.prototype.hasOwnProperty.call(T.checks,k),marked=!!T.marked[k],cur=i===T.i;
+    const bg=cur?'#dbeafe':marked?'#fef3c7':answered?'#dcfce7':'#f3f4f6';
+    const label=(i+1)+(marked?' 🔖':'');
+    return '<button type="button" class="secondary" data-tidx="'+i+'" style="min-width:42px;padding:7px 8px;background:'+bg+';border:1px solid #cbd5e1;font-weight:800">'+label+'</button>';
+  }).join('');
+  box.querySelectorAll('[data-tidx]').forEach(function(b){b.addEventListener('click',function(){
+    const i=Number(this.getAttribute('data-tidx'));if(Number.isInteger(i)&&i>=0&&i<T.q.length){T.i=i;render();}
+  });});
+}
+function syncPracticeNavigation(){
+  const en=lang()==='en';
+  const prev=$('practicePrevBtn'),next=$('practiceNextBtn'),mark=$('practiceMarkBtn'),submitBtn=$('practiceSubmitBtn');
+  if(prev){prev.textContent=en?'← Previous':'← முந்தைய';prev.disabled=T.i<=0||T.busy;}
+  if(next){next.textContent=en?'Next →':'அடுத்து →';next.disabled=T.busy;}
+  if(mark){mark.textContent=T.marked[String(T.q[T.i]?.id)]?(en?'🔖 Unmark Review':'🔖 மதிப்பாய்வு குறியை நீக்கு'):(en?'🔖 Mark for Review':'🔖 மதிப்பாய்வுக்கு குறியிடு');mark.disabled=T.busy||T.submitted;}
+  if(submitBtn){submitBtn.textContent=en?'Submit Test':'தேர்வை சமர்ப்பிக்க';submitBtn.disabled=T.busy||T.submitted;}
+  const title=$('practicePaletteTitle'),legend=$('practicePaletteLegend');
+  if(title)title.textContent=en?'📋 Question Navigation':'📋 கேள்வி வழிசெலுத்தல்';
+  if(legend)legend.textContent=en?'⬜ Unanswered   ✓ Answered   🔖 Marked':'⬜ விடையளிக்கவில்லை   ✓ விடையளித்தது   🔖 மதிப்பாய்வு குறி';
+  updatePracticePalette();
+}
 function render(){
   const q=T.q[T.i]; if(!q)return;
   stop(); T.busy=false;
@@ -4714,13 +4771,25 @@ function render(){
   if($('feedback'))$('feedback').innerHTML='';
   if($('options'))$('options').innerHTML=opts(q).map((o,j)=>
     '<button class="option" type="button" onclick="window.__THIRAL_FINAL_ANSWER('+j+')">'+
-    String.fromCharCode(65+j)+'. '+esc(o)+'</button>'
-  ).join('');
-  T.seconds=15; timer(15);
-  T.timer=setInterval(()=>{
-    T.seconds--; timer(T.seconds);
-    if(T.seconds<=0){stop();answer(-1,true);}
-  },1000);
+    String.fromCharCode(65+j)+'. '+esc(o)+'</button>').join('');
+  const key=String(q.id), checked=T.checks[key], chosen=T.answers[key];
+  if(checked){
+    lock(true);
+    const o=opts(q),ci=Number(checked.correct_option);
+    const en=lang()==='en';
+    const your=Number(chosen)===-1?(en?'Unanswered':'விடையளிக்கவில்லை'):(o[Number(chosen)]||'');
+    const status=Number(chosen)===-1?'⏱️ '+(en?'Unanswered':'விடையளிக்கவில்லை'):checked.correct===true?'✓ '+(en?'Correct':'சரி'):'✗ '+(en?'Incorrect':'தவறு');
+    let h='<div style="font-size:19px;font-weight:800">'+status+'</div>'+
+      '<p><b>'+(en?'Your Answer':'உங்கள் விடை')+':</b> '+esc(your)+'</p>'+
+      '<p><b>'+(en?'Correct Answer':'சரியான பதில்')+':</b> '+esc(o[ci]||'')+'</p>';
+    if(checked.explanation)h+='<p><b>'+(en?'Explanation':'விளக்கம்')+':</b> '+esc(checked.explanation)+'</p>';
+    if($('feedback'))$('feedback').innerHTML=h;
+  }else{
+    lock(false);
+    T.seconds=15; timer(15);
+    T.timer=setInterval(function(){T.seconds--;timer(T.seconds);if(T.seconds<=0){stop();answer(-1,true);}},1000);
+  }
+  syncPracticeNavigation();
 }
 async function answer(value,timeout=false){
   if(T.busy||T.submitted)return;
@@ -4743,12 +4812,9 @@ async function answer(value,timeout=false){
         : '<div class="bad" style="font-size:20px;font-weight:800">✗ தவறு</div>';
     h+='<p><b>சரியான பதில்:</b> '+esc(o[ci]||'')+'</p>';
     if(d.explanation)h+='<p><b>விளக்கம்:</b> '+esc(d.explanation)+'</p>';
-    h+='<div style="margin-top:14px;font-size:14px;opacity:.75">'+
-       (T.i===T.q.length-1?'முடிவுக்கு செல்கிறது...':'அடுத்த கேள்விக்கு செல்கிறது...')+
-       '</div>';
     if($('feedback'))$('feedback').innerHTML=h;
     T.busy=false;
-    setTimeout(function(){ window.__THIRAL_FINAL_NEXT(); },1200);
+    syncPracticeNavigation();
   }catch(e){
     T.busy=false; delete T.answers[key]; lock(false);
     if($('feedback'))$('feedback').innerHTML='<b>விடை சரிபார்க்க முடியவில்லை.</b><br>'+esc(e.message);
@@ -5021,7 +5087,7 @@ async function startPractice(n){
     if($('feedback'))$('feedback').textContent='Practice எண்ணிக்கை 10, 20, 50, 100 அல்லது “முழுவதும்” மட்டும்.';
     return;
   }
-  T.q=[];T.answers={};T.checks={};T.i=0;T.attempt=null;T.submitted=false;T.busy=false;
+  T.q=[];T.answers={};T.checks={};T.marked={};T.i=0;T.attempt=null;T.submitted=false;T.busy=false;
   if($('feedback'))$('feedback').innerHTML='<b>தேர்ந்தெடுத்த முழு Question Bank சரிபார்க்கப்படுகிறது...</b>';
   try{
     const bank=await loadPracticeQuestions(requested);
@@ -5084,10 +5150,21 @@ async function startPractice(n){
 }
 async function next(){
   if(T.busy||T.submitted)return;
-  const q=T.q[T.i]; if(!q||!T.checks[String(q.id)])return;
   if(T.i<T.q.length-1){T.i++;render();return;}
   await submit();
 }
+function prev(){
+  if(T.busy||T.submitted)return;
+  if(T.i>0){T.i--;render();}
+}
+function toggleMark(){
+  if(T.busy||T.submitted)return;
+  const q=T.q[T.i];if(!q)return;
+  const k=String(q.id);T.marked[k]=!T.marked[k];syncPracticeNavigation();
+}
+window.__THIRAL_FINAL_PREV=prev;
+window.__THIRAL_FINAL_MARK=toggleMark;
+window.__THIRAL_FINAL_SUBMIT=function(){if(!T.busy&&!T.submitted)submit();};
 async function submit(){
   if(T.submitted||!T.attempt)return;
   T.submitted=true;stop();
@@ -5193,6 +5270,7 @@ async function submitMock(){
 window.startPractice=startPractice;
 window.__THIRAL_FINAL_ANSWER=answer;
 window.__THIRAL_FINAL_NEXT=next;
+document.addEventListener('click',function(e){if(e.target&&e.target.id==='practicePrevBtn')window.__THIRAL_FINAL_PREV();if(e.target&&e.target.id==='practiceNextBtn')window.__THIRAL_FINAL_NEXT();if(e.target&&e.target.id==='practiceMarkBtn')window.__THIRAL_FINAL_MARK();if(e.target&&e.target.id==='practiceSubmitBtn')window.__THIRAL_FINAL_SUBMIT();});
 window.buildPracticeReview=buildReview;
 window.togglePracticeReview=function(){
   const b=$('practiceReview');if(!b)return;
@@ -6442,7 +6520,7 @@ function escapeHtmlAdmin(v){
 </script>
 
 
-<script id="thiral-gds-departmental-rules-aggregate-final">
+<script id="thiral-gds-departmental-rules-aggregate-final-v6">
 (function(){
   'use strict';
   var GDS='gds_to_mts', SUBJECT='gds_postal_rules';
