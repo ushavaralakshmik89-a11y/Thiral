@@ -3686,7 +3686,14 @@ window.V91_ADV_NUM=V91_ADV_NUM;
           if(!Number.isFinite(vnext) || vnext<=voff) break;
           voff=vnext;
         }
-        return volumeRows;
+        /* Volume-V is a master bank. Practice uses only the requested count,
+           like Group 4, and does not expose a Full Volume practice mode. */
+        var wanted=Math.max(1, Number(count)||10);
+        for(var ri=volumeRows.length-1;ri>0;ri--){
+          var rj=Math.floor(Math.random()*(ri+1));
+          var tmp=volumeRows[ri]; volumeRows[ri]=volumeRows[rj]; volumeRows[rj]=tmp;
+        }
+        return volumeRows.slice(0,wanted);
       }
 
       return [];
@@ -6583,12 +6590,17 @@ function escapeHtmlAdmin(v){
     var material=document.getElementById('materialText');
     var fullLabel = (typeof contentLanguage!=='undefined' && contentLanguage==='en') ? 'Full Volume' : 'முழுத் தொகுதி';
     if(label) label.textContent='📌 '+fullLabel;
-    if(material) material.textContent=(typeof contentLanguage!=='undefined' && contentLanguage==='en') ? 'The complete question bank already uploaded for this section.' : 'இந்தப் பகுதியின் ஏற்கனவே பதிவேற்றப்பட்ட முழு கேள்வித் தொகுப்பு.';
-    /* Direct full-bank mode. There is deliberately no 10/20/50/100 picker. */
-    window.startPractice(9999);
+    if(material) material.textContent=(typeof contentLanguage!=='undefined' && contentLanguage==='en') ? 'Choose a Practice size. Full Volume practice is not available.' : 'பயிற்சிக்கான கேள்வி எண்ணிக்கையைத் தேர்ந்தெடுக்கவும். முழுத் தொகுதி Practice இல்லை.';
+    /* Part-I keeps its existing full-bank behavior. Volume-V follows Group 4:
+       10/20/50/100 buttons only. */
+    if(gdsSelectedBook==='அஞ்சல் கையேடு தொகுதி-V'){
+      show('actions');
+    }else{
+      window.startPractice(9999);
+    }
   };
 
-  window.__THIRAL_GDS_ENGLISH_UI_FINAL__='BOOKS-AND-FULL-VOLUME-LOCALIZED-v4-EN-QUESTION-BANK';
+  window.__THIRAL_GDS_ENGLISH_UI_FINAL__='BOOKS-VOLUME-V-GROUP4-PRACTICE-10-20-50-100-v1';
   window.__THIRAL_GDS_AGGREGATE_FINAL__={
     exam:GDS,
     subject:SUBJECT,
