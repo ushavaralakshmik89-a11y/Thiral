@@ -685,8 +685,7 @@ a{
 <button onclick="openExam('assistant')">📁 Assistant</button>
 <button onclick="openExam('junior_assistant')">📁 Junior Assistant</button>
 </div>
-<h3>📮 Department of Posts</h3>
-<button class="secondary" type="button" onclick="toggleDepartmentPosts()" aria-expanded="false">📮 Department of Posts ▾</button>
+<h3 onclick="toggleDepartmentPosts()" style="cursor:pointer" title="Department of Posts">📮 Department of Posts</h3>
 <div id="departmentPostsOptions" class="grid hidden" style="margin-top:8px">
 <button onclick="openExam('gds_to_mts')">📬 GDS → MTS</button>
 <button onclick="openExam('mts_gds_to_postman_mailguard')">📮 MTS / GDS → Postman / Mail Guard</button>
@@ -1187,9 +1186,7 @@ function openExam(id){selectedExam=id;localStorage.setItem('tnpsc_selected_exam'
 function toggleDepartmentPosts(){
   var box=document.getElementById('departmentPostsOptions');
   if(!box) return;
-  var hidden=box.classList.toggle('hidden');
-  var btn=box.previousElementSibling;
-  if(btn){btn.setAttribute('aria-expanded',String(!hidden));btn.textContent=hidden?'📮 Department of Posts ▾':'📮 Department of Posts ▴';}
+  box.classList.toggle('hidden');
 }
 function renderExamHome(){const ex=EXAMS[selectedExam]||EXAMS.group4;document.getElementById('examTitle').textContent=ex.title;document.getElementById('examInfo').textContent=ex.info;document.getElementById('headerSub').textContent='';document.getElementById('examSubjects').innerHTML=ex.subjects.map(([id,label])=>`<button onclick="subject('${id}')">${label}</button>`).join('');}
 function backToExam(){renderExamHome();show('examHome');}
@@ -5256,8 +5253,13 @@ window.startPractice=async function(n){
   var POSTAL_EXAMS=['gds_to_mts','mts_gds_to_postman_mailguard','postal_pa_sa','pa_to_ipos'];
   function isEnabledExam(id){ return String(id)===G4 || POSTAL_EXAMS.indexOf(String(id))!==-1; }
   function forceGroup4(){
-    try{ selectedExam=G4; }catch(e){}
-    try{ localStorage.setItem('tnpsc_selected_exam',G4); }catch(e){}
+    try{
+      if(!isEnabledExam(selectedExam)) selectedExam=G4;
+    }catch(e){}
+    try{
+      var saved=localStorage.getItem('tnpsc_selected_exam');
+      if(!isEnabledExam(saved)) localStorage.setItem('tnpsc_selected_exam',G4);
+    }catch(e){}
   }
   forceGroup4();
 
