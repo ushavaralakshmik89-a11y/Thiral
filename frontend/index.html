@@ -6404,6 +6404,10 @@ function escapeHtmlAdmin(v){
     if(isGDS() && currentSubject===SUBJECT){
       window.pendingSubject=null; currentTopic=''; currentSub=''; renderGDSSubject(); return;
     }
+    if(isGDS() && currentTopic && document.getElementById('subtopicGrid')){
+      try{ window.topic(currentTopic); }catch(e){}
+      return;
+    }
     if(window.pendingSubject){
       currentSubject=window.pendingSubject; window.pendingSubject=null;
       if(typeof renderSubjectPage==='function') renderSubjectPage();
