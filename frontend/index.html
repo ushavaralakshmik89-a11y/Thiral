@@ -6891,3 +6891,107 @@ function escapeHtmlAdmin(v){
   };
 })();
 </script>
+
+<script id="thiral-gds-volume-v-final-v16-direct">
+(function(){
+  'use strict';
+  var GDS='gds_to_mts';
+  var SUBJECT='gds_postal_rules';
+  var DB_SUBJECT='Departmental Rules / Postal Department Rules & Knowledge';
+  var V5_TA='அஞ்சல் கையேடு தொகுதி-V';
+  var V5_EN='Postal Manual Volume V';
+  var V5_DB='Postal Manual Volume V';
+
+  function isV5Topic(){
+    if(String(selectedExam||'')!==GDS || String(currentSubject||'')!==SUBJECT) return false;
+    var t=String(currentTopic||'').trim();
+    return t===V5_TA || t===V5_EN;
+  }
+  function lang(){ return (typeof contentLanguage!=='undefined' && contentLanguage==='en')?'en':'ta'; }
+  function setText(){
+    var en=lang()==='en';
+    var title=document.getElementById('topicTitle');
+    var subTitle=document.getElementById('subTitle');
+    var material=document.getElementById('materialText');
+    if(title) title.textContent=en ? 'Postal Manual Volume-V – Practice' : 'அஞ்சல் கையேடு தொகுதி-V – பயிற்சி';
+    if(subTitle) subTitle.textContent=en ? V5_EN : V5_TA;
+    if(material) material.textContent=en
+      ? 'Choose 10, 20, 50 or 100 questions.'
+      : '10, 20, 50 அல்லது 100 கேள்விகளில் ஒன்றைத் தேர்வு செய்யவும்.';
+  }
+
+  /* Bypass the older aggregate wrapper completely for Volume-V. */
+  var oldTopic=window.topic;
+  window.topic=function(t){
+    var T=String(t||'').trim();
+    if(String(selectedExam||'')===GDS && String(currentSubject||'')===SUBJECT &&
+       (T===V5_TA || T===V5_EN)){
+      currentTopic=T;
+      currentSub=V5_DB;
+      setText();
+      show('actions');
+      return false;
+    }
+    return oldTopic.apply(this,arguments);
+  };
+
+  var oldSub=window.subtopic;
+  window.subtopic=function(s){
+    if(isV5Topic()){
+      currentSub=V5_DB;
+      setText();
+      show('actions');
+      return false;
+    }
+    return oldSub.apply(this,arguments);
+  };
+
+  var oldStart=window.startPractice;
+  window.startPractice=async function(n){
+    if(!isV5Topic()) return oldStart.apply(this,arguments);
+    var count=Number(n||10);
+    var f=document.getElementById('feedback');
+    if([10,20,50,100].indexOf(count)<0){
+      if(f) f.textContent=lang()==='en'?'Choose 10, 20, 50 or 100 questions.':'10, 20, 50 அல்லது 100 கேள்விகளில் ஒன்றைத் தேர்வு செய்யவும்.';
+      return;
+    }
+    currentSub=V5_DB;
+    if(f) f.textContent=lang()==='en'?'Loading questions...':'கேள்விகள் ஏற்றப்படுகின்றன...';
+    try{
+      var url='/questions?exam='+encodeURIComponent(GDS)+
+        '&subject='+encodeURIComponent(DB_SUBJECT)+
+        '&language='+encodeURIComponent(lang())+
+        '&subtopic='+encodeURIComponent(V5_DB)+
+        '&limit='+count+'&offset=0';
+      var d=await api138(url);
+      var qs=Array.isArray(d.questions)?d.questions:[];
+      if(qs.length<count){
+        throw new Error((lang()==='en'?'Only ':'')+qs.length+(lang()==='en'?' active questions were returned.':' active கேள்விகள் மட்டுமே கிடைத்தன.'));
+      }
+      for(var i=qs.length-1;i>0;i--){
+        var j=Math.floor(Math.random()*(i+1)); var tmp=qs[i]; qs[i]=qs[j]; qs[j]=tmp;
+      }
+      qs=qs.slice(0,count);
+      securePractice.subject=SUBJECT;
+      securePractice.language=lang();
+      securePractice.questions=qs;
+      securePractice.answers={};
+      securePractice.checks={};
+      securePractice.index=0;
+      securePractice.timer=null;
+      securePractice.seconds=15;
+      var a=await api138('/attempts',{
+        method:'POST',
+        body:JSON.stringify({exam:GDS,subject:DB_SUBJECT,mode:'practice',language:lang(),questionIds:qs.map(function(q){return Number(q.id);})})
+      });
+      if(!a || !a.id) throw new Error('Practice attempt உருவாக்கப்படவில்லை.');
+      securePractice.attemptId=a.id;
+      show('practice');
+      if(typeof renderPracticeV138==='function') renderPracticeV138();
+    }catch(e){
+      if(f) f.textContent=e && e.message ? e.message : 'Practice தொடங்க முடியவில்லை.';
+    }
+  };
+  window.__THIRAL_GDS_VOLUME_V_FINAL_V16__={exam:GDS,subject:SUBJECT,dbSubject:DB_SUBJECT,dbSubtopic:V5_DB,counts:[10,20,50,100],direct:true};
+})();
+</script>
