@@ -685,7 +685,7 @@ a{
 <button onclick="openExam('assistant')">📁 Assistant</button>
 <button onclick="openExam('junior_assistant')">📁 Junior Assistant</button>
 </div>
-<h3 onclick="toggleDepartmentPosts()" style="cursor:pointer" title="Department of Posts">📮 Department of Posts</h3>
+<h3 id="departmentPostsHeading" onclick="toggleDepartmentPosts()" style="cursor:pointer" title="கிளிக் செய்து Department of Posts தேர்வுகளை காண்பிக்க / மறைக்க">📮 Department of Posts</h3>
 <div id="departmentPostsOptions" class="grid hidden" style="margin-top:8px">
 <button onclick="openExam('gds_to_mts')">📬 GDS → MTS</button>
 <button onclick="openExam('mts_gds_to_postman_mailguard')">📮 MTS / GDS → Postman / Mail Guard</button>
@@ -5257,8 +5257,10 @@ window.startPractice=async function(n){
       if(!isEnabledExam(selectedExam)) selectedExam=G4;
     }catch(e){}
     try{
-      var saved=localStorage.getItem('tnpsc_selected_exam');
-      if(!isEnabledExam(saved)) localStorage.setItem('tnpsc_selected_exam',G4);
+      var saved=localStorage.getItem('tnpsc_selected_exam')||G4;
+      if(!isEnabledExam(saved)) saved=G4;
+      selectedExam=saved;
+      localStorage.setItem('tnpsc_selected_exam',saved);
     }catch(e){}
   }
   forceGroup4();
@@ -5290,19 +5292,19 @@ window.startPractice=async function(n){
   if(typeof window.startPractice==='function'){
     var oldStartPractice=window.startPractice;
     window.startPractice=function(){
-      forceGroup4();
+      if(!isEnabledExam(selectedExam)) forceGroup4();
       return oldStartPractice.apply(this,arguments);
     };
   }
   if(typeof window.startMock==='function'){
     var oldStartMock=window.startMock;
     window.startMock=function(){
-      forceGroup4();
+      if(!isEnabledExam(selectedExam)) forceGroup4();
       return oldStartMock.apply(this,arguments);
     };
   }
   window.startSelectedMock=function(){
-    forceGroup4();
+    if(!isEnabledExam(selectedExam)) forceGroup4();
     if(typeof window.startMock==='function') return window.startMock();
   };
 
