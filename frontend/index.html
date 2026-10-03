@@ -4708,20 +4708,54 @@ async function answer(n,timedOut){
  }catch(e){P.busy=false;delete P.answers[key];lockButtons(false);if($('feedback'))$('feedback').innerHTML='<b>விடை சரிபார்க்க முடியவில்லை.</b><br>'+esc(e.message);if(!timedOut)startTimer();}
 }
 async function start(n){
- stop();let count=Number(n||10);if(count===9999)count=200;if([10,20,30,50,100,200].indexOf(count)<0){alert('Practice எண்ணிக்கை 10, 20, 30, 50, 100 அல்லது Question Bank ஆக இருக்க வேண்டும்.');return;}
- const subject=(typeof currentSubject!=='undefined'&&currentSubject)||'gs';const language=(typeof contentLanguage!=='undefined'&&contentLanguage==='en')?'en':'ta';const exam=(typeof selectedExam!=='undefined'&&selectedExam)||'group4';
+ stop();
+ let count=Number(n||10);
+ if(count===9999) count=100;
+ if([10,20,50,100].indexOf(count)<0){alert('Practice எண்ணிக்கை 10, 20, 50 அல்லது 100 ஆக இருக்க வேண்டும்.');return;}
+ const subject=(typeof currentSubject!=='undefined'&&currentSubject)||'gs';
+ const language=(typeof contentLanguage!=='undefined'&&contentLanguage==='en')?'en':'ta';
+ const exam=(typeof selectedExam!=='undefined'&&selectedExam)||'group4';
  P.questions=[];P.answers={};P.checks={};P.marked={};P.index=0;P.attemptId=null;P.submitted=false;P.count=count;P.busy=false;
  if($('feedback'))$('feedback').innerHTML='<b>கேள்விகள் ஏற்றப்படுகின்றன...</b>';
  try{
-  const d=await api()('/questions?exam='+encodeURIComponent(exam)+'&subject='+encodeURIComponent(subject)+'&language='+encodeURIComponent(language)+'&limit='+count);
-  if(!Array.isArray(d.questions)||!d.questions.length)throw new Error('இந்த தேர்வு / பாடத்திற்கு backend-ல் கேள்விகள் இல்லை.');
-  if(d.questions.length<count)throw new Error('தேவையான '+count+' கேள்விகளில் '+d.questions.length+' மட்டுமே கிடைத்துள்ளன.');
-  P.questions=d.questions.slice(0,count);
-  const a=await api()('/attempts',{method:'POST',body:JSON.stringify({exam,subject,mode:'practice',language,questionIds:P.questions.map(q=>Number(q.id))})});
-  if(!a||!a.id)throw new Error('Practice attempt உருவாக்கப்படவில்லை.');P.attemptId=a.id;
-  if($('practiceReview')){$('practiceReview').innerHTML='';$('practiceReview').classList.add('hidden','screen-review');$('practiceReview').style.display='none';}
-  if($('resultText'))$('resultText').innerHTML='';if($('stopInfinitePractice'))$('stopInfinitePractice').classList.toggle('hidden',n!==9999);
-  if(typeof show==='function')show('practice');render();
+   let rows=[];
+   const dbSubject=(exam==='gds_to_mts' && subject==='gds_postal_rules')
+     ? 'Departmental Rules / Postal Department Rules & Knowledge' : subject;
+   if(exam==='gds_to_mts' && subject==='gds_postal_rules'){
+     const topic=String(typeof currentTopic!=='undefined'?currentTopic:'').trim();
+     const subtopic=String(typeof currentSub!=='undefined'?currentSub:'').trim();
+     if(topic!=='அஞ்சல் கையேடு தொகுதி-V' || subtopic!=='முழுத் தொகுதி'){
+       throw new Error('Postal Manual Volume-V: முதலில் முழுத் தொகுதி தேர்வு செய்யவும்.');
+     }
+     let offset=0;
+     while(true){
+       const url='/questions?exam='+encodeURIComponent(exam)+'&subject='+encodeURIComponent(dbSubject)+'&language='+encodeURIComponent(language)+'&subtopic='+encodeURIComponent('Postal Manual Volume V')+'&limit=200&offset='+offset;
+       const d=await api()(url);
+       const page=Array.isArray(d.questions)?d.questions:[];
+       rows.push(...page);
+       if(!d.pagination || !d.pagination.hasMore || page.length===0) break;
+       const next=Number(d.pagination.nextOffset);
+       if(!Number.isFinite(next) || next<=offset) break;
+       offset=next;
+     }
+     for(let i=rows.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));const tmp=rows[i];rows[i]=rows[j];rows[j]=tmp;}
+     if(rows.length<count) throw new Error('Postal Manual Volume-V-ல் '+count+' கேள்விகள் கிடைக்கவில்லை. Backend-ல் கிடைத்தது: '+rows.length);
+     P.questions=rows.slice(0,count);
+   }else{
+     const d=await api()('/questions?exam='+encodeURIComponent(exam)+'&subject='+encodeURIComponent(dbSubject)+'&language='+encodeURIComponent(language)+'&limit='+count);
+     if(!Array.isArray(d.questions)||!d.questions.length)throw new Error('இந்த தேர்வு / பாடத்திற்கு backend-ல் கேள்விகள் இல்லை.');
+     if(d.questions.length<count)throw new Error('தேவையான '+count+' கேள்விகளில் '+d.questions.length+' மட்டுமே கிடைத்துள்ளன.');
+     P.questions=d.questions.slice(0,count);
+   }
+   const a=await api()('/attempts',{method:'POST',body:JSON.stringify({exam,subject:dbSubject,mode:'practice',language,questionIds:P.questions.map(q=>Number(q.id))})});
+   if(!a||!a.id)throw new Error('Practice attempt உருவாக்கப்படவில்லை.');
+   P.attemptId=a.id;
+   if($('practiceReview')){$('practiceReview').innerHTML='';$('practiceReview').classList.add('hidden','screen-review');$('practiceReview').style.display='none';}
+   if($('resultText'))$('resultText').innerHTML='';
+   if($('stopInfinitePractice'))$('stopInfinitePractice').classList.add('hidden');
+   if($('feedback'))$('feedback').innerHTML=(exam==='gds_to_mts'&&subject==='gds_postal_rules') ? ('Postal Manual Volume-V: '+P.questions.length+' கேள்விகள் ஏற்றப்பட்டுள்ளன.') : '';
+   if(typeof show==='function')show('practice');
+   render();
  }catch(e){stop();if($('feedback'))$('feedback').innerHTML='<b>Practice தொடங்க முடியவில்லை.</b><br>'+esc(e.message);}
 }
 window.startPractice=start;
