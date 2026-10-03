@@ -1248,7 +1248,7 @@ Object.assign(data,{
   gds_postal_rules:{
     title:'Departmental Rules / Postal Department Rules & Knowledge',
     topics:{
-      'அஞ்சல் வழிகாட்டி பகுதி-I':['பொதுவான அஞ்சல் விதிகள்','அஞ்சல் / கட்டுரை அடிப்படைகள்','அஞ்சல் சேவைகள்'],
+      'அஞ்சல் வழிகாட்டி பகுதி-I':['முழுத் தொகுதி'],
       'அஞ்சல் கையேடு தொகுதி-V':['முழுத் தொகுதி']
     }
   },
@@ -3594,15 +3594,49 @@ window.V91_ADV_NUM=V91_ADV_NUM;
 
   async function getQuestionsV138(examId, subject, lang, count, subtopic){
     var dbSubject = subject;
-    if(String(examId)==='gds_to_mts' && String(subject)==='gds_postal_rules')
-      dbSubject = 'Departmental Rules / Postal Department Rules & Knowledge';
-    var url = '/questions?exam=' + encodeURIComponent(examId) +
-      '&subject=' + encodeURIComponent(dbSubject) +
-      '&language=' + encodeURIComponent(lang) +
-      '&limit=' + encodeURIComponent(count);
-    if(subtopic) url += '&subtopic=' + encodeURIComponent(subtopic);
-    var d = await api138(url);
-    return Array.isArray(d.questions) ? d.questions : [];
+    var isGdsRules = String(examId)==='gds_to_mts' && String(subject)==='gds_postal_rules';
+    if(isGdsRules) dbSubject = 'Departmental Rules / Postal Department Rules & Knowledge';
+
+    async function fetchRows(extraSubtopic, limit, offset){
+      var url = '/questions?exam=' + encodeURIComponent(examId) +
+        '&subject=' + encodeURIComponent(dbSubject) +
+        '&language=' + encodeURIComponent(lang) +
+        '&limit=' + encodeURIComponent(limit || 200) +
+        '&offset=' + encodeURIComponent(offset || 0);
+      if(extraSubtopic) url += '&subtopic=' + encodeURIComponent(extraSubtopic);
+      var d = await api138(url);
+      return d || {};
+    }
+
+    /* GDS Departmental Rules: both source books expose one aggregate UI button.
+       Part-I must combine its three existing database subtopics. Volume-V uses
+       all Departmental Rules rows except those three Part-I subtopics. */
+    var isAggregate = isGdsRules && String(subtopic||'').trim()==='முழுத் தொகுதி';
+    if(isAggregate){
+      var topic = String(currentTopic||'').trim();
+      var part1Subs = new Set(['பொதுவான அஞ்சல் விதிகள்','அஞ்சல் / கட்டுரை அடிப்படைகள்','அஞ்சல் சேவைகள்']);
+      var wanted = topic === 'அஞ்சல் வழிகாட்டி பகுதி-I' ? part1Subs : null;
+      var out = [], offset = 0, page = 200;
+      while(true){
+        var d = await fetchRows('', page, offset);
+        var rows = Array.isArray(d.questions) ? d.questions : [];
+        for(var i=0;i<rows.length;i++){
+          var st=String(rows[i].subtopic||'').trim();
+          if(topic === 'அஞ்சல் வழிகாட்டி பகுதி-I'){
+            if(wanted.has(st)) out.push(rows[i]);
+          }else if(topic === 'அஞ்சல் கையேடு தொகுதி-V'){
+            if(!wanted || !wanted.has(st)) out.push(rows[i]);
+          }
+        }
+        if(!d.pagination || !d.pagination.hasMore || rows.length===0) break;
+        offset=Number(d.pagination.nextOffset ?? (offset+rows.length));
+        if(!Number.isFinite(offset)) break;
+      }
+      return out;
+    }
+
+    var d = await fetchRows(subtopic, Math.max(Number(count)||10,100), 0);
+    return (Array.isArray(d.questions) ? d.questions : []).slice(0, Number(count)||10);
   }
 
   function currentLang(){
@@ -3641,7 +3675,7 @@ window.V91_ADV_NUM=V91_ADV_NUM;
     try{
       var subject = (typeof currentSubject !== 'undefined' && currentSubject) || 'gs';
       var lang = currentLang();
-      var count = (n === 9999) ? 200 : Number(n || 10);
+      var count = (n === 9999) ? 10000 : Number(n || 10);
 
       if(el('feedback')) el('feedback').textContent='கேள்விகள் ஏற்றப்படுகிறது...';
 
@@ -5152,8 +5186,8 @@ chooseContentLanguage=g4SetLanguage;
 window.subject=function(s){
   const S=String(s||'').trim();
   const E=String(selectedExam||'group4').trim();
-  if(!['tamil','gs','apt'].includes(S)) return;
-  if(E!=='group4' && E!=='postal_pa_sa') return;
+  if(E==='gds_to_mts' && S==='gds_postal_rules') { /* GDS Departmental Rules */ } else if(!['tamil','gs','apt'].includes(S)) return;
+  if(E!=='group4' && E!=='postal_pa_sa' && E!=='gds_to_mts') return;
   if(E==='postal_pa_sa' && S==='tamil') return;
   if(E==='group4') localStorage.setItem('tnpsc_selected_exam','group4');
   currentSubject=S;
@@ -5194,15 +5228,17 @@ g4RenderSubjectPage;
 /* Final practice request: never silently fall back to Tamil or another subject. */
 const oldFinalStart=window.startPractice;
 window.startPractice=async function(n){
+  const E=String(selectedExam||'group4').trim();
   const S=String(currentSubject||'').trim();
   const L=(S==='tamil')?'ta':(contentLanguage==='en'?'en':'ta');
   contentLanguage=L;
-  if(String(selectedExam||'group4')!=='postal_pa_sa') {
-    selectedExam='group4';
-    localStorage.setItem('tnpsc_selected_exam','group4');
+  if(E!=='group4' && E!=='postal_pa_sa' && E!=='gds_to_mts') return;
+  if(E==='gds_to_mts' && S==='gds_postal_rules'){ /* GDS Departmental Rules */ } else if(E==='group4' || E==='postal_pa_sa'){
+    selectedExam=E;
+    localStorage.setItem('tnpsc_selected_exam',E);
   }
   localStorage.setItem('tnpsc_content_language',L);
-  if(!['tamil','gs','apt'].includes(S)){
+  if(E==='gds_to_mts' && S==='gds_postal_rules') { /* GDS Departmental Rules */ } else if(!['tamil','gs','apt'].includes(S)){
     if(document.getElementById('feedback')) document.getElementById('feedback').textContent='Group 4 பாடத்தைத் தேர்வு செய்யவும்.';
     return;
   }
@@ -5232,10 +5268,10 @@ window.__THIRAL_GROUP4_FINAL_WEBSITE__={
 const previousStart=window.startPractice;
 window.startPractice=async function(n){
   const E=String(selectedExam||'group4').trim();
-  if(E!=='group4' && E!=='postal_pa_sa') return;
+  if(E!=='group4' && E!=='postal_pa_sa' && E!=='gds_to_mts') return;
   const S=String(currentSubject||'').trim();
   if(E==='postal_pa_sa' && S==='tamil') return;
-  if(!['tamil','gs','apt'].includes(S)){ if(document.getElementById('feedback')) document.getElementById('feedback').textContent='Group 4 பாடத்தைத் தேர்வு செய்யவும்.'; return; }
+  if(E==='gds_to_mts' && S==='gds_postal_rules'){ /* GDS Departmental Rules */ } else if(!['tamil','gs','apt'].includes(S)){ if(document.getElementById('feedback')) document.getElementById('feedback').textContent='Group 4 பாடத்தைத் தேர்வு செய்யவும்.'; return; }
   contentLanguage=(S==='tamil')?'ta':(contentLanguage==='en'?'en':'ta');
   localStorage.setItem('tnpsc_selected_exam','group4');
   localStorage.setItem('tnpsc_content_language',contentLanguage);
@@ -6422,6 +6458,47 @@ function escapeHtmlAdmin(v){
 })();
 </script>
 
+
+<script id="thiral-gds-departmental-rules-aggregate-final">
+(function(){
+  'use strict';
+  var GDS='gds_to_mts', SUBJECT='gds_postal_rules';
+  var baseTopic=window.topic;
+  var baseSubtopic=window.subtopic;
+
+  function isGDS(){return String(selectedExam||'')===GDS && String(currentSubject||'')===SUBJECT;}
+
+  window.topic=function(t){
+    if(!isGDS()) return baseTopic.apply(this,arguments);
+    currentTopic=String(t||'');
+    currentSub='';
+    var title=document.getElementById('topicTitle');
+    var grid=document.getElementById('subtopicGrid');
+    if(title) title.textContent=labelForTopic(currentSubject,currentTopic)+' – Subtopics';
+    if(grid) grid.innerHTML='<button type="button" onclick="subtopic(\'முழுத் தொகுதி\')">முழுத் தொகுதி</button>';
+    show('subtopics');
+  };
+
+  window.subtopic=function(s){
+    if(!isGDS()) return baseSubtopic.apply(this,arguments);
+    currentSub='முழுத் தொகுதி';
+    var label=document.getElementById('subTitle');
+    var material=document.getElementById('materialText');
+    if(label) label.textContent='📌 முழுத் தொகுதி';
+    if(material) material.textContent='இந்தப் பகுதியின் ஏற்கனவே பதிவேற்றப்பட்ட முழு கேள்வித் தொகுப்பு.';
+    /* No count picker. 9999 is the existing full-bank mode. */
+    window.startPractice(9999);
+  };
+
+  window.__THIRAL_GDS_AGGREGATE_FINAL__={
+    exam:GDS,
+    subject:SUBJECT,
+    books:['அஞ்சல் வழிகாட்டி பகுதி-I','அஞ்சல் கையேடு தொகுதி-V'],
+    subtopic:'முழுத் தொகுதி',
+    mode:'full-bank-direct'
+  };
+})();
+</script>
 </body></html>
 
 
