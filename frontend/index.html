@@ -6778,3 +6778,54 @@ function escapeHtmlAdmin(v){
   };
 })();
 </script>
+
+<!-- THIRAL V18: Postal Manual Volume-V direct practice endpoint -->
+<script id="thiral-gds-volume-v-direct-api-v18">
+(function(){
+  'use strict';
+  var GDS='gds_to_mts';
+  var SUBJECT='gds_postal_rules';
+  var DB_SUBJECT='Departmental Rules / Postal Department Rules & Knowledge';
+  var DB_SUBTOPIC='Postal Manual Volume V';
+  var oldLoad=window.loadPracticeQuestions;
+
+  function isVolumeV(){
+    return String(window.selectedExam||'')===GDS &&
+           String(window.currentSubject||'')===SUBJECT &&
+           (String(window.currentTopic||'').trim()==='அஞ்சல் கையேடு தொகுதி-V' ||
+            String(window.currentTopic||'').trim()==='Postal Manual Volume-V');
+  }
+
+  window.loadPracticeQuestions=async function(requested){
+    if(!isVolumeV()) return oldLoad.apply(this,arguments);
+
+    var count=Number(requested||10);
+    if([10,20,50,100].indexOf(count)<0) count=10;
+    var lang=(String(window.contentLanguage||'ta')==='en')?'en':'ta';
+    var api=window.thiralV138Api;
+    if(typeof api!=='function') throw new Error('Backend API தயாராக இல்லை.');
+
+    var url='/practice/questions?exam='+encodeURIComponent(GDS)+
+      '&subject='+encodeURIComponent(DB_SUBJECT)+
+      '&language='+encodeURIComponent(lang)+
+      '&subtopic='+encodeURIComponent(DB_SUBTOPIC)+
+      '&limit='+encodeURIComponent(count);
+
+    var d=await api(url);
+    var rows=Array.isArray(d&&d.questions)?d.questions:[];
+    if(rows.length<count){
+      throw new Error((lang==='en'?'Postal Manual Volume-V: ':'Postal Manual Volume-V: ')+
+        rows.length+' / '+count+' கேள்விகள் மட்டுமே கிடைத்தன.');
+    }
+    return rows;
+  };
+
+  window.__THIRAL_V18_VOLUME_V__={
+    endpoint:'/api/practice/questions',
+    exam:GDS,
+    subject:DB_SUBJECT,
+    subtopic:DB_SUBTOPIC,
+    counts:[10,20,50,100]
+  };
+})();
+</script>
