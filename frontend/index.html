@@ -685,12 +685,12 @@ a{
 <button onclick="openExam('assistant')">📁 Assistant</button>
 <button onclick="openExam('junior_assistant')">📁 Junior Assistant</button>
 </div>
-<h3 id="departmentPostsHeading" onclick="toggleDepartmentPosts()" style="cursor:pointer" title="கிளிக் செய்து Department of Posts தேர்வுகளை காண்பிக்க / மறைக்க">📮 Department of Posts</h3>
+<h3 id="departmentPostsHeading" style="cursor:pointer" title="Department of Posts">📮 Department of Posts</h3>
 <div id="departmentPostsOptions" class="grid hidden" style="margin-top:8px">
-<button onclick="openExam('gds_to_mts')">📬 GDS → MTS</button>
-<button onclick="openExam('mts_gds_to_postman_mailguard')">📮 MTS / GDS → Postman / Mail Guard</button>
-<button onclick="openExam('postal_pa_sa')">📬 Postal Assistant / Sorting Assistant (PA/SA)</button>
-<button onclick="openExam('pa_to_ipos')">🏤 PA → IPOS</button>
+<button type="button" data-dept-exam="gds_to_mts">📬 GDS → MTS</button>
+<button type="button" data-dept-exam="mts_gds_to_postman_mailguard">📮 MTS / GDS → Postman / Mail Guard</button>
+<button type="button" data-dept-exam="postal_pa_sa">📬 Postal Assistant / Sorting Assistant (PA/SA)</button>
+<button type="button" data-dept-exam="pa_to_ipos">🏤 PA → IPOS</button>
 </div>
 <hr>
 <button class="secondary" onclick="showLastResult()">📊 என் Result</button><button class="secondary" onclick="showResultHistory()">🗂️ என் Result History</button><button class="secondary" onclick="openSuggestionPage()">💡 Suggestion / Feedback</button>
@@ -1183,11 +1183,7 @@ function examOwnsQuestion(q){
 
 let selectedExam=localStorage.getItem('tnpsc_selected_exam')||'group4';
 function openExam(id){selectedExam=id;localStorage.setItem('tnpsc_selected_exam',id);renderExamHome();show('examHome');}
-function toggleDepartmentPosts(){
-  var box=document.getElementById('departmentPostsOptions');
-  if(!box) return;
-  box.classList.toggle('hidden');
-}
+
 function renderExamHome(){const ex=EXAMS[selectedExam]||EXAMS.group4;document.getElementById('examTitle').textContent=ex.title;document.getElementById('examInfo').textContent=ex.info;document.getElementById('headerSub').textContent='';document.getElementById('examSubjects').innerHTML=ex.subjects.map(([id,label])=>`<button onclick="subject('${id}')">${label}</button>`).join('');}
 function backToExam(){renderExamHome();show('examHome');}
 function startSelectedMock(){startMock();}
@@ -5253,15 +5249,8 @@ window.startPractice=async function(n){
   var POSTAL_EXAMS=['gds_to_mts','mts_gds_to_postman_mailguard','postal_pa_sa','pa_to_ipos'];
   function isEnabledExam(id){ return String(id)===G4 || POSTAL_EXAMS.indexOf(String(id))!==-1; }
   function forceGroup4(){
-    try{
-      if(!isEnabledExam(selectedExam)) selectedExam=G4;
-    }catch(e){}
-    try{
-      var saved=localStorage.getItem('tnpsc_selected_exam')||G4;
-      if(!isEnabledExam(saved)) saved=G4;
-      selectedExam=saved;
-      localStorage.setItem('tnpsc_selected_exam',saved);
-    }catch(e){}
+    try{ selectedExam=G4; }catch(e){}
+    try{ localStorage.setItem('tnpsc_selected_exam',G4); }catch(e){}
   }
   forceGroup4();
 
@@ -5283,7 +5272,7 @@ window.startPractice=async function(n){
   if(typeof window.renderExamHome==='function'){
     var oldRenderExamHome=window.renderExamHome;
     window.renderExamHome=function(){
-      if(!isEnabledExam(selectedExam)) forceGroup4();
+      forceGroup4();
       return oldRenderExamHome.apply(this,arguments);
     };
   }
@@ -5292,19 +5281,19 @@ window.startPractice=async function(n){
   if(typeof window.startPractice==='function'){
     var oldStartPractice=window.startPractice;
     window.startPractice=function(){
-      if(!isEnabledExam(selectedExam)) forceGroup4();
+      forceGroup4();
       return oldStartPractice.apply(this,arguments);
     };
   }
   if(typeof window.startMock==='function'){
     var oldStartMock=window.startMock;
     window.startMock=function(){
-      if(!isEnabledExam(selectedExam)) forceGroup4();
+      forceGroup4();
       return oldStartMock.apply(this,arguments);
     };
   }
   window.startSelectedMock=function(){
-    if(!isEnabledExam(selectedExam)) forceGroup4();
+    forceGroup4();
     if(typeof window.startMock==='function') return window.startMock();
   };
 
@@ -6295,6 +6284,85 @@ function escapeHtmlAdmin(v){
   window.__THIRAL_MODEL_EXAM_SUBMIT=submit;
   window.__THIRAL_MODEL_EXAM_REVIEW=review;
   window.__THIRAL_RESET_MODEL_EXAM_SESSION=function(){stopTimer();M.questions=[];M.answers={};M.index=0;M.attemptId=0;M.submitting=false;M.layout='single';};
+})();
+</script>
+
+
+<script id="thiral-department-posts-working-final">
+(function(){
+  'use strict';
+
+  var POSTAL_EXAMS = [
+    'gds_to_mts',
+    'mts_gds_to_postman_mailguard',
+    'postal_pa_sa',
+    'pa_to_ipos'
+  ];
+
+  function isPostalExam(id){
+    return POSTAL_EXAMS.indexOf(String(id || '')) !== -1;
+  }
+
+  function setupDepartmentPosts(){
+    var heading = document.getElementById('departmentPostsHeading');
+    var box = document.getElementById('departmentPostsOptions');
+    if(!heading || !box) return;
+
+    /* Always start collapsed. */
+    box.classList.add('hidden');
+
+    heading.onclick = function(){
+      box.classList.toggle('hidden');
+    };
+
+    box.querySelectorAll('button[data-dept-exam]').forEach(function(btn){
+      btn.disabled = false;
+      btn.removeAttribute('aria-disabled');
+      btn.style.opacity = '';
+      btn.style.cursor = 'pointer';
+
+      btn.onclick = function(){
+        var id = String(btn.getAttribute('data-dept-exam') || '');
+        if(!isPostalExam(id)) return false;
+
+        selectedExam = id;
+        try{ localStorage.setItem('tnpsc_selected_exam', id); }catch(e){}
+
+        if(typeof renderExamHome === 'function') renderExamHome();
+        if(typeof show === 'function') show('examHome');
+        return false;
+      };
+    });
+  }
+
+  /*
+   * The existing file contains an older Group-4 lock and another openExam
+   * definition. This final handler is deliberately placed last so the four
+   * Department of Posts buttons are not disabled or reset.
+   */
+  var originalOpenExam = window.openExam;
+  window.openExam = function(id){
+    id = String(id || '');
+    if(isPostalExam(id)){
+      selectedExam = id;
+      try{ localStorage.setItem('tnpsc_selected_exam', id); }catch(e){}
+      if(typeof renderExamHome === 'function') renderExamHome();
+      if(typeof show === 'function') show('examHome');
+      return false;
+    }
+    return originalOpenExam ? originalOpenExam(id) : false;
+  };
+
+  function run(){
+    setupDepartmentPosts();
+  }
+
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', run);
+  }else{
+    run();
+  }
+  window.addEventListener('load', run);
 })();
 </script>
 
