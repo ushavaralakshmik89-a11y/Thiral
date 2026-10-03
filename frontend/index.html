@@ -1270,15 +1270,15 @@ Object.assign(data,{
 function labelForSubject(s){
  if(s==='tamil') return '📚 தமிழ்';
  const GDS_MTS_LABELS={
-   gds_postal_rules:'📮 Departmental Rules / Postal Department Rules & Knowledge',
-   gds_gk:'📘 General Knowledge (GK)',
-   gds_ga:'📙 General Awareness (GA)',
-   gds_current_affairs:'📰 Current Affairs',
-   gds_maths:'📐 Mathematics',
-   gds_reasoning:'🧠 Reasoning Ability',
-   gds_basic_english:'🔤 Basic English'
+   gds_postal_rules:{ta:'📮 துறை விதிகள் / அஞ்சல் துறை விதிகள் & அறிவு',en:'📮 Departmental Rules / Postal Department Rules & Knowledge'},
+   gds_gk:{ta:'📘 பொது அறிவு (GK)',en:'📘 General Knowledge (GK)'},
+   gds_ga:{ta:'📙 பொது விழிப்புணர்வு (GA)',en:'📙 General Awareness (GA)'},
+   gds_current_affairs:{ta:'📰 நடப்பு நிகழ்வுகள்',en:'📰 Current Affairs'},
+   gds_maths:{ta:'📐 கணிதம்',en:'📐 Mathematics'},
+   gds_reasoning:{ta:'🧠 தர்க்கத் திறன்',en:'🧠 Reasoning Ability'},
+   gds_basic_english:{ta:'🔤 அடிப்படை ஆங்கிலம்',en:'🔤 Basic English'}
  };
- if(GDS_MTS_LABELS[s]) return GDS_MTS_LABELS[s];
+ if(GDS_MTS_LABELS[s]) return GDS_MTS_LABELS[s][contentLanguage==='en'?'en':'ta'];
  return (contentLanguage==='en' && EN_LABELS[s]) ? EN_LABELS[s].title : (s==='gs'?'📗 பொது அறிவு':'📐 திறனறிவு / Aptitude');
 }
 function labelForTopic(s,t){
@@ -6365,7 +6365,7 @@ function escapeHtmlAdmin(v){
     var info=data && data[SUBJECT];
     if(!info || !info.topics) return;
     var title=document.getElementById('subjectTitle'), grid=document.getElementById('topicGrid');
-    if(title) title.textContent='📮 '+DB_SUBJECT+' – Topics';
+    if(title) title.textContent=labelForSubject(SUBJECT)+' – Topics';
     if(grid){
       grid.innerHTML=Object.keys(info.topics).map(function(t){
         return '<button type="button" onclick="topic(\''+esc(t)+'\')">'+esc(t)+'</button>';
@@ -6454,7 +6454,7 @@ function escapeHtmlAdmin(v){
     var title=document.getElementById('topicTitle');
     var grid=document.getElementById('subtopicGrid');
     if(title) title.textContent=labelForTopic(currentSubject,gdsSelectedBook)+' – Subtopics';
-    if(grid) grid.innerHTML='<button type="button" onclick="subtopic(\'মுழுத் தொகுதி\')">முழுத் தொகுதி</button>';
+    if(grid){ var fullLabel=(typeof contentLanguage!=='undefined' && contentLanguage==='en')?'Full Volume':'முழுத் தொகுதி'; grid.innerHTML='<button type="button" onclick="subtopic(\'முழுத் தொகுதி\')">'+fullLabel+'</button>'; }
     show('subtopics');
   };
 
@@ -6470,6 +6470,7 @@ function escapeHtmlAdmin(v){
     window.startPractice(9999);
   };
 
+  window.__THIRAL_GDS_ENGLISH_UI_FINAL__='BOOKS-AND-FULL-VOLUME-LOCALIZED-v3';
   window.__THIRAL_GDS_AGGREGATE_FINAL__={
     exam:GDS,
     subject:SUBJECT,
