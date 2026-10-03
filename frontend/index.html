@@ -557,42 +557,6 @@ a{
 }
 </style>
 
-
-<style id="group4-only-dashboard-lock">
-/* Dashboard currently exposes only the completed TNPSC Group 4 exam.
-   Other exam routes remain in the code/database for future activation. */
-#dash .model-exam-card{display:none!important}
-#dash > h3:not(.category-title),
-#dash > h3:not(.category-title) + .grid{display:none!important}
-#dash > .grid:first-of-type button:not([onclick*="openExam('group4')"]){display:none!important}
-#dash > .grid button[onclick*="openExam('gds_to_mts')"],
-#dash > .grid button[onclick*="openExam('gds_mts_to_postman_mail_guard')"],
-#dash > .grid button[onclick*="openExam('pa_sa')"],
-#dash > .grid button[onclick*="openExam('pa_to_ipos')"]{display:none!important}
-</style>
-
-<style id="group4-and-department-posts-dashboard-lock">
-/* Production dashboard: only completed Group 4 and Department of Posts are visible. */
-#dash > h3:has(+ .grid button[onclick*="openExam('gds_to_mts')"]),
-#dash > h3:has(+ .grid button[onclick*="openExam('gds_to_mts')"]) + .grid{
-  display:block !important;
-}
-#dash > h3:has(+ .grid button[onclick*="openExam('gds_to_mts')"]) + .grid{
-  display:grid !important;
-}
-#dash > h3:has(+ .grid button[onclick*="openExam('gds_to_mts')"]) + .grid button[onclick*="openExam('gds_to_mts')"],
-#dash > h3:has(+ .grid button[onclick*="openExam('gds_to_mts')"]) + .grid button[onclick*="openExam('gds_mts_to_postman_mail_guard')"],
-#dash > h3:has(+ .grid button[onclick*="openExam('gds_to_mts')"]) + .grid button[onclick*="openExam('pa_sa')"],
-#dash > h3:has(+ .grid button[onclick*="openExam('gds_to_mts')"]) + .grid button[onclick*="openExam('pa_to_ipos')"]{
-  display:block !important;
-}
-/* Keep every other unfinished Department of Posts exam hidden. */
-#dash > h3:has(+ .grid button[onclick*="openExam('gds_to_mts')"]) + .grid button[onclick*="openExam('gds_mts_to_postman_mail_guard')"],
-#dash > h3:has(+ .grid button[onclick*="openExam('gds_to_mts')"]) + .grid button[onclick*="openExam('pa_sa')"],
-#dash > h3:has(+ .grid button[onclick*="openExam('gds_to_mts')"]) + .grid button[onclick*="openExam('pa_to_ipos')"]{
-  display:block !important;
-}
-</style>
 </head>
 <body>
 <header class="thiral-final-hero">
@@ -1256,6 +1220,13 @@ topics:{
 };
 
 const EN_LABELS={
+ gds_postal_rules:{
+  title:'📮 Departmental Rules / Postal Department Rules & Knowledge',
+  topics:{
+   'அஞ்சல் வழிகாட்டி பகுதி-I':{'en':'Post Office Guide Part-I','subs':{'முழுத் தொகுதி':'Full Volume'}},
+   'அஞ்சல் கையேடு தொகுதி-V':{'en':'Postal Manual Volume-V','subs':{'முழுத் தொகுதி':'Full Volume'}}
+  }
+ },
  gs:{
   title:'📗 General Studies',
   topics:{
@@ -3658,7 +3629,9 @@ window.V91_ADV_NUM=V91_ADV_NUM;
        */
       var topic = String(currentTopic||'').trim();
       if(topic === 'அஞ்சல் வழிகாட்டி பகுதி-I'){
-        var part1Names = ['பொதுவான அஞ்சல் விதிகள்','அஞ்சல் / கட்டுரை அடிப்படைகள்','அஞ்சல் சேவைகள்'];
+        var part1Names = (String(lang)==='en')
+          ? ['General Postal Rules','Postal / Article Basics','Postal Services']
+          : ['பொதுவான அஞ்சல் விதிகள்','அஞ்சல் / கட்டுரை அடிப்படைகள்','அஞ்சல் சேவைகள்'];
         var combined=[];
         for(var si=0; si<part1Names.length; si++){
           var stName=part1Names[si];
@@ -3677,7 +3650,9 @@ window.V91_ADV_NUM=V91_ADV_NUM;
       }
 
       if(topic === 'அஞ்சல் கையேடு தொகுதி-V'){
-        var excluded = new Set(['பொதுவான அஞ்சல் விதிகள்','அஞ்சல் / கட்டுரை அடிப்படைகள்','அஞ்சல் சேவைகள்']);
+        var excluded = String(lang)==='en'
+          ? new Set(['General Postal Rules','Postal / Article Basics','Postal Services'])
+          : new Set(['பொதுவான அஞ்சல் விதிகள்','அஞ்சல் / கட்டுரை அடிப்படைகள்','அஞ்சல் சேவைகள்']);
         var volumeRows=[], voff=0;
         while(true){
           var vd=await fetchRows('',200,voff);
@@ -6484,8 +6459,9 @@ function escapeHtmlAdmin(v){
     currentSub='முழுத் தொகுதி';
     var label=document.getElementById('subTitle');
     var material=document.getElementById('materialText');
-    if(label) label.textContent='📌 முழுத் தொகுதி';
-    if(material) material.textContent='இந்தப் பகுதியின் ஏற்கனவே பதிவேற்றப்பட்ட முழு கேள்வித் தொகுப்பு.';
+    var fullLabel = (typeof contentLanguage!=='undefined' && contentLanguage==='en') ? 'Full Volume' : 'முழுத் தொகுதி';
+    if(label) label.textContent='📌 '+fullLabel;
+    if(material) material.textContent=(typeof contentLanguage!=='undefined' && contentLanguage==='en') ? 'The complete question bank already uploaded for this section.' : 'இந்தப் பகுதியின் ஏற்கனவே பதிவேற்றப்பட்ட முழு கேள்வித் தொகுப்பு.';
     /* Direct full-bank mode. There is deliberately no 10/20/50/100 picker. */
     window.startPractice(9999);
   };
