@@ -6435,4 +6435,134 @@ function escapeHtmlAdmin(v){
   };
 })();
 </script>
+
+<script id="thiral-gds-navigation-safe-v21">
+(function(){
+  'use strict';
+  /* V21: restore GDS-to-MTS subject navigation without touching Student Login
+     or the Group 4 router. Only GDS subject clicks are intercepted. */
+  var GDS_EXAM='gds_to_mts';
+  var GDS_SUBJECTS={
+    gds_postal_rules:true,
+    gds_gk:true,
+    gds_ga:true,
+    gds_current_affairs:true,
+    gds_maths:true,
+    gds_reasoning:true,
+    gds_basic_english:true
+  };
+  var DB_SUBJECT='Departmental Rules / Postal Department Rules & Knowledge';
+  var V_TOPIC='அஞ்சல் கையேடு தொகுதி-V';
+  var V_SUBTOPIC='Postal Manual Volume V';
+  var PART1_TOPIC='அஞ்சல் வழிகாட்டி பகுதி-I';
+
+  function isGDSSubject(s){return !!GDS_SUBJECTS[String(s||'').trim()];}
+  function isGDS(){return String(selectedExam||'')===GDS_EXAM;}
+
+  function renderGDSTopics(){
+    var S=String(currentSubject||'');
+    var info=(typeof data!=='undefined') ? data[S] : null;
+    var title=document.getElementById('subjectTitle');
+    var grid=document.getElementById('topicGrid');
+    if(title) title.textContent=labelForSubject(S)+' – Topics';
+    if(!grid) return;
+
+    var topics=(info && info.topics) ? Object.keys(info.topics) : [];
+    if(!topics.length){
+      grid.innerHTML='<p class="small">இந்த பாடத்திற்கான Topics / கேள்வி வங்கி இன்னும் சேர்க்கப்படவில்லை.</p>';
+    }else{
+      grid.innerHTML=topics.map(function(t){
+        return '<button type="button" onclick="topic(\''+esc(t)+'\')">'+esc(labelForTopic(S,t))+'</button>';
+      }).join('');
+    }
+    show('topics');
+  }
+
+  var previousSubject=window.subject;
+  window.subject=function(s){
+    var S=String(s||'').trim();
+    if(!isGDSSubject(S)){
+      if(typeof previousSubject==='function') return previousSubject.apply(this,arguments);
+      return;
+    }
+    if(!isGDS()) return;
+    currentSubject=S;
+    currentTopic='';
+    currentSub='';
+    window.pendingSubject=S;
+    openLanguageChooser();
+  };
+
+  var previousChooseLanguage=window.chooseContentLanguage;
+  window.chooseContentLanguage=function(lang){
+    var L=String(lang||'ta').toLowerCase()==='en'?'en':'ta';
+    if(isGDS() && isGDSSubject(currentSubject)){
+      contentLanguage=L;
+      try{localStorage.setItem('tnpsc_content_language',L);}catch(e){}
+      var modal=document.getElementById('languageModal');
+      if(modal) modal.classList.add('hidden');
+      var label=document.getElementById('selectedLanguageLabel');
+      if(label) label.textContent=L==='en'?'English':'தமிழ்';
+      window.pendingSubject=null;
+      currentTopic='';
+      currentSub='';
+      renderGDSTopics();
+      return;
+    }
+    if(typeof previousChooseLanguage==='function') return previousChooseLanguage.apply(this,arguments);
+  };
+
+  var previousTopic=window.topic;
+  window.topic=function(t){
+    if(!(isGDS() && isGDSSubject(currentSubject))){
+      if(typeof previousTopic==='function') return previousTopic.apply(this,arguments);
+      return;
+    }
+    currentTopic=String(t||'');
+
+    /* Volume-V has no Full Volume practice option. Selecting the Volume-V
+       topic opens the four practice-count buttons directly. */
+    if(currentSubject==='gds_postal_rules' && currentTopic===V_TOPIC){
+      currentSub=V_SUBTOPIC;
+      var subTitle=document.getElementById('subTitle');
+      if(subTitle) subTitle.textContent=(contentLanguage==='en'?'📌 Postal Manual Volume V':'📌 அஞ்சல் கையேடு தொகுதி-V');
+      var actions=document.getElementById('actions');
+      if(actions){
+        actions.innerHTML=
+          '<h2 id="subTitle">'+(contentLanguage==='en'?'📌 Postal Manual Volume V':'📌 அஞ்சல் கையேடு தொகுதி-V')+'</h2>'+
+          '<p>'+(contentLanguage==='en'?'Practice questions for Postal Manual Volume V.':'Postal Manual Volume-V தொடர்பான Practice கேள்விகள்.')+'</p>'+
+          '<div class="grid">'+
+          '<button type="button" onclick="startPostalManualVPractice(10)">📝 10 கேள்விகள்</button>'+
+          '<button type="button" onclick="startPostalManualVPractice(20)">📝 20 கேள்விகள்</button>'+
+          '<button type="button" onclick="startPostalManualVPractice(50)">📝 50 கேள்விகள்</button>'+
+          '<button type="button" onclick="startPostalManualVPractice(100)">📝 100 கேள்விகள்</button>'+
+          '<button type="button" onclick="show(\'material\')">📖 Study Material</button>'+
+          '</div><button type="button" class="secondary" onclick="show(\'topics\')">← Topics</button>';
+      }
+      show('actions');
+      return;
+    }
+
+    var info=(typeof data!=='undefined') ? data[currentSubject] : null;
+    var list=(info && info.topics && info.topics[currentTopic]) ? info.topics[currentTopic] : [];
+    var title=document.getElementById('topicTitle');
+    var grid=document.getElementById('subtopicGrid');
+    if(title) title.textContent=labelForTopic(currentSubject,currentTopic)+' – Subtopics';
+    if(grid){
+      grid.innerHTML=list.map(function(x){
+        return '<button type="button" onclick="subtopic(\''+esc(x)+'\')">'+esc(labelForSub(currentSubject,currentTopic,x))+'</button>';
+      }).join('');
+    }
+    show('subtopics');
+  };
+
+  window.__THIRAL_GDS_NAVIGATION_SAFE_V21__={
+    exam:GDS_EXAM,
+    subjects:Object.keys(GDS_SUBJECTS),
+    volumeVSubtopic:V_SUBTOPIC,
+    part1Topic:PART1_TOPIC
+  };
+})();
+</script>
+
 </body></html>
