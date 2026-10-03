@@ -1245,47 +1245,13 @@ const EN_LABELS={
 /* GDS → MTS: separate subject containers. Existing Group 4 data is untouched.
    Syllabus/topics will be added to these containers later from verified sources. */
 Object.assign(data,{
-  /* GDS → MTS navigation topics. UI/topic categories only; no Group 4 question data is reused. */
-  gds_postal_rules:{title:'Departmental Rules / Postal Department Rules & Knowledge',topics:{
-    'Post Office Guide Part-I':['General Postal Rules','Mail / Article Basics','Postal Services'],
-    'Postal Manual Volume V':['Departmental Procedures','Rules and Duties','Operational Knowledge']
-  }},
-  gds_gk:{title:'General Knowledge (GK)',topics:{
-    'Indian History':['Ancient India','Medieval India','Modern India','Freedom Movement'],
-    'Indian Geography':['Physical Geography','States and Capitals','Rivers and Resources'],
-    'Indian Polity':['Constitution','Fundamental Rights and Duties','Parliament and Government'],
-    'General Science':['Physics Basics','Chemistry Basics','Biology Basics']
-  }},
-  gds_ga:{title:'General Awareness (GA)',topics:{
-    'India':['National Institutions','Important Places','Important Persons'],
-    'Tamil Nadu':['State Administration','Districts','Important Places'],
-    'Economy and Society':['Basic Economy','Social Development','Public Welfare'],
-    'Sports and Awards':['Sports','Awards and Honours','Important Events']
-  }},
-  gds_current_affairs:{title:'Current Affairs',topics:{
-    'National Current Affairs':['Government and Policies','Appointments','Reports and Indices'],
-    'Tamil Nadu Current Affairs':['Government Schemes','State Events','Appointments'],
-    'International Current Affairs':['International Organisations','World Events','Summits'],
-    'Sports / Awards / Important Events':['Sports News','Awards','Important Days and Events']
-  }},
-  gds_maths:{title:'Mathematics',topics:{
-    'Basic Mathematics':['Numbers','Fractions','Decimals','Percentage','Ratio','Average'],
-    'Mensuration':['Area','Perimeter','Volume','Units'],
-    'Commercial Mathematics':['Profit and Loss','Interest','Time and Work','Speed and Distance'],
-    'Data and Arithmetic':['Simplification','Unitary Method','Basic Data Interpretation']
-  }},
-  gds_reasoning:{title:'Reasoning Ability',topics:{
-    'Series':['Number Series','Alphabet Series'],
-    'Analogy and Classification':['Analogy','Classification'],
-    'Coding and Decoding':['Coding','Decoding'],
-    'Logical Reasoning':['Order and Ranking','Direction Sense','Simple Logical Problems']
-  }},
-  gds_basic_english:{title:'Basic English',topics:{
-    'Grammar':['Parts of Speech','Tenses','Articles','Prepositions','Subject-Verb Agreement'],
-    'Vocabulary':['Synonyms','Antonyms','One Word Substitution','Word Usage'],
-    'Sentence Skills':['Sentence Correction','Fill in the Blanks','Rearrangement'],
-    'Reading Comprehension':['Short Passages','Question and Answer','Meaning from Context']
-  }}
+  gds_postal_rules:{title:'Departmental Rules / Postal Department Rules & Knowledge',topics:{}},
+  gds_gk:{title:'General Knowledge (GK)',topics:{}},
+  gds_ga:{title:'General Awareness (GA)',topics:{}},
+  gds_current_affairs:{title:'Current Affairs',topics:{}},
+  gds_maths:{title:'Mathematics',topics:{}},
+  gds_reasoning:{title:'Reasoning Ability',topics:{}},
+  gds_basic_english:{title:'Basic English',topics:{}}
 });
 
 function labelForSubject(s){
@@ -1299,67 +1265,14 @@ function labelForSubject(s){
    gds_reasoning:'🧠 Reasoning Ability',
    gds_basic_english:'🔤 Basic English'
  };
- if(GDS_MTS_I18N[s]?.title) return GDS_MTS_I18N[s].title[contentLanguage==='en'?'en':'ta'];
  if(GDS_MTS_LABELS[s]) return GDS_MTS_LABELS[s];
  return (contentLanguage==='en' && EN_LABELS[s]) ? EN_LABELS[s].title : (s==='gs'?'📗 பொது அறிவு':'📐 திறனறிவு / Aptitude');
 }
-/* GDS→MTS bilingual display labels. Internal topic/subtopic keys stay stable. */
-const GDS_MTS_I18N={
-  gds_postal_rules:{
-    title:{ta:'📮 துறை விதிகள் / அஞ்சல் துறை விதிகள் மற்றும் அறிவு',en:'📮 Departmental Rules / Postal Department Rules & Knowledge'},
-    topics:{
-      'Post Office Guide Part-I':{ta:'அஞ்சலக வழிகாட்டி பகுதி-I',en:'Post Office Guide Part-I',subs:{
-        'General Postal Rules':{ta:'பொதுவான அஞ்சல் விதிகள்',en:'General Postal Rules'},
-        'Mail / Article Basics':{ta:'அஞ்சல் / கட்டுரை அடிப்படைகள்',en:'Mail / Article Basics'},
-        'Postal Services':{ta:'அஞ்சல் சேவைகள்',en:'Postal Services'}
-      }},
-      'Postal Manual Volume V':{ta:'அஞ்சல் கையேடு தொகுதி V',en:'Postal Manual Volume V',subs:{
-        'Departmental Procedures':{ta:'துறை நடைமுறைகள்',en:'Departmental Procedures'},
-        'Rules and Duties':{ta:'விதிகள் மற்றும் கடமைகள்',en:'Rules and Duties'},
-        'Operational Knowledge':{ta:'செயல்பாட்டு அறிவு',en:'Operational Knowledge'}
-      }}
-    }
-  },
-  gds_gk:{title:{ta:'📘 பொது அறிவு (GK)',en:'📘 General Knowledge (GK)'}},
-  gds_ga:{title:{ta:'📙 பொது விழிப்புணர்வு (GA)',en:'📙 General Awareness (GA)'}},
-  gds_current_affairs:{title:{ta:'📰 நடப்பு நிகழ்வுகள்',en:'📰 Current Affairs'}},
-  gds_maths:{title:{ta:'📐 கணிதம்',en:'📐 Mathematics'}},
-  gds_reasoning:{title:{ta:'🧠 தர்க்கத் திறன்',en:'🧠 Reasoning Ability'}},
-  gds_basic_english:{title:{ta:'🔤 அடிப்படை ஆங்கிலம்',en:'🔤 Basic English'}}
-};
-
-const GDS_TOPIC_TA={
-  gds_gk:{'Indian History':'இந்திய வரலாறு','Indian Geography':'இந்திய புவியியல்','Indian Polity':'இந்திய அரசியல் அமைப்பு','General Science':'பொது அறிவியல்'},
-  gds_ga:{'India':'இந்தியா','Tamil Nadu':'தமிழ்நாடு','Economy and Society':'பொருளாதாரம் மற்றும் சமூகம்','Sports and Awards':'விளையாட்டு மற்றும் விருதுகள்'},
-  gds_current_affairs:{'National Current Affairs':'தேசிய நடப்பு நிகழ்வுகள்','Tamil Nadu Current Affairs':'தமிழ்நாடு நடப்பு நிகழ்வுகள்','International Current Affairs':'சர்வதேச நடப்பு நிகழ்வுகள்','Sports / Awards / Important Events':'விளையாட்டு / விருதுகள் / முக்கிய நிகழ்வுகள்'},
-  gds_maths:{'Basic Mathematics':'அடிப்படை கணிதம்','Mensuration':'அளவியல்','Commercial Mathematics':'வணிகக் கணிதம்','Data and Arithmetic':'தரவு மற்றும் எண்கணிதம்'},
-  gds_reasoning:{'Series':'தொடர்கள்','Analogy and Classification':'ஒப்புமை மற்றும் வகைப்படுத்தல்','Coding and Decoding':'குறியீடு மற்றும் மறைகுறியீடு','Logical Reasoning':'தர்க்க சிந்தனை'},
-  gds_basic_english:{'Grammar':'இலக்கணம்','Vocabulary':'சொற்களஞ்சியம்','Sentence Skills':'வாக்கியத் திறன்','Reading Comprehension':'வாசிப்புப் புரிதல்'}
-};
-const GDS_SUB_TA={
-  gds_gk:{'Ancient India':'பண்டைய இந்தியா','Medieval India':'இடைக்கால இந்தியா','Modern India':'நவீன இந்தியா','Freedom Movement':'சுதந்திரப் போராட்டம்','Physical Geography':'இயற்பியல் புவியியல்','States and Capitals':'மாநிலங்கள் மற்றும் தலைநகரங்கள்','Rivers and Resources':'ஆறுகள் மற்றும் வளங்கள்','Constitution':'அரசியலமைப்பு','Fundamental Rights and Duties':'அடிப்படை உரிமைகள் மற்றும் கடமைகள்','Parliament and Government':'நாடாளுமன்றம் மற்றும் அரசு','Physics Basics':'இயற்பியல் அடிப்படைகள்','Chemistry Basics':'வேதியியல் அடிப்படைகள்','Biology Basics':'உயிரியல் அடிப்படைகள்'},
-  gds_ga:{'National Institutions':'தேசிய நிறுவனங்கள்','Important Places':'முக்கிய இடங்கள்','Important Persons':'முக்கிய நபர்கள்','State Administration':'மாநில நிர்வாகம்','Districts':'மாவட்டங்கள்','Basic Economy':'பொருளாதார அடிப்படைகள்','Social Development':'சமூக வளர்ச்சி','Public Welfare':'பொது நலன்','Sports':'விளையாட்டு','Awards and Honours':'விருதுகள் மற்றும் கௌரவங்கள்','Important Events':'முக்கிய நிகழ்வுகள்'},
-  gds_current_affairs:{'Government and Policies':'அரசு மற்றும் கொள்கைகள்','Appointments':'நியமனங்கள்','Reports and Indices':'அறிக்கைகள் மற்றும் குறியீடுகள்','Government Schemes':'அரசுத் திட்டங்கள்','State Events':'மாநில நிகழ்வுகள்','International Organisations':'சர்வதேச அமைப்புகள்','World Events':'உலக நிகழ்வுகள்','Summits':'உச்சி மாநாடுகள்','Sports News':'விளையாட்டு செய்திகள்','Awards':'விருதுகள்','Important Days and Events':'முக்கிய நாட்கள் மற்றும் நிகழ்வுகள்'},
-  gds_maths:{'Numbers':'எண்கள்','Fractions':'பின்னங்கள்','Decimals':'தசமங்கள்','Percentage':'சதவீதம்','Ratio':'விகிதம்','Average':'சராசரி','Area':'பரப்பளவு','Perimeter':'சுற்றளவு','Volume':'கனஅளவு','Units':'அலகுகள்','Profit and Loss':'இலாபம் மற்றும் நட்டம்','Interest':'வட்டி','Time and Work':'காலம் மற்றும் வேலை','Speed and Distance':'வேகம் மற்றும் தூரம்','Simplification':'எளிமைப்படுத்தல்','Unitary Method':'ஒற்றை முறை','Basic Data Interpretation':'அடிப்படை தரவு விளக்கம்'},
-  gds_reasoning:{'Number Series':'எண் தொடர்','Alphabet Series':'எழுத்துத் தொடர்','Analogy':'ஒப்புமை','Classification':'வகைப்படுத்தல்','Coding':'குறியீடு','Decoding':'மறைகுறியீடு','Order and Ranking':'வரிசை மற்றும் தரவரிசை','Direction Sense':'திசை அறிவு','Simple Logical Problems':'எளிய தர்க்கப் பிரச்சினைகள்'},
-  gds_basic_english:{'Parts of Speech':'சொல் வகைகள்','Tenses':'காலங்கள்','Articles':'Articles','Prepositions':'முன்னிடைச் சொற்கள்','Subject-Verb Agreement':'எழுவாய்-வினைச்சொல் ஒத்திசைவு','Synonyms':'இணைச்சொற்கள்','Antonyms':'எதிர்ச்சொற்கள்','One Word Substitution':'ஒரு சொல் மாற்றீடு','Word Usage':'சொல் பயன்பாடு','Sentence Correction':'வாக்கியத் திருத்தம்','Fill in the Blanks':'இடைவெளி நிரப்புதல்','Rearrangement':'வாக்கிய மறுவரிசைப்படுத்தல்','Short Passages':'குறும் பத்திகள்','Question and Answer':'கேள்வி மற்றும் பதில்','Meaning from Context':'சூழலிலிருந்து பொருள்'}
-};
-
 function labelForTopic(s,t){
- if(GDS_MTS_I18N[s]){
-   const v=GDS_MTS_I18N[s].topics?.[t];
-   if(v) return contentLanguage==='en' ? v.en : v.ta;
-   if(contentLanguage!=='en' && GDS_TOPIC_TA[s]?.[t]) return GDS_TOPIC_TA[s][t];
- }
  if(contentLanguage==='en' && EN_LABELS[s]?.topics[t]) return EN_LABELS[s].topics[t].en;
  return t;
 }
 function labelForSub(s,t,sub){
- if(GDS_MTS_I18N[s]?.topics?.[t]?.subs?.[sub]){
-   const v=GDS_MTS_I18N[s].topics[t].subs[sub];
-   return contentLanguage==='en' ? v.en : v.ta;
- }
- if(contentLanguage!=='en' && GDS_SUB_TA[s]?.[sub]) return GDS_SUB_TA[s][sub];
  if(contentLanguage==='en' && EN_LABELS[s]?.topics[t]?.subs[sub]) return EN_LABELS[s].topics[t].subs[sub];
  return sub;
 }
@@ -4892,10 +4805,26 @@ async function loadPracticeQuestions(requested){
   ]);
   const isTamilagaPolitics = currentSubject==='gs' && POLITICS_SUBTOPICS.has(selectedSubtopic);
 
+  /* Department of Posts uses UI subject keys such as gds_postal_rules,
+     but the questions table stores the actual subject title.  Without this
+     mapping the API receives an empty subject and correctly returns zero
+     questions, while the headings still render. */
+  const POSTAL_DB_SUBJECTS = {
+    gds_to_mts: {
+      gds_postal_rules: 'Departmental Rules / Postal Department Rules & Knowledge',
+      gds_gk: 'General Knowledge (GK)',
+      gds_ga: 'General Awareness (GA)',
+      gds_current_affairs: 'Current Affairs',
+      gds_maths: 'Mathematics',
+      gds_reasoning: 'Reasoning Ability',
+      gds_basic_english: 'Basic English'
+    }
+  };
   const dbSubject =
     currentSubject==='gs' ? (isTamilagaPolitics ? (contentLanguage==='en' ? 'Tamil Nadu Politics' : 'தமிழக அரசியல்') : 'பொது அறிவு') :
     currentSubject==='apt' ? 'apt' :
-    currentSubject==='tamil' ? 'tamil' : '';
+    currentSubject==='tamil' ? 'tamil' :
+    (POSTAL_DB_SUBJECTS[selectedExam]?.[currentSubject] || '');
   let dbSubtopic=selectedSubtopic;
   /* Tamil Nadu Politics is stored with English subject/subtopic names for
      the English bank, while the UI keeps the existing Tamil internal keys. */
@@ -5225,23 +5154,13 @@ chooseContentLanguage=g4SetLanguage;
 window.subject=function(s){
   const S=String(s||'').trim();
   const E=String(selectedExam||'group4').trim();
-  const gdsSubjects=['gds_postal_rules','gds_gk','gds_ga','gds_current_affairs','gds_maths','gds_reasoning','gds_basic_english'];
-  if(!['tamil','gs','apt'].includes(S) && !gdsSubjects.includes(S)) return;
-  const isGdsMts=(E==='gds_to_mts');
-  if(E!=='group4' && E!=='postal_pa_sa' && !isGdsMts) return;
+  if(!['tamil','gs','apt'].includes(S)) return;
+  if(E!=='group4' && E!=='postal_pa_sa') return;
   if(E==='postal_pa_sa' && S==='tamil') return;
   if(E==='group4') localStorage.setItem('tnpsc_selected_exam','group4');
   currentSubject=S;
   currentTopic='';
   currentSub='';
-
-  /* GDS→MTS subjects use the same bilingual language chooser. */
-  if(isGdsMts){
-    window.pendingSubject=S;
-    const modal=document.getElementById('languageModal');
-    if(modal) modal.classList.remove('hidden');
-    return;
-  }
 
   /* தமிழ் is always Tamil. GK/Aptitude get an explicit language choice. */
   if(S==='tamil'){
