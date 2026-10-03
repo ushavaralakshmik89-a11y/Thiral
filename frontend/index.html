@@ -4480,7 +4480,11 @@ window.V91_ADV_NUM=V91_ADV_NUM;
   window.deleteStudentAccount = async function(studentId){
     var sid=String(studentId||'').trim();
     if(!sid) return;
-    var ok=confirm('Student ID: '+sid+'\n\nஇந்த Student account-ஐ நிரந்தரமாக Delete செய்யவா?\n\nStudent-ன் login/account மற்றும் தொடர்புடைய attempts/history நீக்கப்படும். Questions / Question Bank அழிக்கப்படாது.');
+    var ok=confirm('Student ID: '+sid+'
+
+இந்த Student account-ஐ நிரந்தரமாக Delete செய்யவா?
+
+Student-ன் login/account மற்றும் தொடர்புடைய attempts/history நீக்கப்படும். Questions / Question Bank அழிக்கப்படாது.');
     if(!ok) return;
     var confirmId=window.prompt('Delete உறுதிப்படுத்த Student ID-ஐ மீண்டும் உள்ளிடுங்கள்:');
     if(confirmId===null || String(confirmId).trim()!==sid){
@@ -4499,7 +4503,9 @@ window.V91_ADV_NUM=V91_ADV_NUM;
   window.toggleStudentStatus = async function(studentId, currentlyActive){
     var action = currentlyActive ? 'Deactivate / முடக்க' : 'Reactivate / மீண்டும் செயல்படுத்த';
     var message = currentlyActive
-      ? 'இந்த Student ID-ஐ Deactivate செய்யவா?\n\nLogin உடனடியாக தடுக்கப்படும். Results/Attempts அழிக்கப்படாது.'
+      ? 'இந்த Student ID-ஐ Deactivate செய்யவா?
+
+Login உடனடியாக தடுக்கப்படும். Results/Attempts அழிக்கப்படாது.'
       : 'இந்த Student ID-ஐ Reactivate செய்யவா?';
     if(!confirm(message)) return;
     try{
@@ -6056,7 +6062,8 @@ window.startPractice=async function(n){
 <script id="thiral-daily-content-script-v1">
 (function(){
   const items=[
-    {type:'📖 இன்றைய திருக்குறள்',title:'கற்க கசடறக் கற்பவை கற்றபின்',text:'நிற்க அதற்குத் தக.\n— திருக்குறள் 391',explain:'கற்க வேண்டியவற்றைத் தெளிவாகவும் குற்றமின்றியும் கற்று, கற்ற அறிவுக்கு ஏற்றவாறு வாழ்க்கையில் நடந்து கொள்ள வேண்டும்.'},
+    {type:'📖 இன்றைய திருக்குறள்',title:'கற்க கசடறக் கற்பவை கற்றபின்',text:'நிற்க அதற்குத் தக.
+— திருக்குறள் 391',explain:'கற்க வேண்டியவற்றைத் தெளிவாகவும் குற்றமின்றியும் கற்று, கற்ற அறிவுக்கு ஏற்றவாறு வாழ்க்கையில் நடந்து கொள்ள வேண்டும்.'},
     {type:'💭 இன்றைய சிந்தனை',title:'சிறிய முன்னேற்றமும் முன்னேற்றமே',text:'தினமும் நேற்று செய்ததைவிட சிறிதளவு சிறப்பாகச் செய்வதே நீண்ட பயணத்தின் உண்மையான வெற்றி.',explain:'பெரிய மாற்றத்தை ஒரே நாளில் எதிர்பார்ப்பதைவிட, தொடர்ந்து செய்யக்கூடிய சிறிய முன்னேற்றங்களை உருவாக்குவது பயனுள்ளதாக இருக்கும்.'},
     {type:'🌱 இன்றைய அறிவுரை',title:'ஒரு நேரத்தில் ஒரு இலக்கு',text:'ஒரே நாளில் எல்லாவற்றையும் முடிக்க முயலாதீர்கள். முக்கியமான ஒன்றை முதலில் முடிக்குங்கள்.',explain:'முன்னுரிமையைத் தீர்மானித்து செயல்பட்டால் கவனச்சிதறல் குறைந்து வேலை முடிக்கும் திறன் அதிகரிக்கும்.'},
     {type:'🧠 இன்றைய அறிவுத் துளி',title:'நினைவில் நிற்கும் ஒரு வழி',text:'படித்ததை புத்தகத்தை மூடி உங்கள் சொந்த வார்த்தைகளில் சொல்லிப் பாருங்கள்.',explain:'நினைவிலிருந்து மீட்டெடுத்து சொல்லும் பயிற்சி, வெறுமனே மீண்டும் வாசிப்பதைவிட கற்றதை உறுதிப்படுத்த உதவும்.'},
@@ -6066,7 +6073,8 @@ window.startPractice=async function(n){
     {type:'✨ இன்றைய வாழ்க்கைப் பாடம்',title:'ஒப்பிடுவதை குறை',text:'உங்கள் பயணத்தை மற்றவர்களின் பயணத்துடன் ஒப்பிடாமல், நேற்று இருந்த உங்களுடன் ஒப்பிடுங்கள்.',explain:'ஒவ்வொருவருக்கும் தொடக்கநிலையும் சூழலும் வேறுபடும். தனிப்பட்ட முன்னேற்றத்தை அளவிடுவது தெளிவான இலக்கை உருவாக்க உதவும்.'},
     {type:'📚 இன்றைய கற்றல் குறிப்பு',title:'படித்ததை எழுதிப் பாருங்கள்',text:'ஒரு கருத்தை இரண்டு அல்லது மூன்று வரிகளில் எழுதிப் பாருங்கள்.',explain:'சுருக்கமாக எழுதுவது கருத்தின் முக்கிய அம்சங்களை அடையாளம் காணவும் புரிதலைச் சரிபார்க்கவும் உதவும்.'},
     {type:'🌟 இன்றைய சிறப்பு சிந்தனை',title:'வாய்ப்பை காத்திருக்க வேண்டாம்',text:'கிடைக்கும் நேரத்தில் சிறிய படியைத் தொடங்குங்கள்.',explain:'சரியான நேரம் வரும் வரை காத்திருப்பதைவிட, கிடைக்கும் வளங்களுடன் தொடங்குவது செயல்பாட்டை உருவாக்கும்.'},
-    {type:'📖 இன்றைய திருக்குறள்',title:'எண்ணித் துணிக கருமம் துணிந்தபின்',text:'எண்ணுவம் என்பது இழுக்கு.\n— திருக்குறள் 467',explain:'ஒரு செயலைத் தொடங்குவதற்கு முன் அதன் விளைவுகளைச் சிந்தித்து முடிவு செய்ய வேண்டும்.'},
+    {type:'📖 இன்றைய திருக்குறள்',title:'எண்ணித் துணிக கருமம் துணிந்தபின்',text:'எண்ணுவம் என்பது இழுக்கு.
+— திருக்குறள் 467',explain:'ஒரு செயலைத் தொடங்குவதற்கு முன் அதன் விளைவுகளைச் சிந்தித்து முடிவு செய்ய வேண்டும்.'},
     {type:'💭 இன்றைய சிந்தனை',title:'கவனம் ஒரு வளம்',text:'நேரம் மட்டும் அல்ல, கவனமும் வரம்புடைய வளம்.',explain:'முக்கியமான வேலையின் போது தேவையற்ற அறிவிப்புகள் மற்றும் கவனச்சிதறல்களை குறைப்பது பயனளிக்கும்.'},
     {type:'🌱 இன்றைய அறிவுரை',title:'கேள்வி கேட்கத் தயங்காதீர்கள்',text:'புரியாததை கேட்பது பலவீனம் அல்ல; புரிந்து கொள்ளும் முயற்சி.',explain:'சந்தேகத்தை தெளிவுபடுத்துவது தவறான புரிதலை நீக்கி கற்றலை வேகப்படுத்தும்.'},
     {type:'🧠 இன்றைய அறிவுத் துளி',title:'சிறு இடைவெளி உதவும்',text:'நீண்ட நேரம் இடைவிடாமல் படிப்பதைவிட திட்டமிட்ட சிறு இடைவெளிகள் உதவியாக இருக்கலாம்.',explain:'கவனம் குறையும் முன் குறுகிய இடைவெளி எடுத்தால் மீண்டும் பணியில் திரும்புவது எளிதாகும்.'},
@@ -6076,7 +6084,8 @@ window.startPractice=async function(n){
     {type:'✨ இன்றைய வாழ்க்கைப் பாடம்',title:'சொல்லும் முன் சிந்தி',text:'ஒரு வார்த்தையைச் சொல்ல சில வினாடிகள் போதும்; அதன் தாக்கம் நீண்டதாக இருக்கலாம்.',explain:'கோபம் அல்லது அவசரத்தில் பதிலளிப்பதற்கு முன் சிறிது இடைவெளி கொடுப்பது பயனுள்ளதாக இருக்கும்.'},
     {type:'📚 இன்றைய கற்றல் குறிப்பு',title:'தெரிந்ததை மற்றொருவருக்குச் சொல்லுங்கள்',text:'ஒரு கருத்தை எளிமையாக விளக்கிப் பாருங்கள்.',explain:'மற்றொருவருக்குப் புரியும்படி விளக்க முயற்சிப்பது உங்கள் சொந்த புரிதலில் உள்ள இடைவெளிகளை கண்டுபிடிக்க உதவும்.'},
     {type:'🌟 இன்றைய சிறப்பு சிந்தனை',title:'நன்றி சொல்லும் பழக்கம்',text:'இன்று உங்களுக்கு உதவிய ஒருவருக்கு நன்றி சொல்லுங்கள்.',explain:'நன்றியை வெளிப்படுத்துவது உறவுகளில் நேர்மறையான தொடர்பை வளர்க்கும்.'},
-    {type:'📖 இன்றைய திருக்குறள்',title:'வெள்ளத் தனைய மலர்நீட்டம் மாந்தர்தம்',text:'உள்ளத் தனையது உயர்வு.\n— திருக்குறள் 595',explain:'மனிதனின் உயர்வு அவனுடைய உள்ளத்தின் உயர்வோடு தொடர்புடையது என்பதே இந்தக் குறளின் கருத்து.'},
+    {type:'📖 இன்றைய திருக்குறள்',title:'வெள்ளத் தனைய மலர்நீட்டம் மாந்தர்தம்',text:'உள்ளத் தனையது உயர்வு.
+— திருக்குறள் 595',explain:'மனிதனின் உயர்வு அவனுடைய உள்ளத்தின் உயர்வோடு தொடர்புடையது என்பதே இந்தக் குறளின் கருத்து.'},
     {type:'💭 இன்றைய சிந்தனை',title:'நேர்மை எளிமையானது',text:'சரியானதைச் செய்வது எப்போதும் எளிதாக இருக்காது; ஆனால் முடிவில் மன அமைதியைத் தரும்.',explain:'நேர்மையான முடிவுகள் நம்பிக்கையை உருவாக்குகின்றன.'},
     {type:'🌱 இன்றைய அறிவுரை',title:'திட்டத்தை எழுதுங்கள்',text:'நாளைய முக்கியமான மூன்று பணிகளை இன்றே எழுதிவையுங்கள்.',explain:'எழுதப்பட்ட சிறிய திட்டம் அடுத்த நாள் தொடங்குவதற்கான தயக்கத்தை குறைக்க உதவும்.'},
     {type:'🧠 இன்றைய அறிவுத் துளி',title:'கற்றதை இடைவெளியில் நினைவுகூருங்கள்',text:'ஒரே நாளில் முழுவதையும் படிப்பதைவிட இடைவெளிகளுடன் மீள்பார்வை செய்வது பயனுள்ளதாக இருக்கும்.',explain:'மீள்பார்வையை பல நாட்களாகப் பிரிப்பது நீண்டகால நினைவாற்றலுக்கு உதவக்கூடும்.'},
@@ -6118,7 +6127,8 @@ async function loadImportantNews(){
     }
     box.innerHTML=items.map(n=>{
       const title=escapeHtmlAdmin(n.title||'முக்கிய அறிவிப்பு');
-      const content=escapeHtmlAdmin(n.content||'').replace(/\n/g,'<br>');
+      const content=escapeHtmlAdmin(n.content||'').replace(/
+/g,'<br>');
       const date=n.published_at||n.created_at;
       let dateText='';
       if(date){try{dateText=new Date(date).toLocaleString('ta-IN');}catch(e){dateText=String(date);}}
@@ -6674,6 +6684,96 @@ function escapeHtmlAdmin(v){
   }
 })();
 </script>
+
+<script id="thiral-gds-volume-v-final-v19">
+(function(){
+  'use strict';
+  var GDS='gds_to_mts';
+  var SUBJECT='gds_postal_rules';
+  var DB_SUBJECT='Departmental Rules / Postal Department Rules & Knowledge';
+  var DB_SUBTOPIC='Postal Manual Volume V';
+  var baseStart=window.startPractice;
+  var baseApi=window.thiralV138Api;
+  var bridgeActive=false;
+
+  function isV5(){
+    return String(window.selectedExam||'')===GDS &&
+      String(window.currentSubject||'')===SUBJECT &&
+      (String(window.currentTopic||'').trim()==='அஞ்சல் கையேடு தொகுதி-V' ||
+       String(window.currentTopic||'').trim()==='Postal Manual Volume-V');
+  }
+
+  function parseQuery(path){
+    var q={};
+    try{
+      var u=new URL(path,window.location.href);
+      u.searchParams.forEach(function(v,k){q[k]=v;});
+    }catch(e){}
+    return q;
+  }
+
+  window.startPractice=async function(n){
+    if(!isV5()) return baseStart.apply(this,arguments);
+    var count=[10,20,50,100].indexOf(Number(n))>=0?Number(n):10;
+    bridgeActive=true;
+    var oldSub=window.currentSub;
+    var oldApi=window.thiralV138Api;
+    try{
+      /* The existing final practice renderer requires its internal
+         "Full Volume" state. We keep that UI state, but intercept the
+         backend request and force the real Volume-V DB filter. */
+      window.currentSub='முழுத் தொகுதி';
+      window.thiralV138Api=async function(path,opt){
+        if(!bridgeActive || typeof path!=='string') return oldApi(path,opt);
+
+        var q=parseQuery(path);
+        if(q.exam===GDS && path.indexOf('/questions?')===0){
+          var lang=(String(q.language||'ta')==='en')?'en':'ta';
+          var d=await oldApi('/practice/questions?exam='+encodeURIComponent(GDS)+
+            '&subject='+encodeURIComponent(DB_SUBJECT)+
+            '&language='+encodeURIComponent(lang)+
+            '&subtopic='+encodeURIComponent(DB_SUBTOPIC)+
+            '&limit=200');
+          return {
+            questions:Array.isArray(d&&d.questions)?d.questions:[],
+            pagination:{limit:200,offset:0,returned:Array.isArray(d&&d.questions)?d.questions.length:0,total:Array.isArray(d&&d.questions)?d.questions.length:0,hasMore:false,nextOffset:Array.isArray(d&&d.questions)?d.questions.length:0}
+          };
+        }
+
+        if(q.exam===GDS && path==='/attempts' && opt && opt.body){
+          var body={};
+          try{body=JSON.parse(opt.body||'{}');}catch(e){}
+          body.exam=GDS;
+          body.subject=DB_SUBJECT;
+          body.mode='practice';
+          body.language=(String(body.language||'ta')==='en')?'en':'ta';
+          opt=Object.assign({},opt,{body:JSON.stringify(body)});
+          return oldApi(path,opt);
+        }
+
+        return oldApi(path,opt);
+      };
+
+      return await baseStart.call(this,count);
+    }finally{
+      bridgeActive=false;
+      window.thiralV138Api=oldApi;
+      window.currentSub=oldSub;
+    }
+  };
+
+  window.__THIRAL_V19_VOLUME_V_FIX__={
+    fixed:true,
+    exam:GDS,
+    subject:DB_SUBJECT,
+    subtopic:DB_SUBTOPIC,
+    endpoint:'/api/practice/questions',
+    counts:[10,20,50,100],
+    group4Untouched:true
+  };
+})();
+</script>
+
 </body></html>
 
 
