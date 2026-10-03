@@ -3760,8 +3760,13 @@ window.V91_ADV_NUM=V91_ADV_NUM;
       securePractice.timer = null;
       securePractice.seconds = 15;
 
-      if(isGdsRules && String(selectedSubtopic||'').trim()==='முழுத் தொகுதி' && String(currentTopic||'').trim()==='அஞ்சல் வழிகாட்டி பகுதி-I'){
-        if(el('feedback')) el('feedback').textContent='அஞ்சல் வழிகாட்டி பகுதி-I: '+securePractice.questions.length+' கேள்விகள் ஏற்றப்பட்டுள்ளன.';
+      if(String(selectedExam)==='gds_to_mts' && String(subject)==='gds_postal_rules' &&
+         String(selectedSubtopic||'').trim()==='முழுத் தொகுதி' && String(currentTopic||'').trim()==='அஞ்சல் வழிகாட்டி பகுதி-I'){
+        if(el('feedback')) el('feedback').textContent=(lang==='en'?'Post Office Guide Part-I: ':'அஞ்சல் வழிகாட்டி பகுதி-I: ')+securePractice.questions.length+(lang==='en'?' questions loaded.':' கேள்விகள் ஏற்றப்பட்டுள்ளன.');
+      }
+      if(String(selectedExam)==='gds_to_mts' && String(subject)==='gds_postal_rules' &&
+         String(selectedSubtopic||'').trim()==='முழுத் தொகுதி' && String(currentTopic||'').trim()==='அஞ்சல் கையேடு தொகுதி-V'){
+        if(el('feedback')) el('feedback').textContent=(lang==='en'?'Postal Manual Volume-V: ':'அஞ்சல் கையேடு தொகுதி-V: ')+securePractice.questions.length+(lang==='en'?' questions loaded.':' கேள்விகள் ஏற்றப்பட்டுள்ளன.');
       }
 
       if(!securePractice.questions.length){
@@ -5326,7 +5331,7 @@ window.mockPrev=mockPrev;
 window.submitMock=submitMock;
 
 /* Unique proof marker for checking the deployed HTML. */
-window.__THIRAL_FINAL_DIRECT_API__='DATABASE-QUESTIONS-ONLY-v1';
+window.__THIRAL_FINAL_DIRECT_API__='DATABASE-QUESTIONS-ONLY-v2-V5-TA-EN';
 })();
 </script>
 
