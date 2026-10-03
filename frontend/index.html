@@ -6447,6 +6447,95 @@ function escapeHtmlAdmin(v){
 })();
 </script>
 
+
+<script id="thiral-gds-department-rules-final-two-topics">
+/* FINAL FIX: Departmental Rules must always show BOTH source volumes. */
+(function(){
+  'use strict';
+  var EXAM='gds_to_mts', SUBJECT='gds_postal_rules';
+  var TOPIC1='அஞ்சல் வழிகாட்டி பகுதி-I';
+  var TOPIC2='அஞ்சல் கையேடு தொகுதி-V';
+  var SUBS1=['பொதுவான அஞ்சல் விதிகள்','அஞ்சல் / கட்டுரை அடிப்படைகள்','அஞ்சல் சேவைகள்'];
+
+  function isGds(){return String(window.selectedExam||'')===EXAM;}
+  function esc(v){return String(v==null?'':v).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
+
+  function ensureData(){
+    if(!window.data) return false;
+    if(!data[SUBJECT]) data[SUBJECT]={title:'Departmental Rules / Postal Department Rules & Knowledge',topics:{}};
+    data[SUBJECT].topics={};
+    data[SUBJECT].topics[TOPIC1]=SUBS1.slice();
+    data[SUBJECT].topics[TOPIC2]=[];
+    return true;
+  }
+
+  function render(){
+    if(!isGds() || String(window.currentSubject||'')!==SUBJECT) return;
+    if(!ensureData()) return;
+    var title=document.getElementById('subjectTitle');
+    var grid=document.getElementById('topicGrid');
+    if(title) title.textContent='📮 Departmental Rules / Postal Department Rules & Knowledge';
+    if(!grid) return;
+    grid.innerHTML=
+      '<button type="button" onclick="topic(\''+esc(TOPIC1)+'\')">📕 '+TOPIC1+'</button>'+
+      '<button type="button" onclick="topic(\''+esc(TOPIC2)+'\')">📘 '+TOPIC2+'</button>';
+    if(typeof show==='function') show('topics');
+  }
+
+  var oldSubject=window.subject;
+  window.subject=function(s){
+    if(String(window.selectedExam||'')===EXAM && String(s||'')===SUBJECT){
+      window.currentSubject=SUBJECT;
+      window.currentTopic='';
+      window.currentSub='';
+      ensureData();
+      render();
+      return;
+    }
+    return typeof oldSubject==='function' ? oldSubject.apply(this,arguments) : undefined;
+  };
+
+  var oldTopic=window.topic;
+  window.topic=function(t){
+    if(isGds() && String(window.currentSubject||'')===SUBJECT && (String(t||'')===TOPIC1 || String(t||'')===TOPIC2)){
+      window.currentTopic=String(t);
+      window.currentSub='';
+      window.pendingGdsTopic=window.currentTopic;
+      if(typeof openLanguageChooser==='function') openLanguageChooser();
+      return;
+    }
+    return typeof oldTopic==='function' ? oldTopic.apply(this,arguments) : undefined;
+  };
+
+  var oldChoose=window.chooseContentLanguage;
+  window.chooseContentLanguage=function(lang){
+    if(isGds() && String(window.pendingGdsTopic||'') && String(window.currentSubject||'')===SUBJECT){
+      window.contentLanguage=(String(lang||'ta').toLowerCase()==='en')?'en':'ta';
+      try{localStorage.setItem('tnpsc_content_language',window.contentLanguage);}catch(e){}
+      var modal=document.getElementById('languageModal');
+      if(modal) modal.classList.add('hidden');
+      var topic=String(window.pendingGdsTopic); window.pendingGdsTopic=null;
+      window.currentTopic=topic;
+      var list=(data[SUBJECT].topics[topic]||[]);
+      var title=document.getElementById('topicTitle');
+      var grid=document.getElementById('subtopicGrid');
+      if(title) title.textContent='📌 '+topic+' – Subtopics';
+      if(grid){
+        if(list.length){
+          grid.innerHTML=list.map(function(x){return '<button type="button" onclick="subtopic(\''+esc(x)+'\')">'+x+'</button>';}).join('');
+        }else{
+          grid.innerHTML='<div class="card" style="grid-column:1/-1;text-align:center"><h3>📘 '+topic+'</h3><p>இந்த Volume-க்கான source content இன்னும் இணைக்கப்படவில்லை.</p></div>';
+        }
+      }
+      if(typeof show==='function') show('subtopics');
+      return;
+    }
+    return typeof oldChoose==='function' ? oldChoose.apply(this,arguments) : undefined;
+  };
+
+  window.__THIRAL_GDS_TWO_TOPICS_FINAL__={exam:EXAM,subject:SUBJECT,topics:[TOPIC1,TOPIC2]};
+})();
+</script>
 </body></html>
 
 
