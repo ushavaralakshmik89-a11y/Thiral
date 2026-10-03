@@ -3613,26 +3613,51 @@ window.V91_ADV_NUM=V91_ADV_NUM;
        all Departmental Rules rows except those three Part-I subtopics. */
     var isAggregate = isGdsRules && String(subtopic||'').trim()==='முழுத் தொகுதி';
     if(isAggregate){
+      /*
+       * Part-I has exactly three existing database subtopics. Do NOT depend on
+       * a broad subject query or on the UI topic variable to discover them.
+       * Fetch each subtopic explicitly, page by page, and combine the rows.
+       * This guarantees that the 339 Tamil rows already uploaded to the
+       * questions table are what Practice receives.
+       */
       var topic = String(currentTopic||'').trim();
-      var part1Subs = new Set(['பொதுவான அஞ்சல் விதிகள்','அஞ்சல் / கட்டுரை அடிப்படைகள்','அஞ்சல் சேவைகள்']);
-      var wanted = topic === 'அஞ்சல் வழிகாட்டி பகுதி-I' ? part1Subs : null;
-      var out = [], offset = 0, page = 200;
-      while(true){
-        var d = await fetchRows('', page, offset);
-        var rows = Array.isArray(d.questions) ? d.questions : [];
-        for(var i=0;i<rows.length;i++){
-          var st=String(rows[i].subtopic||'').trim();
-          if(topic === 'அஞ்சல் வழிகாட்டி பகுதி-I'){
-            if(wanted.has(st)) out.push(rows[i]);
-          }else if(topic === 'அஞ்சல் கையேடு தொகுதி-V'){
-            if(!wanted || !wanted.has(st)) out.push(rows[i]);
+      if(topic === 'அஞ்சல் வழிகாட்டி பகுதி-I'){
+        var part1Names = ['பொதுவான அஞ்சல் விதிகள்','அஞ்சல் / கட்டுரை அடிப்படைகள்','அஞ்சல் சேவைகள்'];
+        var combined=[];
+        for(var si=0; si<part1Names.length; si++){
+          var stName=part1Names[si];
+          var off=0;
+          while(true){
+            var sd=await fetchRows(stName,200,off);
+            var srows=Array.isArray(sd.questions)?sd.questions:[];
+            for(var sj=0;sj<srows.length;sj++) combined.push(srows[sj]);
+            if(!sd.pagination || !sd.pagination.hasMore || srows.length===0) break;
+            var next=Number(sd.pagination.nextOffset);
+            if(!Number.isFinite(next) || next<=off) break;
+            off=next;
           }
         }
-        if(!d.pagination || !d.pagination.hasMore || rows.length===0) break;
-        offset=Number(d.pagination.nextOffset ?? (offset+rows.length));
-        if(!Number.isFinite(offset)) break;
+        return combined;
       }
-      return out;
+
+      if(topic === 'அஞ்சல் கையேடு தொகுதி-V'){
+        var excluded = new Set(['பொதுவான அஞ்சல் விதிகள்','அஞ்சல் / கட்டுரை அடிப்படைகள்','அஞ்சல் சேவைகள்']);
+        var volumeRows=[], voff=0;
+        while(true){
+          var vd=await fetchRows('',200,voff);
+          var vrows=Array.isArray(vd.questions)?vd.questions:[];
+          for(var vi=0;vi<vrows.length;vi++){
+            if(!excluded.has(String(vrows[vi].subtopic||'').trim())) volumeRows.push(vrows[vi]);
+          }
+          if(!vd.pagination || !vd.pagination.hasMore || vrows.length===0) break;
+          var vnext=Number(vd.pagination.nextOffset);
+          if(!Number.isFinite(vnext) || vnext<=voff) break;
+          voff=vnext;
+        }
+        return volumeRows;
+      }
+
+      return [];
     }
 
     var d = await fetchRows(subtopic, Math.max(Number(count)||10,100), 0);
@@ -3695,6 +3720,10 @@ window.V91_ADV_NUM=V91_ADV_NUM;
       securePractice.index = 0;
       securePractice.timer = null;
       securePractice.seconds = 15;
+
+      if(isGdsRules && String(selectedSubtopic||'').trim()==='முழுத் தொகுதி' && String(currentTopic||'').trim()==='அஞ்சல் வழிகாட்டி பகுதி-I'){
+        if(el('feedback')) el('feedback').textContent='அஞ்சல் வழிகாட்டி பகுதி-I: '+securePractice.questions.length+' கேள்விகள் ஏற்றப்பட்டுள்ளன.';
+      }
 
       if(!securePractice.questions.length){
         throw new Error('இந்த தேர்வு/பாடத்திற்கு backend-ல் கேள்விகள் இல்லை.');
@@ -6465,17 +6494,19 @@ function escapeHtmlAdmin(v){
   var GDS='gds_to_mts', SUBJECT='gds_postal_rules';
   var baseTopic=window.topic;
   var baseSubtopic=window.subtopic;
+  var gdsSelectedBook='';
 
   function isGDS(){return String(selectedExam||'')===GDS && String(currentSubject||'')===SUBJECT;}
 
   window.topic=function(t){
     if(!isGDS()) return baseTopic.apply(this,arguments);
-    currentTopic=String(t||'');
+    gdsSelectedBook=String(t||'').trim();
+    currentTopic=gdsSelectedBook;
     currentSub='';
     var title=document.getElementById('topicTitle');
     var grid=document.getElementById('subtopicGrid');
-    if(title) title.textContent=labelForTopic(currentSubject,currentTopic)+' – Subtopics';
-    if(grid) grid.innerHTML='<button type="button" onclick="subtopic(\'முழுத் தொகுதி\')">முழுத் தொகுதி</button>';
+    if(title) title.textContent=labelForTopic(currentSubject,gdsSelectedBook)+' – Subtopics';
+    if(grid) grid.innerHTML='<button type="button" onclick="subtopic(\'মுழுத் தொகுதி\')">முழுத் தொகுதி</button>';
     show('subtopics');
   };
 
@@ -6486,7 +6517,7 @@ function escapeHtmlAdmin(v){
     var material=document.getElementById('materialText');
     if(label) label.textContent='📌 முழுத் தொகுதி';
     if(material) material.textContent='இந்தப் பகுதியின் ஏற்கனவே பதிவேற்றப்பட்ட முழு கேள்வித் தொகுப்பு.';
-    /* No count picker. 9999 is the existing full-bank mode. */
+    /* Direct full-bank mode. There is deliberately no 10/20/50/100 picker. */
     window.startPractice(9999);
   };
 
@@ -6495,6 +6526,7 @@ function escapeHtmlAdmin(v){
     subject:SUBJECT,
     books:['அஞ்சல் வழிகாட்டி பகுதி-I','அஞ்சல் கையேடு தொகுதி-V'],
     subtopic:'முழுத் தொகுதி',
+    selectedBook:gdsSelectedBook,
     mode:'full-bank-direct'
   };
 })();
