@@ -557,6 +557,18 @@ a{
 }
 </style>
 
+
+<style id="thiral-practice-navigation-final">
+#practiceNavigation{width:100%;box-sizing:border-box;}
+#practiceNavigation #practicePrevBtn{justify-self:start;}
+#practiceNavigation #practiceNextBtn{justify-self:end;min-width:110px;}
+#practiceNavigation #practiceSubmitBtn{justify-self:end;min-width:120px;}
+@media (max-width:560px){
+  #practiceNavigation{grid-template-columns:1fr 1fr;}
+  #practiceNavigation #practicePrevBtn{justify-self:start;}
+  #practiceNavigation #practiceNextBtn,#practiceNavigation #practiceSubmitBtn{justify-self:stretch;}
+}
+</style>
 </head>
 <body>
 <header class="thiral-final-hero">
@@ -765,7 +777,7 @@ a{
 <div class="top"><h2>📝 Practice</h2><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><div class="timer">⏱️ <span id="timer">15</span>s</div><button type="button" id="practiceLogoutBtn" class="secondary" onclick="window.thiralLogoutFromActivity()">Logout</button></div></div>
 <p><span class="badge" id="level"></span> <span class="badge" id="progress"></span></p>
 <div class="bar"><div id="bar"></div></div>
-<h3 id="question"></h3><div id="options"></div><p id="feedback"></p><div id="practiceNavigation" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:14px"><button type="button" class="secondary" id="practicePrevBtn">← Previous</button><button type="button" class="secondary" id="practiceNextBtn">Next →</button><button type="button" id="practiceSubmitBtn">Submit Test</button></div>><button id="stopInfinitePractice" class="secondary hidden" onclick="stopInfinitePractice()">⏹ Practice நிறுத்தி Result பார்க்க</button>
+<h3 id="question"></h3><div id="options"></div><p id="feedback"></p><div id="practiceNavigation" style="display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;margin-top:14px;width:100%"><button type="button" class="secondary" id="practicePrevBtn">← Previous</button><button type="button" class="secondary" id="practiceNextBtn">Next →</button><button type="button" id="practiceSubmitBtn">Submit Test</button></div>><button id="stopInfinitePractice" class="secondary hidden" onclick="stopInfinitePractice()">⏹ Practice நிறுத்தி Result பார்க்க</button>
 </section>
 
 <section id="result" class="card hidden">
@@ -4815,6 +4827,19 @@ async function answer(value,timeout=false){
     if($('feedback'))$('feedback').innerHTML=h;
     T.busy=false;
     syncPracticeNavigation();
+
+    /* After an answer is checked, move to the next question automatically.
+       The 15-second timeout uses the same path, so timeout also advances. */
+    window.setTimeout(function(){
+      if(T.submitted) return;
+      if(T.i < T.q.length-1){
+        T.i++;
+        render();
+        window.scrollTo({top:0,behavior:'instant'});
+      }else{
+        submit();
+      }
+    }, 700);
   }catch(e){
     T.busy=false; delete T.answers[key]; lock(false);
     if($('feedback'))$('feedback').innerHTML='<b>விடை சரிபார்க்க முடியவில்லை.</b><br>'+esc(e.message);
