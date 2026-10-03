@@ -685,7 +685,7 @@ a{
 <button onclick="openExam('assistant')">📁 Assistant</button>
 <button onclick="openExam('junior_assistant')">📁 Junior Assistant</button>
 </div>
-<h3>📮 Postal</h3>
+<h3>📮 Department of Posts</h3>
 <div class="grid">
 <button onclick="openExam('postal_pa_sa')">📮 Postal PA / SA</button>
 </div>
@@ -5108,9 +5108,11 @@ chooseContentLanguage=g4SetLanguage;
 
 window.subject=function(s){
   const S=String(s||'').trim();
+  const E=String(selectedExam||'group4').trim();
   if(!['tamil','gs','apt'].includes(S)) return;
-  selectedExam='group4';
-  localStorage.setItem('tnpsc_selected_exam','group4');
+  if(E!=='group4' && E!=='postal_pa_sa') return;
+  if(E==='postal_pa_sa' && S==='tamil') return;
+  if(E==='group4') localStorage.setItem('tnpsc_selected_exam','group4');
   currentSubject=S;
   currentTopic='';
   currentSub='';
@@ -5152,8 +5154,10 @@ window.startPractice=async function(n){
   const S=String(currentSubject||'').trim();
   const L=(S==='tamil')?'ta':(contentLanguage==='en'?'en':'ta');
   contentLanguage=L;
-  selectedExam='group4';
-  localStorage.setItem('tnpsc_selected_exam','group4');
+  if(String(selectedExam||'group4')!=='postal_pa_sa') {
+    selectedExam='group4';
+    localStorage.setItem('tnpsc_selected_exam','group4');
+  }
   localStorage.setItem('tnpsc_content_language',L);
   if(!['tamil','gs','apt'].includes(S)){
     if(document.getElementById('feedback')) document.getElementById('feedback').textContent='Group 4 பாடத்தைத் தேர்வு செய்யவும்.';
@@ -5184,8 +5188,10 @@ window.__THIRAL_GROUP4_FINAL_WEBSITE__={
 /* Prevent the older wrapper from allowing a wrong subject/language state. */
 const previousStart=window.startPractice;
 window.startPractice=async function(n){
-  selectedExam='group4';
+  const E=String(selectedExam||'group4').trim();
+  if(E!=='group4' && E!=='postal_pa_sa') return;
   const S=String(currentSubject||'').trim();
+  if(E==='postal_pa_sa' && S==='tamil') return;
   if(!['tamil','gs','apt'].includes(S)){ if(document.getElementById('feedback')) document.getElementById('feedback').textContent='Group 4 பாடத்தைத் தேர்வு செய்யவும்.'; return; }
   contentLanguage=(S==='tamil')?'ta':(contentLanguage==='en'?'en':'ta');
   localStorage.setItem('tnpsc_selected_exam','group4');
@@ -5239,19 +5245,27 @@ window.startPractice=async function(n){
 (function(){
   'use strict';
   var G4='group4';
-  function forceGroup4(){
-    try{ selectedExam=G4; }catch(e){}
-    try{ localStorage.setItem('tnpsc_selected_exam',G4); }catch(e){}
+  var POSTS='postal_pa_sa';
+  function forceAllowedExam(){
+    try{
+      var current=String(selectedExam||'');
+      if(current!==G4 && current!==POSTS) selectedExam=G4;
+    }catch(e){}
+    try{
+      var saved=String(localStorage.getItem('tnpsc_selected_exam')||'');
+      if(saved!==G4 && saved!==POSTS) localStorage.setItem('tnpsc_selected_exam',G4);
+    }catch(e){}
   }
-  forceGroup4();
+  forceAllowedExam();
 
-  /* Final authority for exam navigation. */
+  /* Final authority for exam navigation. Group 4 and Department of Posts are now open. */
   window.openExam=function(id){
-    if(String(id)!==G4){
-      forceGroup4();
+    var exam=String(id||'');
+    if(exam!==G4 && exam!==POSTS){
+      forceAllowedExam();
       return false;
     }
-    forceGroup4();
+    try{ selectedExam=exam; localStorage.setItem('tnpsc_selected_exam',exam); }catch(e){}
     if(typeof renderExamHome==='function') renderExamHome();
     show('examHome');
     return false;
@@ -5291,7 +5305,7 @@ window.startPractice=async function(n){
   function lockOtherExamButtons(){
     document.querySelectorAll('button[onclick]').forEach(function(btn){
       var m=String(btn.getAttribute('onclick')||'').match(/openExam\(['"]([^'"]+)['"]\)/);
-      if(m && m[1]!==G4){
+      if(m && m[1]!==G4 && m[1]!==POSTS){
         btn.disabled=true;
         btn.setAttribute('aria-disabled','true');
         btn.title='தற்போது TNPSC Group 4 மட்டும் செயல்பாட்டில் உள்ளது';
@@ -5305,10 +5319,11 @@ window.startPractice=async function(n){
   window.addEventListener('load',lockOtherExamButtons);
 
   /* Guard against an old saved exam value after reload. */
-  window.addEventListener('pageshow',forceGroup4);
-  window.addEventListener('visibilitychange',function(){ if(document.visibilityState==='visible') forceGroup4(); });
+  window.addEventListener('pageshow',forceAllowedExam);
+  window.addEventListener('visibilitychange',function(){ if(document.visibilityState==='visible') forceAllowedExam(); });
 
-  window.__THIRAL_GROUP4_ONLY_FINAL__=true;
+  window.__THIRAL_GROUP4_ONLY_FINAL__=false;
+  window.__THIRAL_GROUP4_POSTAL_OPEN__=true;
 })();
 </script>
 <script>
