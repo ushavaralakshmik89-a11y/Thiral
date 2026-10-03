@@ -1159,7 +1159,7 @@ const EXAMS={
  gds_to_mts:{title:'📮 Department of Posts – GDS to MTS',info:'Department of Posts • GDS to MTS',subjects:[['gds_postal_rules','📮 Departmental Rules / Postal Department Rules & Knowledge'],['gds_gk','📘 General Knowledge (GK)'],['gds_ga','📙 General Awareness (GA)'],['gds_current_affairs','📰 Current Affairs'],['gds_maths','📐 Mathematics'],['gds_reasoning','🧠 Reasoning Ability'],['gds_basic_english','🔤 Basic English']]},
  gds_mts_to_postman_mail_guard:{title:'📮 Department of Posts – GDS/MTS to Postman / Mail Guard',info:'Department of Posts • GDS/MTS to Postman / Mail Guard',subjects:[['gs','📗 General Awareness'],['apt','📐 Aptitude / Reasoning']]},
  pa_sa:{title:'📮 Department of Posts – PA/SA',info:'Department of Posts • PA/SA',subjects:[['gs','📗 General Awareness'],['apt','📐 Aptitude / Reasoning']]},
- pa_to_ipos:{title:'📮 Department of Posts – PA to IPoS',info:'Department of Posts • PA to IPoS',subjects:[['gs','📗 General Awareness'],['apt','📐 Aptitude / Reasoning']]},
+ pa_to_ipos:{title:'📮 Department of Posts – PA to IPoS',info:'Department of Posts • PA to IPoS',subjects:[['gs','📗 General Awareness'],['apt','📐 Aptitude / Reasoning']]}, postal_pa_sa:{title:'📮 Postal PA / SA',info:'General Awareness • Aptitude • Reasoning',subjects:[['gs','📗 General Awareness'],['apt','📐 Aptitude / Reasoning']]},
  tntet_p1:{title:'👩‍🏫 TNTET Paper I',info:'Child Development • Language • Mathematics • Environmental Studies',subjects:[['gs','📗 Child Development / General'],['apt','📐 Mathematics / Reasoning']]},
  tntet_p2:{title:'👩‍🏫 TNTET Paper II',info:'Child Development • Language • Mathematics / Science / Social Science',subjects:[['gs','📗 Child Development / General'],['apt','📐 Subject Aptitude / Reasoning']]},
  trb:{title:'👩‍🏫 TRB தேர்வுகள்',info:'Teacher Recruitment – பாடத்திட்டம் தேர்வின்படி மாறும்',subjects:[['gs','📗 General / Subject Knowledge'],['apt','📐 Reasoning / Aptitude']]},
@@ -1245,13 +1245,47 @@ const EN_LABELS={
 /* GDS → MTS: separate subject containers. Existing Group 4 data is untouched.
    Syllabus/topics will be added to these containers later from verified sources. */
 Object.assign(data,{
-  gds_postal_rules:{title:'Departmental Rules / Postal Department Rules & Knowledge',topics:{}},
-  gds_gk:{title:'General Knowledge (GK)',topics:{}},
-  gds_ga:{title:'General Awareness (GA)',topics:{}},
-  gds_current_affairs:{title:'Current Affairs',topics:{}},
-  gds_maths:{title:'Mathematics',topics:{}},
-  gds_reasoning:{title:'Reasoning Ability',topics:{}},
-  gds_basic_english:{title:'Basic English',topics:{}}
+  /* GDS → MTS navigation topics. UI/topic categories only; no Group 4 question data is reused. */
+  gds_postal_rules:{title:'Departmental Rules / Postal Department Rules & Knowledge',topics:{
+    'Post Office Guide Part-I':['General Postal Rules','Mail / Article Basics','Postal Services'],
+    'Postal Manual Volume V':['Departmental Procedures','Rules and Duties','Operational Knowledge']
+  }},
+  gds_gk:{title:'General Knowledge (GK)',topics:{
+    'Indian History':['Ancient India','Medieval India','Modern India','Freedom Movement'],
+    'Indian Geography':['Physical Geography','States and Capitals','Rivers and Resources'],
+    'Indian Polity':['Constitution','Fundamental Rights and Duties','Parliament and Government'],
+    'General Science':['Physics Basics','Chemistry Basics','Biology Basics']
+  }},
+  gds_ga:{title:'General Awareness (GA)',topics:{
+    'India':['National Institutions','Important Places','Important Persons'],
+    'Tamil Nadu':['State Administration','Districts','Important Places'],
+    'Economy and Society':['Basic Economy','Social Development','Public Welfare'],
+    'Sports and Awards':['Sports','Awards and Honours','Important Events']
+  }},
+  gds_current_affairs:{title:'Current Affairs',topics:{
+    'National Current Affairs':['Government and Policies','Appointments','Reports and Indices'],
+    'Tamil Nadu Current Affairs':['Government Schemes','State Events','Appointments'],
+    'International Current Affairs':['International Organisations','World Events','Summits'],
+    'Sports / Awards / Important Events':['Sports News','Awards','Important Days and Events']
+  }},
+  gds_maths:{title:'Mathematics',topics:{
+    'Basic Mathematics':['Numbers','Fractions','Decimals','Percentage','Ratio','Average'],
+    'Mensuration':['Area','Perimeter','Volume','Units'],
+    'Commercial Mathematics':['Profit and Loss','Interest','Time and Work','Speed and Distance'],
+    'Data and Arithmetic':['Simplification','Unitary Method','Basic Data Interpretation']
+  }},
+  gds_reasoning:{title:'Reasoning Ability',topics:{
+    'Series':['Number Series','Alphabet Series'],
+    'Analogy and Classification':['Analogy','Classification'],
+    'Coding and Decoding':['Coding','Decoding'],
+    'Logical Reasoning':['Order and Ranking','Direction Sense','Simple Logical Problems']
+  }},
+  gds_basic_english:{title:'Basic English',topics:{
+    'Grammar':['Parts of Speech','Tenses','Articles','Prepositions','Subject-Verb Agreement'],
+    'Vocabulary':['Synonyms','Antonyms','One Word Substitution','Word Usage'],
+    'Sentence Skills':['Sentence Correction','Fill in the Blanks','Rearrangement'],
+    'Reading Comprehension':['Short Passages','Question and Answer','Meaning from Context']
+  }}
 });
 
 function labelForSubject(s){
@@ -5138,13 +5172,23 @@ chooseContentLanguage=g4SetLanguage;
 window.subject=function(s){
   const S=String(s||'').trim();
   const E=String(selectedExam||'group4').trim();
-  if(!['tamil','gs','apt'].includes(S)) return;
-  if(E!=='group4' && E!=='postal_pa_sa') return;
+  const gdsSubjects=['gds_postal_rules','gds_gk','gds_ga','gds_current_affairs','gds_maths','gds_reasoning','gds_basic_english'];
+  if(!['tamil','gs','apt'].includes(S) && !gdsSubjects.includes(S)) return;
+  const isGdsMts=(E==='gds_to_mts');
+  if(E!=='group4' && E!=='postal_pa_sa' && !isGdsMts) return;
   if(E==='postal_pa_sa' && S==='tamil') return;
   if(E==='group4') localStorage.setItem('tnpsc_selected_exam','group4');
   currentSubject=S;
   currentTopic='';
   currentSub='';
+
+  /* GDS→MTS subjects use the same bilingual language chooser. */
+  if(isGdsMts){
+    window.pendingSubject=S;
+    const modal=document.getElementById('languageModal');
+    if(modal) modal.classList.remove('hidden');
+    return;
+  }
 
   /* தமிழ் is always Tamil. GK/Aptitude get an explicit language choice. */
   if(S==='tamil'){
@@ -5267,10 +5311,9 @@ window.startPractice=async function(n){
 </script>
 
 <script id="thiral-group4-only-final-lock">
-/* THIRAL: GROUP 4 + DEPARTMENT OF POSTS STRUCTURE LOCK
-   Keep existing UI/data intact. Group 4 remains protected.
-   Department of Posts headings are open for structure/navigation only.
-   Practice/Mock for Department of Posts remain blocked until their question data is connected.
+/* THIRAL: GROUP 4 ONLY MODE
+   Keep the existing UI/data intact. Only Group 4 is allowed to open or run.
+   All other exam headings may remain visible, but their buttons are disabled.
    No database/data deletion or migration is performed here. */
 (function(){
   'use strict';
@@ -5312,7 +5355,7 @@ window.startPractice=async function(n){
     };
   }
 
-  /* Practice and Mock Test for Department of Posts remain intentionally blocked at this structure-only stage. */
+  /* Practice and Mock Test can only run under Group 4. */
   if(typeof window.startPractice==='function'){
     var oldStartPractice=window.startPractice;
     window.startPractice=function(){
