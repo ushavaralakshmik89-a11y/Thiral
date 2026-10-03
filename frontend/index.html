@@ -6565,4 +6565,67 @@ function escapeHtmlAdmin(v){
 })();
 </script>
 
+<script id="thiral-gds-postal-volumes-visible-v22">
+(function(){
+  'use strict';
+  var GDS='gds_to_mts';
+  var SUBJECT='gds_postal_rules';
+  var PART1='அஞ்சல் வழிகாட்டி பகுதி-I';
+  var PART1_EN='Post Office Guide Part-I';
+  var V='அஞ்சல் கையேடு தொகுதி-V';
+  var V_EN='Postal Manual Volume V';
+  var oldChoose=window.chooseContentLanguage;
+  var oldTopic=window.topic;
+
+  function isPostal(){ return String(window.selectedExam||selectedExam||'')===GDS && String(window.currentSubject||currentSubject||'')===SUBJECT; }
+  function renderVolumes(){
+    var title=document.getElementById('subjectTitle');
+    var grid=document.getElementById('topicGrid');
+    var en=String(window.contentLanguage||contentLanguage||'ta')==='en';
+    if(title) title.textContent=(en?'📮 Departmental Rules / Postal Department Rules & Knowledge':'📮 அஞ்சல் துறை விதிகள் / அறிவு')+' – Topics';
+    if(!grid) return;
+    grid.innerHTML=
+      '<button type="button" onclick="topic(\''+PART1.replace(/'/g,"\\'")+'\')">📘 '+(en?PART1_EN:PART1)+'</button>'+
+      '<button type="button" onclick="topic(\''+V.replace(/'/g,"\\'")+'\')">📗 '+(en?V_EN:V)+'</button>';
+    if(typeof show==='function') show('topics');
+  }
+
+  window.chooseContentLanguage=function(lang){
+    if(isPostal()){
+      var L=String(lang||'ta').toLowerCase()==='en'?'en':'ta';
+      window.contentLanguage=L;
+      try{localStorage.setItem('tnpsc_content_language',L);}catch(e){}
+      var modal=document.getElementById('languageModal'); if(modal) modal.classList.add('hidden');
+      var label=document.getElementById('selectedLanguageLabel'); if(label) label.textContent=L==='en'?'English':'தமிழ்';
+      window.pendingSubject=null;
+      window.currentTopic=''; window.currentSub='';
+      renderVolumes();
+      return;
+    }
+    if(typeof oldChoose==='function') return oldChoose.apply(this,arguments);
+  };
+
+  window.topic=function(t){
+    if(isPostal() && String(t||'')===PART1){
+      window.currentTopic=PART1; window.currentSub='';
+      var en=String(window.contentLanguage||contentLanguage||'ta')==='en';
+      var title=document.getElementById('topicTitle');
+      var grid=document.getElementById('subtopicGrid');
+      if(title) title.textContent=(en?'📘 '+PART1_EN:'📘 '+PART1)+' – Subtopics';
+      if(grid){
+        grid.innerHTML='<button type="button" onclick="subtopic(\'Post Office Guide Part-I\')">📚 '+(en?'Full Volume':'முழு தொகுதி')+'</button>';
+      }
+      if(typeof show==='function') show('subtopics');
+      return;
+    }
+    if(isPostal() && String(t||'')===V){
+      if(typeof oldTopic==='function') return oldTopic.apply(this,arguments);
+      return;
+    }
+    if(typeof oldTopic==='function') return oldTopic.apply(this,arguments);
+  };
+
+  window.__THIRAL_POSTAL_VOLUMES_VISIBLE_V22__={part1:PART1,volume5:V};
+})();
+</script>
 </body></html>
