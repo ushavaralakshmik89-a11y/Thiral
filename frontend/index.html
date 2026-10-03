@@ -685,27 +685,10 @@ a{
 <button onclick="openExam('assistant')">📁 Assistant</button>
 <button onclick="openExam('junior_assistant')">📁 Junior Assistant</button>
 </div>
-<h3 id="departmentPostsHeading"
-    onclick="toggleDepartmentPosts()"
-    style="cursor:pointer;user-select:none"
-    title="கிளிக் செய்தால் Department of Posts தேர்வுகள் தோன்றும்">
-  📮 Department of Posts
-</h3>
-<div id="departmentPostsOptions"
-     class="grid"
-     style="display:none;margin-top:8px">
-  <button onclick="openExam('gds_to_mts')">📬 GDS → MTS</button>
-  <button onclick="openExam('mts_gds_to_postman_mailguard')">📮 MTS / GDS → Postman / Mail Guard</button>
-  <button onclick="openExam('postal_pa_sa')">📬 Postal Assistant / Sorting Assistant (PA/SA)</button>
-  <button onclick="openExam('pa_to_ipos')">🏤 PA → IPOS</button>
+<h3>📮 Postal</h3>
+<div class="grid">
+<button onclick="openExam('postal_pa_sa')">📮 Postal PA / SA</button>
 </div>
-<script>
-function toggleDepartmentPosts(){
-  var box=document.getElementById('departmentPostsOptions');
-  if(!box) return;
-  box.style.display=(box.style.display==='none' || box.style.display==='')?'grid':'none';
-}
-</script>
 <hr>
 <button class="secondary" onclick="showLastResult()">📊 என் Result</button><button class="secondary" onclick="showResultHistory()">🗂️ என் Result History</button><button class="secondary" onclick="openSuggestionPage()">💡 Suggestion / Feedback</button>
 </section>
@@ -1169,11 +1152,7 @@ const EXAMS={
  clerical:{title:'📁 Clerical',info:'General Knowledge • Aptitude • Reasoning',subjects:[['gs','📗 General Knowledge'],['apt','📐 Aptitude / Reasoning']]},
  assistant:{title:'📁 Assistant',info:'General Knowledge • Aptitude • Reasoning',subjects:[['gs','📗 General Knowledge'],['apt','📐 Aptitude / Reasoning']]},
  junior_assistant:{title:'📁 Junior Assistant',info:'General Knowledge • Aptitude • Reasoning',subjects:[['gs','📗 General Knowledge'],['apt','📐 Aptitude / Reasoning']]},
- gds_to_mts:{title:'📬 GDS → MTS',info:'Department of Posts • GDS to MTS Departmental Exam',subjects:[['gs','📗 General Awareness'],['apt','📐 Basic Arithmetic']]},
- mts_gds_to_postman_mailguard:{title:'📮 MTS / GDS → Postman / Mail Guard',info:'Department of Posts • MTS / GDS to Postman / Mail Guard Departmental Exam',subjects:[['gs','📗 General Awareness'],['apt','📐 Basic Arithmetic']]},
- postal_pa_sa:{title:'📬 Postal Assistant / Sorting Assistant (PA/SA)',info:'Department of Posts • Postal Assistant / Sorting Assistant',subjects:[['gs','📗 General Awareness'],['apt','📐 Aptitude / Reasoning']]},
- pa_to_ipos:{title:'🏤 PA → IPOS',info:'Department of Posts • Postal Assistant to IPOS Departmental Exam',subjects:[['gs','📗 General Awareness'],['apt','📐 Aptitude / Reasoning']]},
-
+ postal_pa_sa:{title:'📮 Postal PA / SA',info:'General Awareness • Aptitude • Reasoning',subjects:[['gs','📗 General Awareness'],['apt','📐 Aptitude / Reasoning']]},
  tntet_p1:{title:'👩‍🏫 TNTET Paper I',info:'Child Development • Language • Mathematics • Environmental Studies',subjects:[['gs','📗 Child Development / General'],['apt','📐 Mathematics / Reasoning']]},
  tntet_p2:{title:'👩‍🏫 TNTET Paper II',info:'Child Development • Language • Mathematics / Science / Social Science',subjects:[['gs','📗 Child Development / General'],['apt','📐 Subject Aptitude / Reasoning']]},
  trb:{title:'👩‍🏫 TRB தேர்வுகள்',info:'Teacher Recruitment – பாடத்திட்டம் தேர்வின்படி மாறும்',subjects:[['gs','📗 General / Subject Knowledge'],['apt','📐 Reasoning / Aptitude']]},
@@ -5253,114 +5232,83 @@ window.startPractice=async function(n){
 </script>
 
 <script id="thiral-group4-only-final-lock">
-/* THIRAL: GROUP 4 + DEPARTMENT OF POSTS */
+/* THIRAL: GROUP 4 ONLY MODE
+   Keep the existing UI/data intact. Only Group 4 is allowed to open or run.
+   All other exam headings may remain visible, but their buttons are disabled.
+   No database/data deletion or migration is performed here. */
 (function(){
   'use strict';
-
   var G4='group4';
-  var DEPARTMENT_POSTS=[
-    'gds_to_mts',
-    'mts_gds_to_postman_mailguard',
-    'postal_pa_sa',
-    'pa_to_ipos'
-  ];
-
-  function isDepartmentPosts(id){
-    return DEPARTMENT_POSTS.indexOf(String(id||''))!==-1;
-  }
-
-  function isEnabledExam(id){
-    return String(id||'')===G4 || isDepartmentPosts(id);
-  }
-
   function forceGroup4(){
-    try{
-      if(!isEnabledExam(selectedExam)) selectedExam=G4;
-    }catch(e){}
-    try{
-      var saved=localStorage.getItem('tnpsc_selected_exam')||G4;
-      if(!isEnabledExam(saved)) saved=G4;
-      selectedExam=saved;
-      localStorage.setItem('tnpsc_selected_exam',saved);
-    }catch(e){}
+    try{ selectedExam=G4; }catch(e){}
+    try{ localStorage.setItem('tnpsc_selected_exam',G4); }catch(e){}
   }
-
   forceGroup4();
 
   /* Final authority for exam navigation. */
   window.openExam=function(id){
-    id=String(id||'');
-    if(!isEnabledExam(id)){
+    if(String(id)!==G4){
       forceGroup4();
       return false;
     }
-
-    selectedExam=id;
-    try{ localStorage.setItem('tnpsc_selected_exam',id); }catch(e){}
-
+    forceGroup4();
     if(typeof renderExamHome==='function') renderExamHome();
     show('examHome');
     return false;
   };
 
-  /* Keep Department of Posts selection instead of forcing it back to Group 4. */
+  /* If any older code calls renderExamHome after a stale exam value,
+     it is forced back to Group 4. */
   if(typeof window.renderExamHome==='function'){
     var oldRenderExamHome=window.renderExamHome;
     window.renderExamHome=function(){
-      if(!isEnabledExam(selectedExam)) forceGroup4();
+      forceGroup4();
       return oldRenderExamHome.apply(this,arguments);
     };
   }
 
+  /* Practice and Mock Test can only run under Group 4. */
   if(typeof window.startPractice==='function'){
     var oldStartPractice=window.startPractice;
     window.startPractice=function(){
-      if(!isEnabledExam(selectedExam)) forceGroup4();
+      forceGroup4();
       return oldStartPractice.apply(this,arguments);
     };
   }
-
   if(typeof window.startMock==='function'){
     var oldStartMock=window.startMock;
     window.startMock=function(){
-      if(!isEnabledExam(selectedExam)) forceGroup4();
+      forceGroup4();
       return oldStartMock.apply(this,arguments);
     };
   }
-
   window.startSelectedMock=function(){
-    if(!isEnabledExam(selectedExam)) forceGroup4();
+    forceGroup4();
     if(typeof window.startMock==='function') return window.startMock();
   };
 
-  /* Other exam buttons remain disabled, but the four Department of Posts
-     buttons stay fully active. */
+  /* Keep other exam headings visible, but make their entry buttons inactive. */
   function lockOtherExamButtons(){
     document.querySelectorAll('button[onclick]').forEach(function(btn){
       var m=String(btn.getAttribute('onclick')||'').match(/openExam\(['"]([^'"]+)['"]\)/);
-      if(m && !isEnabledExam(m[1])){
+      if(m && m[1]!==G4){
         btn.disabled=true;
         btn.setAttribute('aria-disabled','true');
-        btn.title='தற்போது TNPSC Group 4 மற்றும் Department of Posts மட்டும் செயல்பாட்டில் உள்ளது';
+        btn.title='தற்போது TNPSC Group 4 மட்டும் செயல்பாட்டில் உள்ளது';
         btn.style.opacity='0.55';
         btn.style.cursor='not-allowed';
       }
     });
   }
-
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',lockOtherExamButtons);
   else lockOtherExamButtons();
   window.addEventListener('load',lockOtherExamButtons);
 
-  /* Do not reset a Department of Posts exam after it has been opened. */
-  window.addEventListener('pageshow',function(){
-    if(!isDepartmentPosts(selectedExam)) forceGroup4();
-  });
-  window.addEventListener('visibilitychange',function(){
-    if(document.visibilityState==='visible' && !isDepartmentPosts(selectedExam)) forceGroup4();
-  });
+  /* Guard against an old saved exam value after reload. */
+  window.addEventListener('pageshow',forceGroup4);
+  window.addEventListener('visibilitychange',function(){ if(document.visibilityState==='visible') forceGroup4(); });
 
-  window.__THIRAL_GROUP4_PLUS_POSTAL_FINAL__=true;
+  window.__THIRAL_GROUP4_ONLY_FINAL__=true;
 })();
 </script>
 <script>
