@@ -1245,7 +1245,13 @@ const EN_LABELS={
 /* GDS → MTS: separate subject containers. Existing Group 4 data is untouched.
    Syllabus/topics will be added to these containers later from verified sources. */
 Object.assign(data,{
-  gds_postal_rules:{title:'Departmental Rules / Postal Department Rules & Knowledge',topics:{}},
+  gds_postal_rules:{
+    title:'Departmental Rules / Postal Department Rules & Knowledge',
+    topics:{
+      'அஞ்சல் வழிகாட்டி பகுதி-I':['பொதுவான அஞ்சல் விதிகள்','அஞ்சல் / கட்டுரை அடிப்படைகள்','அஞ்சல் சேவைகள்'],
+      'அஞ்சல் கையேடு தொகுதி-V':['முழுத் தொகுதி']
+    }
+  },
   gds_gk:{title:'General Knowledge (GK)',topics:{}},
   gds_ga:{title:'General Awareness (GA)',topics:{}},
   gds_current_affairs:{title:'Current Affairs',topics:{}},
@@ -3586,13 +3592,16 @@ window.V91_ADV_NUM=V91_ADV_NUM;
     show('examHome');
   };
 
-  async function getQuestionsV138(examId, subject, lang, count){
-    var d = await api138(
-      '/questions?exam=' + encodeURIComponent(examId) +
-      '&subject=' + encodeURIComponent(subject) +
+  async function getQuestionsV138(examId, subject, lang, count, subtopic){
+    var dbSubject = subject;
+    if(String(examId)==='gds_to_mts' && String(subject)==='gds_postal_rules')
+      dbSubject = 'Departmental Rules / Postal Department Rules & Knowledge';
+    var url = '/questions?exam=' + encodeURIComponent(examId) +
+      '&subject=' + encodeURIComponent(dbSubject) +
       '&language=' + encodeURIComponent(lang) +
-      '&limit=' + encodeURIComponent(count)
-    );
+      '&limit=' + encodeURIComponent(count);
+    if(subtopic) url += '&subtopic=' + encodeURIComponent(subtopic);
+    var d = await api138(url);
     return Array.isArray(d.questions) ? d.questions : [];
   }
 
@@ -3638,11 +3647,13 @@ window.V91_ADV_NUM=V91_ADV_NUM;
 
       securePractice.subject = subject;
       securePractice.language = lang;
+      var selectedSubtopic = (typeof currentSub !== 'undefined') ? String(currentSub || '').trim() : '';
       securePractice.questions = await getQuestionsV138(
         selectedExam,
         subject,
         lang,
-        count
+        count,
+        selectedSubtopic
       );
 
       securePractice.answers = {};
@@ -3655,11 +3666,14 @@ window.V91_ADV_NUM=V91_ADV_NUM;
         throw new Error('இந்த தேர்வு/பாடத்திற்கு backend-ல் கேள்விகள் இல்லை.');
       }
 
+      var attemptSubject = (String(selectedExam)==='gds_to_mts' && String(subject)==='gds_postal_rules')
+        ? 'Departmental Rules / Postal Department Rules & Knowledge'
+        : subject;
       var a = await api138('/attempts',{
         method:'POST',
         body:JSON.stringify({
           exam:selectedExam,
-          subject:subject,
+          subject:attemptSubject,
           mode:'practice',
           language:lang,
           questionIds:securePractice.questions.map(function(q){return q.id;})
@@ -6326,6 +6340,85 @@ function escapeHtmlAdmin(v){
   window.__THIRAL_MODEL_EXAM_SUBMIT=submit;
   window.__THIRAL_MODEL_EXAM_REVIEW=review;
   window.__THIRAL_RESET_MODEL_EXAM_SESSION=function(){stopTimer();M.questions=[];M.answers={};M.index=0;M.attemptId=0;M.submitting=false;M.layout='single';};
+})();
+</script>
+
+<script id="thiral-gds-mts-final-authority-v1">
+(function(){
+  'use strict';
+  var GDS='gds_to_mts', SUBJECT='gds_postal_rules';
+  var DB_SUBJECT='Departmental Rules / Postal Department Rules & Knowledge';
+  var previousSubject=window.subject;
+  var previousStartPractice=window.startPractice;
+
+  function isGDS(){return String(selectedExam||'')===GDS;}
+  function renderGDSSubject(){
+    var info=data && data[SUBJECT];
+    if(!info || !info.topics) return;
+    var title=document.getElementById('subjectTitle'), grid=document.getElementById('topicGrid');
+    if(title) title.textContent='📮 '+DB_SUBJECT+' – Topics';
+    if(grid){
+      grid.innerHTML=Object.keys(info.topics).map(function(t){
+        return '<button type="button" onclick="topic(\''+esc(t)+'\')">'+esc(t)+'</button>';
+      }).join('');
+    }
+    show('topics');
+  }
+
+  window.openExam=function(id){
+    var exam=String(id||'');
+    if(['group4',GDS,'gds_mts_to_postman_mail_guard','pa_sa','pa_to_ipos'].indexOf(exam)<0) return false;
+    selectedExam=exam;
+    try{localStorage.setItem('tnpsc_selected_exam',exam);}catch(e){}
+    if(typeof renderExamHome==='function') renderExamHome();
+    show('examHome');
+    return false;
+  };
+
+  window.subject=function(s){
+    var S=String(s||'').trim();
+    if(isGDS() && S===SUBJECT){
+      currentSubject=SUBJECT; currentTopic=''; currentSub='';
+      window.pendingSubject=SUBJECT;
+      openLanguageChooser();
+      return;
+    }
+    if(typeof previousSubject==='function') return previousSubject.call(this,s);
+  };
+
+  window.chooseContentLanguage=function(lang){
+    var L=String(lang||'ta').toLowerCase()==='en'?'en':'ta';
+    contentLanguage=L;
+    try{localStorage.setItem('tnpsc_content_language',L);}catch(e){}
+    var modal=document.getElementById('languageModal'); if(modal) modal.classList.add('hidden');
+    var label=document.getElementById('selectedLanguageLabel'); if(label) label.textContent=L==='en'?'English':'தமிழ்';
+    if(isGDS() && currentSubject===SUBJECT){
+      window.pendingSubject=null; currentTopic=''; currentSub=''; renderGDSSubject(); return;
+    }
+    if(window.pendingSubject){
+      currentSubject=window.pendingSubject; window.pendingSubject=null;
+      if(typeof renderSubjectPage==='function') renderSubjectPage();
+    }
+  };
+
+  window.startPractice=async function(n){
+    if(!isGDS()) return previousStartPractice.apply(this,arguments);
+    if(currentSubject!==SUBJECT){
+      var f=document.getElementById('feedback'); if(f) f.textContent='முதலில் Departmental Rules தேர்வு செய்யவும்.'; return;
+    }
+    if(!String(currentSub||'').trim()){
+      var f2=document.getElementById('feedback'); if(f2) f2.textContent='முதலில் Subtopic தேர்வு செய்யவும்.'; return;
+    }
+    return previousStartPractice.apply(this,arguments);
+  };
+
+  window.__THIRAL_GDS_MTS_FINAL__={
+    exam:GDS,
+    subject:SUBJECT,
+    dbSubject:DB_SUBJECT,
+    languages:['ta','en'],
+    questions:'backend-only'
+  };
 })();
 </script>
 
