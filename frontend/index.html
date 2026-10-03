@@ -557,6 +557,42 @@ a{
 }
 </style>
 
+
+<style id="group4-only-dashboard-lock">
+/* Dashboard currently exposes only the completed TNPSC Group 4 exam.
+   Other exam routes remain in the code/database for future activation. */
+#dash .model-exam-card{display:none!important}
+#dash > h3:not(.category-title),
+#dash > h3:not(.category-title) + .grid{display:none!important}
+#dash > .grid:first-of-type button:not([onclick*="openExam('group4')"]){display:none!important}
+#dash > .grid button[onclick*="openExam('gds_to_mts')"],
+#dash > .grid button[onclick*="openExam('gds_mts_to_postman_mail_guard')"],
+#dash > .grid button[onclick*="openExam('pa_sa')"],
+#dash > .grid button[onclick*="openExam('pa_to_ipos')"]{display:none!important}
+</style>
+
+<style id="group4-and-department-posts-dashboard-lock">
+/* Production dashboard: only completed Group 4 and Department of Posts are visible. */
+#dash > h3:has(+ .grid button[onclick*="openExam('gds_to_mts')"]),
+#dash > h3:has(+ .grid button[onclick*="openExam('gds_to_mts')"]) + .grid{
+  display:block !important;
+}
+#dash > h3:has(+ .grid button[onclick*="openExam('gds_to_mts')"]) + .grid{
+  display:grid !important;
+}
+#dash > h3:has(+ .grid button[onclick*="openExam('gds_to_mts')"]) + .grid button[onclick*="openExam('gds_to_mts')"],
+#dash > h3:has(+ .grid button[onclick*="openExam('gds_to_mts')"]) + .grid button[onclick*="openExam('gds_mts_to_postman_mail_guard')"],
+#dash > h3:has(+ .grid button[onclick*="openExam('gds_to_mts')"]) + .grid button[onclick*="openExam('pa_sa')"],
+#dash > h3:has(+ .grid button[onclick*="openExam('gds_to_mts')"]) + .grid button[onclick*="openExam('pa_to_ipos')"]{
+  display:block !important;
+}
+/* Keep every other unfinished Department of Posts exam hidden. */
+#dash > h3:has(+ .grid button[onclick*="openExam('gds_to_mts')"]) + .grid button[onclick*="openExam('gds_mts_to_postman_mail_guard')"],
+#dash > h3:has(+ .grid button[onclick*="openExam('gds_to_mts')"]) + .grid button[onclick*="openExam('pa_sa')"],
+#dash > h3:has(+ .grid button[onclick*="openExam('gds_to_mts')"]) + .grid button[onclick*="openExam('pa_to_ipos')"]{
+  display:block !important;
+}
+</style>
 </head>
 <body>
 <header class="thiral-final-hero">
