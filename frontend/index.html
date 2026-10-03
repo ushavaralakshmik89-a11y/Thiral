@@ -6368,7 +6368,7 @@ function escapeHtmlAdmin(v){
     if(title) title.textContent=labelForSubject(SUBJECT)+' – Topics';
     if(grid){
       grid.innerHTML=Object.keys(info.topics).map(function(t){
-        return '<button type="button" onclick="topic(\''+esc(t)+'\')">'+esc(t)+'</button>';
+        return '<button type="button" onclick="topic(\''+esc(t)+'\')">'+esc(labelForTopic(SUBJECT,t))+'</button>';
       }).join('');
     }
     show('topics');
