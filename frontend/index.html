@@ -1156,7 +1156,7 @@ const EXAMS={
  assistant:{title:'📁 Assistant',info:'General Knowledge • Aptitude • Reasoning',subjects:[['gs','📗 General Knowledge'],['apt','📐 Aptitude / Reasoning']]},
  junior_assistant:{title:'📁 Junior Assistant',info:'General Knowledge • Aptitude • Reasoning',subjects:[['gs','📗 General Knowledge'],['apt','📐 Aptitude / Reasoning']]},
 
- gds_to_mts:{title:'📮 Department of Posts – GDS to MTS',info:'Department of Posts • GDS to MTS',subjects:[['gs','📗 General Awareness'],['apt','📐 Aptitude / Reasoning']]},
+ gds_to_mts:{title:'📮 Department of Posts – GDS to MTS',info:'Department of Posts • GDS to MTS',subjects:[['gds_postal_rules','📮 Departmental Rules / Postal Department Rules & Knowledge'],['gds_gk','📘 General Knowledge (GK)'],['gds_ga','📙 General Awareness (GA)'],['gds_current_affairs','📰 Current Affairs'],['gds_maths','📐 Mathematics'],['gds_reasoning','🧠 Reasoning Ability'],['gds_basic_english','🔤 Basic English']]},
  gds_mts_to_postman_mail_guard:{title:'📮 Department of Posts – GDS/MTS to Postman / Mail Guard',info:'Department of Posts • GDS/MTS to Postman / Mail Guard',subjects:[['gs','📗 General Awareness'],['apt','📐 Aptitude / Reasoning']]},
  pa_sa:{title:'📮 Department of Posts – PA/SA',info:'Department of Posts • PA/SA',subjects:[['gs','📗 General Awareness'],['apt','📐 Aptitude / Reasoning']]},
  pa_to_ipos:{title:'📮 Department of Posts – PA to IPoS',info:'Department of Posts • PA to IPoS',subjects:[['gs','📗 General Awareness'],['apt','📐 Aptitude / Reasoning']]}, postal_pa_sa:{title:'📮 Postal PA / SA',info:'General Awareness • Aptitude • Reasoning',subjects:[['gs','📗 General Awareness'],['apt','📐 Aptitude / Reasoning']]},
@@ -1242,8 +1242,30 @@ const EN_LABELS={
   }
  }
 };
+/* GDS → MTS: separate subject containers. Existing Group 4 data is untouched.
+   Syllabus/topics will be added to these containers later from verified sources. */
+Object.assign(data,{
+  gds_postal_rules:{title:'Departmental Rules / Postal Department Rules & Knowledge',topics:{}},
+  gds_gk:{title:'General Knowledge (GK)',topics:{}},
+  gds_ga:{title:'General Awareness (GA)',topics:{}},
+  gds_current_affairs:{title:'Current Affairs',topics:{}},
+  gds_maths:{title:'Mathematics',topics:{}},
+  gds_reasoning:{title:'Reasoning Ability',topics:{}},
+  gds_basic_english:{title:'Basic English',topics:{}}
+});
+
 function labelForSubject(s){
  if(s==='tamil') return '📚 தமிழ்';
+ const GDS_MTS_LABELS={
+   gds_postal_rules:'📮 Departmental Rules / Postal Department Rules & Knowledge',
+   gds_gk:'📘 General Knowledge (GK)',
+   gds_ga:'📙 General Awareness (GA)',
+   gds_current_affairs:'📰 Current Affairs',
+   gds_maths:'📐 Mathematics',
+   gds_reasoning:'🧠 Reasoning Ability',
+   gds_basic_english:'🔤 Basic English'
+ };
+ if(GDS_MTS_LABELS[s]) return GDS_MTS_LABELS[s];
  return (contentLanguage==='en' && EN_LABELS[s]) ? EN_LABELS[s].title : (s==='gs'?'📗 பொது அறிவு':'📐 திறனறிவு / Aptitude');
 }
 function labelForTopic(s,t){
