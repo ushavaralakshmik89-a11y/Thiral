@@ -6536,6 +6536,107 @@ function escapeHtmlAdmin(v){
   window.__THIRAL_GDS_TWO_TOPICS_FINAL__={exam:EXAM,subject:SUBJECT,topics:[TOPIC1,TOPIC2]};
 })();
 </script>
+
+<script id="thiral-gds-department-rules-runtime-fix-v2">
+/* Runtime fix v2: use the actual top-level lexical state (selectedExam/currentSubject)
+   instead of window.selectedExam/window.currentSubject. This keeps the GDS router
+   working with the existing HTML architecture. */
+(function(){
+  'use strict';
+  var EXAM='gds_to_mts', SUBJECT='gds_postal_rules';
+  var TOPIC1='அஞ்சல் வழிகாட்டி பகுதி-I';
+  var TOPIC2='அஞ்சல் கையேடு தொகுதி-V';
+  var SUBS1=['பொதுவான அஞ்சல் விதிகள்','அஞ்சல் / கட்டுரை அடிப்படைகள்','அஞ்சல் சேவைகள்'];
+
+  function esc2(v){return String(v==null?'':v).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
+  function isGds(){return String(selectedExam||'')===EXAM;}
+  function ensure(){
+    if(!window.data) return false;
+    if(!data[SUBJECT]) data[SUBJECT]={title:'Departmental Rules / Postal Department Rules & Knowledge',topics:{}};
+    data[SUBJECT].topics={};
+    data[SUBJECT].topics[TOPIC1]=SUBS1.slice();
+    data[SUBJECT].topics[TOPIC2]=[];
+    return true;
+  }
+  function showLanguage(){
+    var m=document.getElementById('languageModal');
+    if(m) m.classList.remove('hidden');
+  }
+  function renderRules(){
+    if(!isGds() || currentSubject!==SUBJECT || !ensure()) return;
+    var title=document.getElementById('subjectTitle');
+    var grid=document.getElementById('topicGrid');
+    if(title) title.textContent='📮 Departmental Rules / Postal Department Rules & Knowledge';
+    if(grid){
+      grid.innerHTML=
+        '<button type="button" onclick="topic(\''+esc2(TOPIC1)+'\')">📕 '+TOPIC1+'</button>'+
+        '<button type="button" onclick="topic(\''+esc2(TOPIC2)+'\')">📘 '+TOPIC2+'</button>';
+    }
+    show('topics');
+  }
+  function renderSelectedTopic(){
+    if(!isGds() || currentSubject!==SUBJECT) return;
+    var list=(data[SUBJECT].topics[currentTopic]||[]);
+    var title=document.getElementById('topicTitle');
+    var grid=document.getElementById('subtopicGrid');
+    if(title) title.textContent='📌 '+currentTopic+' – Subtopics';
+    if(!grid) return;
+    if(list.length){
+      grid.innerHTML=list.map(function(x){
+        return '<button type="button" onclick="subtopic(\''+esc2(x)+'\')">'+x+'</button>';
+      }).join('');
+    }else{
+      grid.innerHTML='<div class="card" style="grid-column:1/-1;text-align:center">'+
+        '<h3>📘 '+currentTopic+'</h3>'+
+        '<p>இந்த Volume-க்கான source content இன்னும் இணைக்கப்படவில்லை.</p>'+
+        '<p class="small">Source இல்லாமல் subtopic அல்லது கேள்விகளை உருவாக்கவில்லை.</p></div>';
+    }
+    show('subtopics');
+  }
+
+  var previousSubject=window.subject;
+  window.subject=function(s){
+    var S=String(s||'').trim();
+    if(isGds() && S===SUBJECT){
+      currentSubject=SUBJECT; currentTopic=''; currentSub='';
+      ensure(); renderRules(); return false;
+    }
+    return typeof previousSubject==='function' ? previousSubject.apply(this,arguments) : undefined;
+  };
+
+  var previousTopic=window.topic;
+  window.topic=function(t){
+    var T=String(t||'');
+    if(isGds() && currentSubject===SUBJECT && (T===TOPIC1 || T===TOPIC2)){
+      ensure(); currentTopic=T; currentSub='';
+      window.__thiralPendingGdsTopic=T;
+      showLanguage();
+      return false;
+    }
+    return typeof previousTopic==='function' ? previousTopic.apply(this,arguments) : undefined;
+  };
+
+  var previousChoose=window.chooseContentLanguage;
+  window.chooseContentLanguage=function(lang){
+    if(isGds() && currentSubject===SUBJECT && window.__thiralPendingGdsTopic){
+      contentLanguage=(String(lang||'ta').toLowerCase()==='en')?'en':'ta';
+      try{localStorage.setItem('tnpsc_content_language',contentLanguage);}catch(e){}
+      var label=document.getElementById('selectedLanguageLabel');
+      if(label) label.textContent=contentLanguage==='en'?'English':'தமிழ்';
+      var modal=document.getElementById('languageModal');
+      if(modal) modal.classList.add('hidden');
+      currentTopic=window.__thiralPendingGdsTopic;
+      window.__thiralPendingGdsTopic='';
+      currentSub='';
+      renderSelectedTopic();
+      return false;
+    }
+    return typeof previousChoose==='function' ? previousChoose.apply(this,arguments) : undefined;
+  };
+
+  window.__THIRAL_GDS_DEPARTMENT_RULES_RUNTIME_FIX_V2__=true;
+})();
+</script>
 </body></html>
 
 
