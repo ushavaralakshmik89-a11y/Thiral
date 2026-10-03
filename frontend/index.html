@@ -4870,6 +4870,41 @@ function selectPracticeByDifficulty(bank,n){
 async function loadPracticeQuestions(requested){
   const selectedSubtopic=(typeof currentSub!=='undefined'?String(currentSub||'').trim():'');
   if(!selectedSubtopic) throw new Error('Subtopic தேர்வு செய்யப்படவில்லை.');
+
+  /* GDS → MTS Departmental Rules: Part-I is presented in the UI as one
+     "முழுத் தொகுதி" bank, but the existing Supabase rows retain their
+     original three subtopic values. Fetch those three existing banks and
+     combine them without changing any database row. Tamil only for the
+     currently uploaded Part-I bank. */
+  if(String(selectedExam||'')==='gds_to_mts' && String(currentSubject||'')==='gds_postal_rules' &&
+     String(currentTopic||'')==='அஞ்சல் வழிகாட்டி பகுதி-I' && selectedSubtopic==='முழுத் தொகுதி'){
+    const partISubs=['பொதுவான அஞ்சல் விதிகள்','அஞ்சல் / கட்டுரை அடிப்படைகள்','அஞ்சல் சேவைகள்'];
+    const all=[];
+    for(const st of partISubs){
+      let offset=0;
+      const pageSize=200;
+      while(true){
+        const d=await api('/questions?exam='+encodeURIComponent('gds_to_mts')+
+          '&subject='+encodeURIComponent('Departmental Rules / Postal Department Rules & Knowledge')+
+          '&language='+encodeURIComponent(contentLanguage==='en'?'en':'ta')+
+          '&subtopic='+encodeURIComponent(st)+
+          '&limit='+pageSize+'&offset='+offset);
+        const rows=Array.isArray(d.questions)?d.questions:[];
+        all.push(...rows.map(normalizePracticeDifficulty));
+        if(!d.pagination || !d.pagination.hasMore || rows.length===0) break;
+        offset=Number(d.pagination.nextOffset ?? (offset+rows.length));
+        if(!Number.isFinite(offset)) break;
+      }
+    }
+    const seen=new Set(), unique=[];
+    for(const q of all){
+      const k=String(q.id||'')||practiceQuestionKey(q);
+      if(seen.has(k)) continue;
+      seen.add(k); unique.push(q);
+    }
+    return unique;
+  }
+
   /* தமிழக அரசியல் is displayed inside the GS UI, but its database
      subject is intentionally separate from the normal பொது அறிவு bank. */
   const POLITICS_SUBTOPICS = new Set([
@@ -4970,7 +5005,7 @@ async function startPractice(n){
     return;
   }
   T.q=[];T.answers={};T.checks={};T.i=0;T.attempt=null;T.submitted=false;T.busy=false;
-  if($('feedback'))$('feedback').innerHTML='<b>தேர்ந்தெடுத்த Subtopic-ன் முழு Question Bank சரிபார்க்கப்படுகிறது...</b>';
+  if($('feedback'))$('feedback').innerHTML='<b>தேர்ந்தெடுத்த முழு Question Bank சரிபார்க்கப்படுகிறது...</b>';
   try{
     const bank=await loadPracticeQuestions(requested);
     if(!bank.length)throw new Error('இந்த Subtopic-ல் கேள்விகள் இல்லை.');
@@ -6444,5 +6479,42 @@ function escapeHtmlAdmin(v){
     try{ var picker=document.getElementById('thiralMockLanguagePicker'); if(picker) picker.remove(); }catch(e){}
     try{ if(typeof window.logout==='function') await window.logout(); else show('home'); }catch(e){ try{ show('home'); }catch(_){ } }
   };
+})();
+</script>
+
+<script id="thiral-currently-open-exams-lock-final">
+(function(){
+  'use strict';
+  /* Current release scope: only completed Group 4 and the GDS→MTS
+     Departmental Rules module are open. Other dashboard IDs remain visible
+     for future work but cannot enter their exam pages. */
+  var ALLOWED=['group4','gds_to_mts'];
+  var ORIGINAL_OPEN_EXAM=window.openExam;
+  function isAllowed(id){ return ALLOWED.indexOf(String(id||''))>=0; }
+  window.__THIRAL_CURRENT_RELEASE_ACCESS__={allowed:ALLOWED.slice()};
+
+  window.openExam=function(id){
+    var E=String(id||'');
+    if(!isAllowed(E)){
+      alert('இந்தத் தேர்வுப் பகுதி இன்னும் தயாராகவில்லை. தற்போது TNPSC Group 4 மற்றும் Department of Posts – GDS to MTS மட்டும் திறக்கப்பட்டுள்ளது.');
+      return false;
+    }
+    selectedExam=E;
+    try{localStorage.setItem('tnpsc_selected_exam',E);}catch(e){}
+    if(typeof renderExamHome==='function') renderExamHome();
+    show('examHome');
+    return false;
+  };
+
+  /* Do not allow a stale localStorage value to open an unfinished exam. */
+  try{
+    var saved=localStorage.getItem('tnpsc_selected_exam');
+    if(saved && !isAllowed(saved)){
+      selectedExam='group4';
+      localStorage.setItem('tnpsc_selected_exam','group4');
+    }
+  }catch(e){
+    if(!isAllowed(selectedExam)) selectedExam='group4';
+  }
 })();
 </script>
