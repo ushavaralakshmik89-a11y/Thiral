@@ -685,12 +685,17 @@ a{
 <button onclick="openExam('assistant')">📁 Assistant</button>
 <button onclick="openExam('junior_assistant')">📁 Junior Assistant</button>
 </div>
-<h3 id="departmentPostsHeading" style="cursor:pointer" title="Department of Posts">📮 Department of Posts</h3>
-<div id="departmentPostsOptions" class="grid hidden" style="margin-top:8px">
-<button type="button" data-dept-exam="gds_to_mts">📬 GDS → MTS</button>
-<button type="button" data-dept-exam="mts_gds_to_postman_mailguard">📮 MTS / GDS → Postman / Mail Guard</button>
-<button type="button" data-dept-exam="postal_pa_sa">📬 Postal Assistant / Sorting Assistant (PA/SA)</button>
-<button type="button" data-dept-exam="pa_to_ipos">🏤 PA → IPOS</button>
+<h3 id="departmentPostsHeading"
+    style="cursor:pointer;user-select:none"
+    title="கிளிக் செய்தால் Department of Posts தேர்வுகள் தோன்றும்">
+  📮 Department of Posts
+</h3>
+<div id="departmentPostsOptions"
+     style="display:none;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:8px">
+  <button type="button" data-dept-exam="gds_to_mts">📬 GDS → MTS</button>
+  <button type="button" data-dept-exam="mts_gds_to_postman_mailguard">📮 MTS / GDS → Postman / Mail Guard</button>
+  <button type="button" data-dept-exam="postal_pa_sa">📬 Postal Assistant / Sorting Assistant (PA/SA)</button>
+  <button type="button" data-dept-exam="pa_to_ipos">🏤 PA → IPOS</button>
 </div>
 <hr>
 <button class="secondary" onclick="showLastResult()">📊 என் Result</button><button class="secondary" onclick="showResultHistory()">🗂️ என் Result History</button><button class="secondary" onclick="openSuggestionPage()">💡 Suggestion / Feedback</button>
@@ -6288,11 +6293,11 @@ function escapeHtmlAdmin(v){
 </script>
 
 
-<script id="thiral-department-posts-working-final">
+<script id="thiral-department-posts-final-corrected">
 (function(){
   'use strict';
 
-  var POSTAL_EXAMS = [
+  var POSTAL_EXAMS=[
     'gds_to_mts',
     'mts_gds_to_postman_mailguard',
     'postal_pa_sa',
@@ -6300,69 +6305,61 @@ function escapeHtmlAdmin(v){
   ];
 
   function isPostalExam(id){
-    return POSTAL_EXAMS.indexOf(String(id || '')) !== -1;
+    return POSTAL_EXAMS.indexOf(String(id||'')) !== -1;
   }
 
-  function setupDepartmentPosts(){
-    var heading = document.getElementById('departmentPostsHeading');
-    var box = document.getElementById('departmentPostsOptions');
+  function initPostalUI(){
+    var heading=document.getElementById('departmentPostsHeading');
+    var box=document.getElementById('departmentPostsOptions');
     if(!heading || !box) return;
 
-    /* Always start collapsed. */
-    box.classList.add('hidden');
+    /* Start hidden, without relying on the site's .hidden CSS class. */
+    box.style.display='none';
 
-    heading.onclick = function(){
-      box.classList.toggle('hidden');
+    heading.onclick=function(){
+      box.style.display=(box.style.display==='none' || box.style.display==='') ? 'grid' : 'none';
     };
 
     box.querySelectorAll('button[data-dept-exam]').forEach(function(btn){
-      btn.disabled = false;
+      var id=String(btn.getAttribute('data-dept-exam')||'');
+      btn.disabled=false;
+      btn.removeAttribute('disabled');
       btn.removeAttribute('aria-disabled');
-      btn.style.opacity = '';
-      btn.style.cursor = 'pointer';
+      btn.style.opacity='';
+      btn.style.cursor='pointer';
 
-      btn.onclick = function(){
-        var id = String(btn.getAttribute('data-dept-exam') || '');
+      btn.onclick=function(){
         if(!isPostalExam(id)) return false;
-
-        selectedExam = id;
-        try{ localStorage.setItem('tnpsc_selected_exam', id); }catch(e){}
-
-        if(typeof renderExamHome === 'function') renderExamHome();
-        if(typeof show === 'function') show('examHome');
+        selectedExam=id;
+        try{localStorage.setItem('tnpsc_selected_exam',id);}catch(e){}
+        if(typeof renderExamHome==='function') renderExamHome();
+        if(typeof show==='function') show('examHome');
         return false;
       };
     });
   }
 
-  /*
-   * The existing file contains an older Group-4 lock and another openExam
-   * definition. This final handler is deliberately placed last so the four
-   * Department of Posts buttons are not disabled or reset.
-   */
-  var originalOpenExam = window.openExam;
-  window.openExam = function(id){
-    id = String(id || '');
+  /* Final navigation authority for the four Department of Posts exams. */
+  var previousOpenExam=window.openExam;
+  window.openExam=function(id){
+    id=String(id||'');
     if(isPostalExam(id)){
-      selectedExam = id;
-      try{ localStorage.setItem('tnpsc_selected_exam', id); }catch(e){}
-      if(typeof renderExamHome === 'function') renderExamHome();
-      if(typeof show === 'function') show('examHome');
+      selectedExam=id;
+      try{localStorage.setItem('tnpsc_selected_exam',id);}catch(e){}
+      if(typeof renderExamHome==='function') renderExamHome();
+      if(typeof show==='function') show('examHome');
       return false;
     }
-    return originalOpenExam ? originalOpenExam(id) : false;
+    return previousOpenExam ? previousOpenExam(id) : false;
   };
 
-  function run(){
-    setupDepartmentPosts();
+  function boot(){
+    initPostalUI();
   }
 
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', run);
-  }else{
-    run();
-  }
-  window.addEventListener('load', run);
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot);
+  else boot();
+  window.addEventListener('load',boot);
 })();
 </script>
 
