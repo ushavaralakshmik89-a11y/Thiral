@@ -1294,11 +1294,20 @@ function labelForSubject(s){
  return (contentLanguage==='en' && EN_LABELS[s]) ? EN_LABELS[s].title : (s==='gs'?'📗 பொது அறிவு':'📐 திறனறிவு / Aptitude');
 }
 function labelForTopic(s,t){
- if(contentLanguage==='en' && EN_LABELS[s]?.topics[t]) return EN_LABELS[s].topics[t].en;
+ if(contentLanguage==='en'){
+   if(EN_LABELS[s] && EN_LABELS[s].topics && EN_LABELS[s].topics[t] && EN_LABELS[s].topics[t].en) return EN_LABELS[s].topics[t].en;
+   if(s==='gds_postal_rules'){
+     const m={'அஞ்சல் வழிகாட்டி பகுதி-I':'Post Office Guide Part-I','அஞ்சல் கையேடு தொகுதி-V':'Postal Manual Volume-V'};
+     if(m[t]) return m[t];
+   }
+ }
  return t;
 }
 function labelForSub(s,t,sub){
- if(contentLanguage==='en' && EN_LABELS[s]?.topics[t]?.subs[sub]) return EN_LABELS[s].topics[t].subs[sub];
+ if(contentLanguage==='en'){
+   if(EN_LABELS[s] && EN_LABELS[s].topics && EN_LABELS[s].topics[t] && EN_LABELS[s].topics[t].subs && EN_LABELS[s].topics[t].subs[sub]) return EN_LABELS[s].topics[t].subs[sub];
+   if(s==='gds_postal_rules' && sub==='முழுத் தொகுதி') return 'Full Volume';
+ }
  return sub;
 }
 
@@ -1509,15 +1518,15 @@ function renderSubjectPage(){
  const title=document.getElementById('subjectTitle');
  const grid=document.getElementById('topicGrid');
  const info=data[currentSubject];
- if(!info){alert('இந்த பாடத்தின் உள்ளடக்கம் இன்னும் சேர்க்கப்படவில்லை.');return;}
- title.textContent=labelForSubject(currentSubject)+' – Topics';
+ if(!info){alert(contentLanguage==='en'?'This subject is not available yet.':'இந்த பாடத்தின் உள்ளடக்கம் இன்னும் சேர்க்கப்படவில்லை.');return;}
+ title.textContent=labelForSubject(currentSubject)+(contentLanguage==='en'?' – Topics':' – தலைப்புகள்');
  grid.innerHTML=Object.keys(info.topics).map(t=>`<button onclick="topic('${esc(t)}')">${labelForTopic(currentSubject,t)}</button>`).join('');
  show('topics');
 }
 
 function topic(t){
  currentTopic=t;
- topicTitle.textContent=labelForTopic(currentSubject,t)+' – Subtopics';
+ topicTitle.textContent=labelForTopic(currentSubject,t)+(contentLanguage==='en'?' – Subtopics':' – துணைத்தலைப்புகள்');
  subtopicGrid.innerHTML=data[currentSubject].topics[currentTopic].map(x=>`<button onclick="subtopic('${esc(x)}')">${labelForSub(currentSubject,currentTopic,x)}</button>`).join('');
  show('subtopics');
 }
@@ -6588,6 +6597,30 @@ function escapeHtmlAdmin(v){
     selectedBook:gdsSelectedBook,
     mode:'full-bank-direct'
   };
+})();
+</script>
+
+<script id="thiral-bilingual-ui-v9">
+(function(){
+  function setNavLanguage(){
+    var en=(typeof contentLanguage!=='undefined' && contentLanguage==='en');
+    var p=document.getElementById('practicePrevBtn'), n=document.getElementById('practiceNextBtn'), sub=document.getElementById('practiceSubmitBtn');
+    if(p) p.textContent=en?'← Previous':'← முந்தையது';
+    if(n) n.textContent=en?'Next →':'அடுத்து →';
+    if(sub) sub.textContent=en?'Submit Test':'தேர்வை சமர்ப்பிக்கவும்';
+    var h=document.querySelector('#practice h2');
+    if(h) h.textContent=en?'Practice':'பயிற்சி';
+  }
+  window.thiralRefreshBilingualUI=setNavLanguage;
+  document.addEventListener('DOMContentLoaded',setNavLanguage);
+  var oldChoose=window.chooseContentLanguage;
+  if(typeof oldChoose==='function'){
+    window.chooseContentLanguage=function(lang){
+      var r=oldChoose.apply(this,arguments);
+      setTimeout(setNavLanguage,60);
+      return r;
+    };
+  }
 })();
 </script>
 </body></html>
