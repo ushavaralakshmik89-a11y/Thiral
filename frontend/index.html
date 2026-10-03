@@ -4889,7 +4889,13 @@ async function loadPracticeQuestions(requested){
      currently uploaded Part-I bank. */
   if(String(selectedExam||'')==='gds_to_mts' && String(currentSubject||'')==='gds_postal_rules' &&
      String(currentTopic||'')==='அஞ்சல் வழிகாட்டி பகுதி-I' && selectedSubtopic==='முழுத் தொகுதி'){
-    const partISubs=['பொதுவான அஞ்சல் விதிகள்','அஞ்சல் / கட்டுரை அடிப்படைகள்','அஞ்சல் சேவைகள்'];
+    /* The UI keeps one stable Tamil internal key (முழுத் தொகுதி), but the
+       uploaded English rows use English subtopic values.  Map only at the
+       database query boundary so English Practice never asks Supabase for a
+       Tamil subtopic. */
+    const partISubsTA=['பொதுவான அஞ்சல் விதிகள்','அஞ்சல் / கட்டுரை அடிப்படைகள்','அஞ்சல் சேவைகள்'];
+    const partISubsEN=['General Postal Rules','Postal / Article Basics','Postal Services'];
+    const partISubs=(contentLanguage==='en') ? partISubsEN : partISubsTA;
     const all=[];
     for(const st of partISubs){
       let offset=0;
@@ -6470,7 +6476,7 @@ function escapeHtmlAdmin(v){
     window.startPractice(9999);
   };
 
-  window.__THIRAL_GDS_ENGLISH_UI_FINAL__='BOOKS-AND-FULL-VOLUME-LOCALIZED-v3';
+  window.__THIRAL_GDS_ENGLISH_UI_FINAL__='BOOKS-AND-FULL-VOLUME-LOCALIZED-v4-EN-QUESTION-BANK';
   window.__THIRAL_GDS_AGGREGATE_FINAL__={
     exam:GDS,
     subject:SUBJECT,
