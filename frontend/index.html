@@ -6345,6 +6345,82 @@ function escapeHtmlAdmin(v){
 </script>
 
 
+<script id="thiral-gds-volume-v-login-safe-v20">
+(function(){
+  'use strict';
+  const DB_SUBJECT='Departmental Rules / Postal Department Rules & Knowledge';
+  const DB_SUBTOPIC='Postal Manual Volume V';
+
+  async function startPostalManualVPractice(count){
+    try{
+      if(String(selectedExam||'')!=='gds_to_mts'){
+        selectedExam='gds_to_mts';
+        try{ localStorage.setItem('tnpsc_selected_exam','gds_to_mts'); }catch(e){}
+      }
+      if(String(currentSubject||'')!=='gds_postal_rules'){
+        alert('Postal Manual Volume V என்பது GDS to MTS → Departmental Rules பாடத்திற்குள் மட்டுமே உள்ளது.');
+        return;
+      }
+      currentSub=DB_SUBTOPIC;
+      const lang=(contentLanguage==='en'?'en':'ta');
+      const url='/practice/questions?exam='+encodeURIComponent('gds_to_mts')+
+        '&subject='+encodeURIComponent(DB_SUBJECT)+
+        '&language='+encodeURIComponent(lang)+
+        '&subtopic='+encodeURIComponent(DB_SUBTOPIC)+
+        '&limit='+encodeURIComponent(String(count));
+      if(typeof api!=='function') throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
+      const d=await api(url);
+      const rows=Array.isArray(d.questions)?d.questions:[];
+      if(rows.length<count){
+        alert('Postal Manual Volume V - '+(lang==='en'?'English':'Tamil')+' பகுதியில் '+count+' புதிய கேள்விகள் தற்போது கிடைக்கவில்லை. கிடைத்தது: '+rows.length);
+        return;
+      }
+      questions=rows;
+      lastPracticeCount=count;
+      total=rows.length;
+      qi=0; correct=wrong=unanswered=0;
+      practiceAnswers=new Array(total).fill(-1);
+      const review=document.getElementById('practiceReview');
+      if(review){review.innerHTML='';review.classList.add('hidden');}
+      document.getElementById('subTitle').textContent='📌 Postal Manual Volume V • '+count+' கேள்விகள்';
+      const stopBtn=document.getElementById('stopInfinitePractice');
+      if(stopBtn) stopBtn.classList.add('hidden');
+      if(typeof thiralSendActivity==='function') thiralSendActivity('practice_start',{count:total,subject:'gds_postal_rules',subtopic:DB_SUBTOPIC});
+      show('practice');
+      loadQ();
+    }catch(err){
+      console.error(err);
+      alert('Postal Manual Volume V Practice தொடங்க முடியவில்லை. '+(err&&err.message?err.message:'Backend error'));
+    }
+  }
+  window.startPostalManualVPractice=startPostalManualVPractice;
+
+  const originalSubtopic=window.subtopic;
+  if(typeof originalSubtopic==='function'){
+    window.subtopic=function(s){
+      const r=originalSubtopic.apply(this,arguments);
+      setTimeout(function(){
+        try{
+          const isV=(String(selectedExam||'')==='gds_to_mts' &&
+                     String(currentSubject||'')==='gds_postal_rules' &&
+                     String(currentSub||'')===DB_SUBTOPIC);
+          if(!isV) return;
+          document.querySelectorAll('#actions button[onclick^="startPractice("]').forEach(function(btn){
+            const m=String(btn.getAttribute('onclick')||'').match(/startPractice\((\d+)\)/);
+            if(!m) return;
+            const n=Number(m[1]);
+            if([10,20,50,100].includes(n)) btn.setAttribute('onclick','startPostalManualVPractice('+n+')');
+          });
+          const p=document.querySelector('#actions > p');
+          if(p) p.textContent=(contentLanguage==='en')?'Study material and practice questions for Postal Manual Volume V.':'Postal Manual Volume V தொடர்பான Study Material மற்றும் Practice கேள்விகள்.';
+        }catch(e){ console.error(e); }
+      },0);
+      return r;
+    };
+  }
+})();
+</script>
+
 <script id="thiral-activity-logout-final">
 (function(){
   'use strict';
@@ -6360,290 +6436,902 @@ function escapeHtmlAdmin(v){
 })();
 </script>
 
-<script id="thiral-gds-postal-isolated-navigation-v1">
+<script id="thiral-gds-navigation-safe-v21">
 (function(){
   'use strict';
-  /* POSTAL ONLY. No global topic/subtopic/subject/practice overrides.
-     Group 4 is intentionally untouched. */
-  var EXAM='gds_to_mts';
+  /* V21: restore GDS-to-MTS subject navigation without touching Student Login
+     or the Group 4 router. Only GDS subject clicks are intercepted. */
+  var GDS_EXAM='gds_to_mts';
+  var GDS_SUBJECTS={
+    gds_postal_rules:true,
+    gds_gk:true,
+    gds_ga:true,
+    gds_current_affairs:true,
+    gds_maths:true,
+    gds_reasoning:true,
+    gds_basic_english:true
+  };
+  var DB_SUBJECT='Departmental Rules / Postal Department Rules & Knowledge';
+  var V_TOPIC='அஞ்சல் கையேடு தொகுதி-V';
+  var V_SUBTOPIC='Postal Manual Volume V';
+  var PART1_TOPIC='அஞ்சல் வழிகாட்டி பகுதி-I';
+
+  function isGDSSubject(s){return !!GDS_SUBJECTS[String(s||'').trim()];}
+  function isGDS(){return String(selectedExam||'')===GDS_EXAM;}
+
+  function renderGDSTopics(){
+    var S=String(currentSubject||'');
+    var info=(typeof data!=='undefined') ? data[S] : null;
+    var title=document.getElementById('subjectTitle');
+    var grid=document.getElementById('topicGrid');
+    if(title) title.textContent=labelForSubject(S)+' – Topics';
+    if(!grid) return;
+
+    var topics=(info && info.topics) ? Object.keys(info.topics) : [];
+    if(!topics.length){
+      grid.innerHTML='<p class="small">இந்த பாடத்திற்கான Topics / கேள்வி வங்கி இன்னும் சேர்க்கப்படவில்லை.</p>';
+    }else{
+      grid.innerHTML=topics.map(function(t){
+        return '<button type="button" onclick="topic(\''+esc(t)+'\')">'+esc(labelForTopic(S,t))+'</button>';
+      }).join('');
+    }
+    show('topics');
+  }
+
+  var previousSubject=window.subject;
+  window.subject=function(s){
+    var S=String(s||'').trim();
+    if(!isGDSSubject(S)){
+      if(typeof previousSubject==='function') return previousSubject.apply(this,arguments);
+      return;
+    }
+    if(!isGDS()) return;
+    currentSubject=S;
+    currentTopic='';
+    currentSub='';
+    window.pendingSubject=S;
+    openLanguageChooser();
+  };
+
+  var previousChooseLanguage=window.chooseContentLanguage;
+  window.chooseContentLanguage=function(lang){
+    var L=String(lang||'ta').toLowerCase()==='en'?'en':'ta';
+    if(isGDS() && isGDSSubject(currentSubject)){
+      contentLanguage=L;
+      try{localStorage.setItem('tnpsc_content_language',L);}catch(e){}
+      var modal=document.getElementById('languageModal');
+      if(modal) modal.classList.add('hidden');
+      var label=document.getElementById('selectedLanguageLabel');
+      if(label) label.textContent=L==='en'?'English':'தமிழ்';
+      window.pendingSubject=null;
+      currentTopic='';
+      currentSub='';
+      renderGDSTopics();
+      return;
+    }
+    if(typeof previousChooseLanguage==='function') return previousChooseLanguage.apply(this,arguments);
+  };
+
+  var previousTopic=window.topic;
+  window.topic=function(t){
+    if(!(isGDS() && isGDSSubject(currentSubject))){
+      if(typeof previousTopic==='function') return previousTopic.apply(this,arguments);
+      return;
+    }
+    currentTopic=String(t||'');
+
+    /* Volume-V has no Full Volume practice option. Selecting the Volume-V
+       topic opens the four practice-count buttons directly. */
+    if(currentSubject==='gds_postal_rules' && currentTopic===V_TOPIC){
+      currentSub=V_SUBTOPIC;
+      var subTitle=document.getElementById('subTitle');
+      if(subTitle) subTitle.textContent=(contentLanguage==='en'?'📌 Postal Manual Volume V':'📌 அஞ்சல் கையேடு தொகுதி-V');
+      var actions=document.getElementById('actions');
+      if(actions){
+        actions.innerHTML=
+          '<h2 id="subTitle">'+(contentLanguage==='en'?'📌 Postal Manual Volume V':'📌 அஞ்சல் கையேடு தொகுதி-V')+'</h2>'+
+          '<p>'+(contentLanguage==='en'?'Practice questions for Postal Manual Volume V.':'Postal Manual Volume-V தொடர்பான Practice கேள்விகள்.')+'</p>'+
+          '<div class="grid">'+
+          '<button type="button" onclick="startPostalManualVPractice(10)">📝 10 கேள்விகள்</button>'+
+          '<button type="button" onclick="startPostalManualVPractice(20)">📝 20 கேள்விகள்</button>'+
+          '<button type="button" onclick="startPostalManualVPractice(50)">📝 50 கேள்விகள்</button>'+
+          '<button type="button" onclick="startPostalManualVPractice(100)">📝 100 கேள்விகள்</button>'+
+          '<button type="button" onclick="show(\'material\')">📖 Study Material</button>'+
+          '</div><button type="button" class="secondary" onclick="show(\'topics\')">← Topics</button>';
+      }
+      show('actions');
+      return;
+    }
+
+    var info=(typeof data!=='undefined') ? data[currentSubject] : null;
+    var list=(info && info.topics && info.topics[currentTopic]) ? info.topics[currentTopic] : [];
+    var title=document.getElementById('topicTitle');
+    var grid=document.getElementById('subtopicGrid');
+    if(title) title.textContent=labelForTopic(currentSubject,currentTopic)+' – Subtopics';
+    if(grid){
+      grid.innerHTML=list.map(function(x){
+        return '<button type="button" onclick="subtopic(\''+esc(x)+'\')">'+esc(labelForSub(currentSubject,currentTopic,x))+'</button>';
+      }).join('');
+    }
+    show('subtopics');
+  };
+
+  window.__THIRAL_GDS_NAVIGATION_SAFE_V21__={
+    exam:GDS_EXAM,
+    subjects:Object.keys(GDS_SUBJECTS),
+    volumeVSubtopic:V_SUBTOPIC,
+    part1Topic:PART1_TOPIC
+  };
+})();
+</script>
+
+<script id="thiral-gds-postal-volumes-visible-v22">
+(function(){
+  'use strict';
+  var GDS='gds_to_mts';
   var SUBJECT='gds_postal_rules';
+  var PART1='அஞ்சல் வழிகாட்டி பகுதி-I';
+  var PART1_EN='Post Office Guide Part-I';
+  var V='அஞ்சல் கையேடு தொகுதி-V';
+  var V_EN='Postal Manual Volume V';
+  var oldChoose=window.chooseContentLanguage;
+  var oldTopic=window.topic;
+
+  function isPostal(){ return String(window.selectedExam||selectedExam||'')===GDS && String(window.currentSubject||currentSubject||'')===SUBJECT; }
+  function renderVolumes(){
+    var title=document.getElementById('subjectTitle');
+    var grid=document.getElementById('topicGrid');
+    var en=String(window.contentLanguage||contentLanguage||'ta')==='en';
+    if(title) title.textContent=(en?'📮 Departmental Rules / Postal Department Rules & Knowledge':'📮 அஞ்சல் துறை விதிகள் / அறிவு')+' – Topics';
+    if(!grid) return;
+    grid.innerHTML=
+      '<button type="button" onclick="topic(\''+PART1.replace(/'/g,"\\'")+'\')">📘 '+(en?PART1_EN:PART1)+'</button>'+
+      '<button type="button" onclick="topic(\''+V.replace(/'/g,"\\'")+'\')">📗 '+(en?V_EN:V)+'</button>';
+    if(typeof show==='function') show('topics');
+  }
+
+  window.chooseContentLanguage=function(lang){
+    if(isPostal()){
+      var L=String(lang||'ta').toLowerCase()==='en'?'en':'ta';
+      window.contentLanguage=L;
+      try{localStorage.setItem('tnpsc_content_language',L);}catch(e){}
+      var modal=document.getElementById('languageModal'); if(modal) modal.classList.add('hidden');
+      var label=document.getElementById('selectedLanguageLabel'); if(label) label.textContent=L==='en'?'English':'தமிழ்';
+      window.pendingSubject=null;
+      window.currentTopic=''; window.currentSub='';
+      renderVolumes();
+      return;
+    }
+    if(typeof oldChoose==='function') return oldChoose.apply(this,arguments);
+  };
+
+  window.topic=function(t){
+    if(isPostal() && String(t||'')===PART1){
+      window.currentTopic=PART1; window.currentSub='';
+      var en=String(window.contentLanguage||contentLanguage||'ta')==='en';
+      var title=document.getElementById('topicTitle');
+      var grid=document.getElementById('subtopicGrid');
+      if(title) title.textContent=(en?'📘 '+PART1_EN:'📘 '+PART1)+' – Subtopics';
+      if(grid){
+        grid.innerHTML='<button type="button" onclick="subtopic(\'Post Office Guide Part-I\')">📚 '+(en?'Full Volume':'முழு தொகுதி')+'</button>';
+      }
+      if(typeof show==='function') show('subtopics');
+      return;
+    }
+    if(isPostal() && String(t||'')===V){
+      if(typeof oldTopic==='function') return oldTopic.apply(this,arguments);
+      return;
+    }
+    if(typeof oldTopic==='function') return oldTopic.apply(this,arguments);
+  };
+
+  window.__THIRAL_POSTAL_VOLUMES_VISIBLE_V22__={part1:PART1,volume5:V};
+})();
+</script>
+
+<script id="thiral-gds-postal-full-practice-final-v23">
+(function(){
+  'use strict';
+
+  const EXAM='gds_to_mts';
+  const UI_SUBJECT='gds_postal_rules';
+  const DB_SUBJECT='Departmental Rules / Postal Department Rules & Knowledge';
+  const PART1='அஞ்சல் வழிகாட்டி பகுதி-I';
+  const PART1_EN='Post Office Guide Part-I';
+  const PART1_INTERNAL='Post Office Guide Part-I';
+  const V='அஞ்சல் கையேடு தொகுதி-V';
+  const V_EN='Postal Manual Volume V';
+  const V_DB='Postal Manual Volume V';
+  const COUNTS=[10,20,50,100];
+
+  function postal(){
+    return String(window.selectedExam||'')===EXAM && String(window.currentSubject||'')===UI_SUBJECT;
+  }
+  function language(){ return String(window.contentLanguage||'ta')==='en'?'en':'ta'; }
+  function api(){
+    if(typeof window.thiralV138Api==='function') return window.thiralV138Api;
+    throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
+  }
+  function esc(v){
+    return String(v==null?'':v).replace(/[&<>"']/g,function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+  function qtext(q){return q && (q.question||q.q||'') || '';}
+  function qopts(q){return q && (Array.isArray(q.options)?q.options:(Array.isArray(q.o)?q.o:[])) || [];}
+
+  function renderActions(kind){
+    const en=language()==='en';
+    const isV=kind==='v';
+    const title=isV
+      ? (en?'📗 '+V_EN:'📗 '+V)
+      : (en?'📘 '+PART1_EN+' • Full Volume':'📘 '+PART1+' • முழு தொகுதி');
+    const desc=isV
+      ? (en?'Practice questions for Postal Manual Volume V.':'Postal Manual Volume-V தொடர்பான Practice கேள்விகள்.')
+      : (en?'Practice questions from the complete Post Office Guide Part-I question bank.':'Post Office Guide Part-I முழு தொகுதி Question Bank-இலிருந்து Practice கேள்விகள்.');
+    const back=isV ? (en?'Topics':'தலைப்புகள்') : (en?'Subtopics':'உள்தலைப்புகள்');
+    const box=document.getElementById('actions');
+    if(!box)return;
+    box.innerHTML=
+      '<h2 id="subTitle">'+esc(title)+'</h2>'+
+      '<p>'+esc(desc)+'</p>'+
+      '<div class="grid">'+COUNTS.map(function(n){
+        return `<button type="button" onclick="window.__thiralPostalPracticeV23(${n},${JSON.stringify(kind)})">📝 ${n} ${en?'Questions':'கேள்விகள்'}</button>`;
+      }).join('')+'</div>'+
+      '<button type="button" class="secondary" onclick="show(\'topics\')">← '+esc(back)+'</button>';
+    if(typeof show==='function')show('actions');
+  }
+
+  // Final Topic router for the two postal volumes. This runs after older patches,
+  // so the two volumes cannot fall into the old Group-4 topic renderer.
+  const oldTopic=window.topic;
+  window.topic=function(t){
+    if(postal() && String(t||'')===PART1){
+      window.currentTopic=PART1;
+      window.currentSub=PART1_INTERNAL;
+      renderActions('p');
+      return;
+    }
+    if(postal() && String(t||'')===V){
+      window.currentTopic=V;
+      window.currentSub=V_DB;
+      renderActions('v');
+      return;
+    }
+    return typeof oldTopic==='function' ? oldTopic.apply(this,arguments) : undefined;
+  };
+
+  const oldSubtopic=window.subtopic;
+  window.subtopic=function(s){
+    if(postal() && (String(s||'')===PART1_INTERNAL || String(s||'')===PART1)){
+      window.currentTopic=PART1;
+      window.currentSub=PART1_INTERNAL;
+      renderActions('p');
+      return;
+    }
+    if(postal() && String(s||'')===V_DB){
+      window.currentTopic=V;
+      window.currentSub=V_DB;
+      renderActions('v');
+      return;
+    }
+    return typeof oldSubtopic==='function' ? oldSubtopic.apply(this,arguments) : undefined;
+  };
+
+  async function fetchAllPostalSubject(lang){
+    const all=[];
+    let offset=0;
+    const page=200;
+    while(true){
+      const d=await api()('/questions?exam='+encodeURIComponent(EXAM)+
+        '&subject='+encodeURIComponent(DB_SUBJECT)+
+        '&language='+encodeURIComponent(lang)+
+        '&limit='+page+'&offset='+offset);
+      const rows=Array.isArray(d.questions)?d.questions:[];
+      all.push.apply(all,rows);
+      if(!d.pagination || !d.pagination.hasMore || rows.length===0)break;
+      const next=Number(d.pagination.nextOffset);
+      if(!Number.isFinite(next) || next<=offset)break;
+      offset=next;
+    }
+    return all;
+  }
+
+  async function getPart1Questions(lang,count){
+    const all=await fetchAllPostalSubject(lang);
+    // The current Departmental Rules database contains Part-I and Volume-V
+    // under this subject. Full Volume means all active Part-I rows only.
+    const rows=all.filter(function(q){return String(q.subtopic||'').trim()!==V_DB;});
+    const seen=new Set();
+    const unique=rows.filter(function(q){
+      const id=String(q.id||'');
+      if(!id || seen.has(id))return false;
+      seen.add(id);return true;
+    });
+    if(unique.length<count){
+      throw new Error((lang==='en'?'Post Office Guide Part-I English':'Post Office Guide Part-I தமிழ்')+
+        ' Full Volume-ல் '+count+' கேள்விகள் இல்லை. கிடைத்தது: '+unique.length+'.');
+    }
+    return unique.sort(function(){return Math.random()-0.5;}).slice(0,count);
+  }
+
+  async function getVolumeVQuestions(lang,count){
+    const d=await api()('/practice/questions?exam='+encodeURIComponent(EXAM)+
+      '&subject='+encodeURIComponent(DB_SUBJECT)+
+      '&language='+encodeURIComponent(lang)+
+      '&subtopic='+encodeURIComponent(V_DB)+
+      '&limit='+count);
+    const rows=Array.isArray(d.questions)?d.questions:[];
+    if(rows.length<count){
+      throw new Error((lang==='en'?'Postal Manual Volume V English':'Postal Manual Volume V தமிழ்')+
+        ' பகுதியில் '+count+' புதிய கேள்விகள் கிடைக்கவில்லை. கிடைத்தது: '+rows.length+'.');
+    }
+    return rows.slice(0,count);
+  }
+
+  // Independent postal practice controller. It does not replace Login,
+  // Group-4 startPractice, loadPracticeQuestions, or the global API.
+  const S={questions:[],answers:{},checks:{},index:0,attemptId:null,timer:null,seconds:15,submitted:false};
+  function stopTimer(){if(S.timer){clearInterval(S.timer);S.timer=null;}}
+  function tick(n){const x=document.getElementById('timer');if(x)x.textContent=String(Math.max(0,n));}
+  function renderQuestion(){
+    const q=S.questions[S.index];if(!q)return;
+    stopTimer();
+    const level=document.getElementById('level'),progress=document.getElementById('progress'),bar=document.getElementById('bar'),question=document.getElementById('question'),options=document.getElementById('options'),feedback=document.getElementById('feedback');
+    if(level)level.textContent=q.difficulty||q.d||'சாதாரணம்';
+    if(progress)progress.textContent=(S.index+1)+' / '+S.questions.length;
+    if(bar)bar.style.width=((S.index+1)/S.questions.length*100)+'%';
+    if(question)question.textContent=qtext(q);
+    if(feedback)feedback.innerHTML='';
+    if(options){
+      options.innerHTML=qopts(q).map(function(o,i){
+        return '<button class="option" type="button" onclick="window.__thiralPostalAnswerV23('+i+',false)">'+String.fromCharCode(65+i)+'. '+esc(o)+'</button>';
+      }).join('');
+    }
+    S.seconds=15;tick(15);
+    S.timer=setInterval(function(){
+      S.seconds--;tick(S.seconds);
+      if(S.seconds<=0){stopTimer();window.__thiralPostalAnswerV23(-1,true);}
+    },1000);
+  }
+
+  async function answer(i,timedOut){
+    if(S.submitted)return;
+    const q=S.questions[S.index];if(!q)return;
+    const key=String(q.id);
+    if(Object.prototype.hasOwnProperty.call(S.checks,key))return;
+    stopTimer();
+    const buttons=document.querySelectorAll('#options button');
+    for(let b=0;b<buttons.length;b++)buttons[b].disabled=true;
+    S.answers[key]=Number(i);
+    const feedback=document.getElementById('feedback');
+    if(feedback)feedback.innerHTML='<b>விடை சரிபார்க்கப்படுகிறது...</b>';
+    try{
+      const d=await api()('/attempts/'+S.attemptId+'/check-answer',{
+        method:'POST',body:JSON.stringify({questionId:Number(q.id),answer:Number(i)})
+      });
+      S.checks[key]=d;
+      const o=qopts(q),ci=Number(d.correct_option);
+      let h='';
+      if(timedOut)h+='<div style="font-size:20px;font-weight:800">⏱️ நேரம் முடிந்தது</div>';
+      else if(d.correct===true)h+='<div style="font-size:20px;font-weight:800">✓ சரி</div>';
+      else h+='<div style="font-size:20px;font-weight:800">✗ தவறு</div>';
+      h+='<div style="margin-top:7px"><b>சரியான பதில்:</b> '+esc(o[ci]||'')+'</div>';
+      if(d.explanation)h+='<div style="margin-top:7px"><b>விளக்கம்:</b> '+esc(d.explanation)+'</div>';
+      h+='<div style="margin-top:14px;font-size:14px;opacity:.75">'+(S.index===S.questions.length-1?'முடிவுக்கு செல்கிறது...':'அடுத்த கேள்விக்கு செல்கிறது...')+'</div>';
+      if(feedback)feedback.innerHTML=h;
+      setTimeout(function(){next();},1200);
+    }catch(e){
+      for(let b=0;b<buttons.length;b++)buttons[b].disabled=false;
+      delete S.answers[key];
+      if(feedback)feedback.innerHTML='<b>விடை சரிபார்க்க முடியவில்லை.</b><br>'+esc(e.message||e);
+      if(!timedOut){S.seconds=15;tick(15);S.timer=setInterval(function(){S.seconds--;tick(S.seconds);if(S.seconds<=0){stopTimer();answer(-1,true);}},1000);}
+    }
+  }
+
+  async function next(){
+    if(S.index<S.questions.length-1){S.index++;renderQuestion();return;}
+    await submit();
+  }
+
+  async function submit(){
+    if(S.submitted)return;
+    S.submitted=true;stopTimer();
+    try{
+      const d=await api()('/attempts/'+S.attemptId+'/submit',{
+        method:'POST',body:JSON.stringify({answers:S.answers})
+      });
+      const total=Number(d.total||S.questions.length);
+      const correct=Number(d.correct||0);
+      const unanswered=Object.values(S.answers).filter(function(v){return Number(v)===-1;}).length;
+      const wrong=Math.max(0,total-correct-unanswered);
+      const score=d.score!=null?Number(d.score):Math.round(correct*100/Math.max(1,total));
+      const student=(window.thiralV138User&&window.thiralV138User.name)||'';
+      const result=document.getElementById('resultText');
+      if(result)result.innerHTML='<p><b>மாணவர் பெயர்:</b> '+esc(student)+'</p><p><b>தேர்வு:</b> Department of Posts • GDS to MTS</p><p><b>வகை:</b> Practice</p><p><b>மொத்த கேள்விகள்:</b> '+total+'</p><p><b>சரி:</b> '+correct+'</p><p><b>தவறு:</b> '+wrong+'</p><p><b>விடையளிக்காதது:</b> '+unanswered+'</p><p><b>மதிப்பெண்:</b> '+score+'%</p>';
+      buildReview();
+      if(typeof show==='function')show('result');
+      const box=document.getElementById('practiceReview');
+      if(box){box.classList.remove('hidden','screen-review');box.style.display='block';}
+    }catch(e){
+      S.submitted=false;
+      const feedback=document.getElementById('feedback');
+      if(feedback)feedback.innerHTML='<b>Result சேமிக்க முடியவில்லை.</b><br>'+esc(e.message||e);
+    }
+  }
+
+  function buildReview(){
+    const box=document.getElementById('practiceReview');if(!box)return;
+    box.innerHTML='<h2>📝 Total Review</h2>'+S.questions.map(function(q,i){
+      const d=S.checks[String(q.id)]||{},o=qopts(q),a=S.answers[String(q.id)],ci=Number(d.correct_option);
+      const your=Number(a)===-1?'விடையளிக்கவில்லை':(o[Number(a)]||'');
+      const right=o[ci]||'';
+      const status=Number(a)===-1?'⏱️ விடையளிக்கவில்லை':(d.correct===true?'✓ சரி':'✗ தவறு');
+      return '<div class="card" style="box-shadow:none;border:1px solid #e5e7eb;margin:12px 0;padding:15px"><div style="font-weight:800">'+(i+1)+'. '+esc(qtext(q))+'</div><p><b>உங்கள் விடை:</b> '+esc(your)+'</p><p><b>சரியான பதில்:</b> '+esc(right)+'</p><p style="font-weight:800;font-size:18px">'+status+'</p>'+(d.explanation?'<p><b>விளக்கம்:</b> '+esc(d.explanation)+'</p>':'')+'</div>';
+    }).join('');
+  }
+
+  window.__thiralPostalAnswerV23=answer;
+  window.__thiralPostalNextV23=next;
+
+  window.__thiralPostalPracticeV23=async function(count,kind){
+    count=Number(count);
+    if(!postal() || COUNTS.indexOf(count)<0)return;
+    const lang=language();
+    try{
+      stopTimer();
+      const rows=kind==='v' ? await getVolumeVQuestions(lang,count) : await getPart1Questions(lang,count);
+      S.questions=rows;S.answers={};S.checks={};S.index=0;S.attemptId=null;S.submitted=false;S.seconds=15;
+      const a=await api()('/attempts',{
+        method:'POST',
+        body:JSON.stringify({exam:EXAM,subject:DB_SUBJECT,mode:'practice',language:lang,questionIds:rows.map(function(q){return Number(q.id);})})
+      });
+      if(!a||!a.id)throw new Error('Practice attempt உருவாக்கப்படவில்லை.');
+      S.attemptId=a.id;
+      const review=document.getElementById('practiceReview');
+      if(review){review.innerHTML='';review.classList.add('hidden','screen-review');review.style.display='none';}
+      const result=document.getElementById('resultText');if(result)result.innerHTML='';
+      const stop=document.getElementById('stopInfinitePractice');if(stop)stop.classList.add('hidden');
+      if(typeof show==='function')show('practice');
+      renderQuestion();
+    }catch(e){
+      console.error('Postal practice V23:',e);
+      const msg=e&&e.message?e.message:String(e);
+      const feedback=document.getElementById('feedback');
+      if(feedback)feedback.innerHTML='<b>Practice தொடங்க முடியவில்லை.</b><br>'+esc(msg);
+      else alert('Practice தொடங்க முடியவில்லை. '+msg);
+    }
+  };
+
+  window.__THIRAL_POSTAL_PRACTICE_V23__={exam:EXAM,subject:DB_SUBJECT,part1:PART1,volume5:V,counts:COUNTS};
+})();
+</script>
+<script id="thiral-v24-backend-fallback">
+/* THIRAL V24: Postal Volume I / V backend-safe bridge.
+   Does not change DB data or question content. If the V138 bridge is not
+   present, use the same-origin /api endpoint with the authenticated cookie. */
+(function(){
+  'use strict';
+  function directApi(path,opt){
+    opt=opt||{};
+    var headers=Object.assign({'Content-Type':'application/json'},opt.headers||{});
+    return fetch('/api'+path,Object.assign({},opt,{credentials:'include',headers:headers}))
+      .then(async function(r){
+        var d={}; try{d=await r.json();}catch(e){}
+        if(!r.ok) throw new Error(d.error||('HTTP '+r.status));
+        return d;
+      });
+  }
+  if(typeof window.thiralV138Api!=='function') window.thiralV138Api=directApi;
+
+  /* Older Volume-V button handlers in previous patches are redirected to the
+     final V23 controller, so an obsolete handler cannot produce the old API
+     error dialog. */
+  if(typeof window.__thiralPostalPracticeV23==='function'){
+    window.startPostalManualVPractice=function(n){
+      return window.__thiralPostalPracticeV23(Number(n),'v');
+    };
+    window.startPostalManualVPracticeV23=window.startPostalManualVPractice;
+  }
+
+  /* If an old Part-I handler is still attached, keep the final postal router
+     authoritative without touching Group-4's practice engine. */
+  window.__THIRAL_POSTAL_BACKEND_V24__={
+    apiReady:typeof window.thiralV138Api==='function',
+    endpoint:'/api',
+    volumes:['Post Office Guide Part-I','Postal Manual Volume V'],
+    counts:[10,20,50,100]
+  };
+})();
+</script>
+<script id="thiral-gds-postal-questions-final-v25">
+(function(){
+  'use strict';
+  var EXAM='gds_to_mts';
+  var UI_SUBJECT='gds_postal_rules';
   var DB_SUBJECT='Departmental Rules / Postal Department Rules & Knowledge';
   var PART1_TA='அஞ்சல் வழிகாட்டி பகுதி-I';
   var PART1_EN='Post Office Guide Part-I';
   var V_TA='அஞ்சல் கையேடு தொகுதி-V';
   var V_EN='Postal Manual Volume V';
   var V_DB='Postal Manual Volume V';
-  var P1_SUBS_TA=['பொதுவான அஞ்சல் விதிகள்','அஞ்சல் / கட்டுரை அடிப்படைகள்','அஞ்சல் சேவைகள்'];
-  var P1_SUBS_EN=['General Postal Rules','Postal / Article Basics','Postal Services'];
   var COUNTS=[10,20,50,100];
+  var PART1_TA_SUBS=['பொதுவான அஞ்சல் விதிகள்','அஞ்சல் / கட்டுரை அடிப்படைகள்','அஞ்சல் சேவைகள்'];
+  var PART1_EN_SUBS=['General Postal Rules','Postal / Article Basics','Postal Services'];
 
   function isPostal(){
-    return String(selectedExam||'')===EXAM && String(currentSubject||'')===SUBJECT;
+    return String(typeof selectedExam!=='undefined'?selectedExam:'')===EXAM &&
+           String(typeof currentSubject!=='undefined'?currentSubject:'')===UI_SUBJECT;
   }
-  function en(){return String(contentLanguage||'ta')==='en';}
-  function escHtml(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-  function escAttr(v){return String(v==null?'':v).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
-  function showSafe(id){if(typeof show==='function')show(id);}
-  function actions(){return document.getElementById('actions');}
-  function subGrid(){return document.getElementById('subtopicGrid');}
-  function topicGrid(){return document.getElementById('topicGrid');}
+  function lang(){ return String(typeof contentLanguage!=='undefined'?contentLanguage:'ta')==='en'?'en':'ta'; }
+  function apiBase(){
+    if(typeof window.thiralV138Api==='function') return window.thiralV138Api;
+    return function(path,opt){
+      opt=opt||{};
+      var headers=Object.assign({'Content-Type':'application/json'},opt.headers||{});
+      return fetch('/api'+path,Object.assign({},opt,{credentials:'include',headers:headers})).then(async function(r){
+        var d={}; try{d=await r.json();}catch(e){}
+        if(!r.ok) throw new Error(d.error||('HTTP '+r.status));
+        return d;
+      });
+    };
+  }
+  function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 
-  function renderTopics(){
-    if(!isPostal()) return;
-    var title=document.getElementById('subjectTitle');
-    var grid=topicGrid();
-    if(title) title.textContent=(en()?'📮 Departmental Rules / Postal Department Rules & Knowledge':'📮 அஞ்சல் துறை விதிகள் / அறிவு')+' – Topics';
-    if(!grid)return;
-    grid.innerHTML='<button type="button" data-thiral-postal-topic="p1" onclick="window.__THIRAL_GDS_POSTAL_RENDER_PART1()">📘 '+escHtml(en()?PART1_EN:PART1_TA)+'</button>'+
-                   '<button type="button" data-thiral-postal-topic="v5" onclick="window.__THIRAL_GDS_POSTAL_RENDER_V5()">📗 '+escHtml(en()?V_EN:V_TA)+'</button>';
-    showSafe('topics');
+  async function fetchPractice(subtopic,language,limit){
+    var path='/practice/questions?exam='+encodeURIComponent(EXAM)+
+      '&subject='+encodeURIComponent(DB_SUBJECT)+
+      '&language='+encodeURIComponent(language)+
+      '&subtopic='+encodeURIComponent(subtopic)+
+      '&limit='+encodeURIComponent(String(limit));
+    return await apiBase()(path);
   }
+
+  async function part1Rows(language,count){
+    var names=language==='en'?PART1_EN_SUBS:PART1_TA_SUBS;
+    var all=[];
+    for(var i=0;i<names.length;i++){
+      var d=await fetchPractice(names[i],language,Math.min(200,count));
+      var rows=Array.isArray(d.questions)?d.questions:[];
+      all.push.apply(all,rows);
+    }
+    var seen={};
+    all=all.filter(function(q){var id=String(q&&q.id||'');if(!id||seen[id])return false;seen[id]=1;return true;});
+    for(var j=all.length-1;j>0;j--){var k=Math.floor(Math.random()*(j+1)),tmp=all[j];all[j]=all[k];all[k]=tmp;}
+    if(all.length<count) throw new Error((language==='en'?PART1_EN:PART1_TA)+' Full Volume-ல் '+count+' கேள்விகள் கிடைக்கவில்லை. கிடைத்தது: '+all.length+'.');
+    return all.slice(0,count);
+  }
+
+  async function volume5Rows(language,count){
+    var d=await fetchPractice(V_DB,language,count);
+    var rows=Array.isArray(d.questions)?d.questions:[];
+    if(rows.length<count) throw new Error((language==='en'?V_EN:V_TA)+' பகுதியில் '+count+' புதிய கேள்விகள் கிடைக்கவில்லை. கிடைத்தது: '+rows.length+'.');
+    return rows.slice(0,count);
+  }
+
+  async function start(kind,count){
+    count=Number(count);
+    if(COUNTS.indexOf(count)<0) return;
+    if(!isPostal()){
+      try{selectedExam=EXAM;currentSubject=UI_SUBJECT;}catch(e){}
+    }
+    var L=lang();
+    try{
+      var rows=(kind==='p')?await part1Rows(L,count):await volume5Rows(L,count);
+      /* Reuse the already-tested V23 renderer/attempt flow, but supply a safe
+         API only for this one call. This avoids changing Login or Group 4. */
+      if(typeof window.__thiralPostalPracticeV23!=='function') throw new Error('Postal practice renderer கிடைக்கவில்லை.');
+      var original=window.thiralV138Api;
+      var safe=function(path,opt){
+        var p=String(path||'');
+        /* The V23 Part-I loader asks /questions without a subtopic. We have
+           already fetched the exact Part-I rows, so return those rows here. */
+        if(kind==='p' && p.indexOf('/questions?')===0){
+          return Promise.resolve({questions:rows,pagination:{limit:rows.length,offset:0,returned:rows.length,total:rows.length,hasMore:false,nextOffset:rows.length}});
+        }
+        return (typeof original==='function'?original:apiBase())(path,opt);
+      };
+      window.thiralV138Api=safe;
+      try{
+        await window.__thiralPostalPracticeV23(count,kind);
+      }finally{
+        window.thiralV138Api=original || apiBase();
+      }
+    }catch(e){
+      console.error('THIRAL V25 postal practice',e);
+      alert('Practice தொடங்க முடியவில்லை. '+(e&&e.message?e.message:String(e)));
+    }
+  }
+  window.startPostalFullPracticeV25=function(n){return start('p',n);};
+  window.startPostalManualVPractice=function(n){return start('v',n);};
+
   function renderPart1(){
-    if(!isPostal())return;
     currentTopic=PART1_TA; currentSub='Post Office Guide Part-I';
-    var title=document.getElementById('topicTitle');
-    var grid=subGrid();
-    if(title)title.textContent='📘 '+escHtml(en()?PART1_EN:PART1_TA)+' – '+(en()?'Full Volume':'முழு தொகுதி');
-    if(!grid)return;
-    /* Part-I is intentionally one complete volume here. The three DB
-       subtopics are combined by the practice loader, so the student sees
-       one Full Volume entry containing every available question. */
-    grid.innerHTML='<button type="button" data-thiral-postal-sub="p1-full" onclick="window.__THIRAL_GDS_POSTAL_START(\'p1-full-all\')">📚 '+(en()?'Full Volume – All Questions':'முழு தொகுதி – அனைத்து கேள்விகளும்')+'</button>';
-    showSafe('subtopics');
+    var en=lang()==='en';
+    var box=document.getElementById('actions');
+    if(!box)return;
+    box.innerHTML='<h2 id="subTitle">📘 '+(en?PART1_EN:PART1_TA)+' • '+(en?'Full Volume':'முழு தொகுதி')+'</h2>'+
+      '<p>'+(en?'Practice questions from the complete Post Office Guide Part-I question bank.':'Post Office Guide Part-I முழு தொகுதி Question Bank-இலிருந்து Practice கேள்விகள்.')+'</p>'+
+      '<div class="grid">'+COUNTS.map(function(n){return '<button type="button" onclick="startPostalFullPracticeV25('+n+')">📝 '+n+' '+(en?'Questions':'கேள்விகள்')+'</button>';}).join('')+'</div>'+
+      '<button type="button" class="secondary" onclick="show(\'subtopics\')">← '+(en?'Subtopics':'உள்தலைப்புகள்')+'</button>';
+    show('actions');
   }
-  function renderVolume5(){
-    if(!isPostal())return;
+  function renderV(){
     currentTopic=V_TA; currentSub=V_DB;
-    var box=actions(); if(!box)return;
-    box.innerHTML='<h2 id="subTitle">📗 '+escHtml(en()?V_EN:V_TA)+'</h2>'+
-      '<p>'+(en()?'Practice questions for Postal Manual Volume V.':'Postal Manual Volume-V தொடர்பான Practice கேள்விகள்.')+'</p>'+
-      '<div class="grid">'+COUNTS.map(function(n){return '<button type="button" data-thiral-postal-count="v5-'+n+'">📝 '+n+' '+(en()?'Questions':'கேள்விகள்')+'</button>';}).join('')+'</div>'+
-      '<button type="button" class="secondary" data-thiral-postal-back="topics">← '+(en()?'Topics':'தலைப்புகள்')+'</button>';
-    showSafe('actions');
-  }
-  function renderP1Actions(key){
-    if(!isPostal())return;
-    var subs=en()?P1_SUBS_EN:P1_SUBS_TA;
-    var label=key==='full'?(en()?'Full Volume':'முழு தொகுதி'):subs[Number(key)];
-    currentSub=key==='full'?'Post Office Guide Part-I':(subs[Number(key)]||'');
-    var box=actions(); if(!box)return;
-    if(key==='full'){
-      box.innerHTML='<h2 id="subTitle">📘 '+escHtml(en()?PART1_EN:PART1_TA)+' • '+(en()?'Full Volume':'முழு தொகுதி')+'</h2>'+        '<p>'+(en()?'All available Post Office Guide Part-I questions will be loaded in the selected language.':'தேர்ந்தெடுத்த மொழியில் Post Office Guide Part-I-ல் உள்ள அனைத்து கிடைக்கும் கேள்விகளும் முழுமையாக ஏற்றப்படும்.')+'</p>'+        '<div class="grid"><button type="button" data-thiral-postal-count="p1-full-all">📚 '+(en()?'Full Volume':'முழு தொகுதி')+'</button></div>'+        '<button type="button" class="secondary" data-thiral-postal-back="p1">← '+(en()?'Subtopics':'உள்தலைப்புகள்')+'</button>';
-    }else{
-      box.innerHTML='<h2 id="subTitle">📘 '+escHtml(en()?PART1_EN:PART1_TA)+' • '+escHtml(label)+'</h2>'+        '<p>'+(en()?'Practice questions for this section.':'இந்தப் பகுதிக்கான Practice கேள்விகள்.')+'</p>'+        '<div class="grid">'+COUNTS.map(function(n){return '<button type="button" data-thiral-postal-count="p1-'+key+'-'+n+'">📝 '+n+' '+(en()?'Questions':'கேள்விகள்')+'</button>';}).join('')+'</div>'+        '<button type="button" class="secondary" data-thiral-postal-back="p1">← '+(en()?'Subtopics':'உள்தலைப்புகள்')+'</button>';
-    }
-    showSafe('actions');
-  }
-  function routeTopic(kind){if(kind==='p1')renderPart1();else if(kind==='v5')renderVolume5();}
-  function routeSub(key){
-    if(key==='p1-full'){
-      currentTopic=PART1_TA; currentSub='Post Office Guide Part-I';
-      if(typeof window.__THIRAL_GDS_POSTAL_START==='function'){
-        window.__THIRAL_GDS_POSTAL_START('p1-full-all');
-      }else{
-        renderP1Actions('full');
-      }
-      return;
-    }
-    /* Individual Part-I DB subtopic buttons are intentionally not exposed
-       in this UI. Full Volume contains all three subtopics. */
+    var en=lang()==='en';
+    var box=document.getElementById('actions');
+    if(!box)return;
+    box.innerHTML='<h2 id="subTitle">📗 '+(en?V_EN:V_TA)+'</h2>'+
+      '<p>'+(en?'Practice questions for Postal Manual Volume V.':'Postal Manual Volume-V தொடர்பான Practice கேள்விகள்.')+'</p>'+
+      '<div class="grid">'+COUNTS.map(function(n){return '<button type="button" onclick="startPostalManualVPractice('+n+')">📝 '+n+' '+(en?'Questions':'கேள்விகள்')+'</button>';}).join('')+'</div>'+
+      '<button type="button" class="secondary" onclick="show(\'topics\')">← '+(en?'Topics':'தலைப்புகள்')+'</button>';
+    show('actions');
   }
 
-  document.addEventListener('click',function(ev){
-    /* Subject entry is intercepted only for the single GDS Postal subject.
-       This prevents the Group 4 subject router from ever seeing the click. */
-    var node=ev.target;
-    while(node && node!==document){
-      var oc=node.getAttribute && String(node.getAttribute('onclick')||'');
-      if(oc.indexOf("subject('gds_postal_rules')")>=0 || oc.indexOf('subject(\"gds_postal_rules\")')>=0){
-        ev.preventDefault(); ev.stopPropagation(); if(ev.stopImmediatePropagation)ev.stopImmediatePropagation();
-        try{ currentSubject=SUBJECT; currentTopic=''; currentSub=''; window.pendingSubject=SUBJECT; }catch(e){}
-        var lm=document.getElementById('languageModal'); if(lm)lm.classList.remove('hidden');
-        return;
-      }
-      node=node.parentNode;
-    }
+  var oldTopic=window.topic;
+  window.topic=function(t){
+    if(isPostal() && (String(t||'')===PART1_TA || String(t||'')===PART1_EN)) return renderPart1();
+    if(isPostal() && (String(t||'')===V_TA || String(t||'')===V_EN)) return renderV();
+    return typeof oldTopic==='function'?oldTopic.apply(this,arguments):undefined;
+  };
+  var oldSub=window.subtopic;
+  window.subtopic=function(s){
+    if(isPostal() && (String(s||'')===PART1_TA || String(s||'')===PART1_EN || String(s||'')==='Post Office Guide Part-I')) return renderPart1();
+    if(isPostal() && String(s||'')===V_DB) return renderV();
+    return typeof oldSub==='function'?oldSub.apply(this,arguments):undefined;
+  };
 
-    /* Language chooser is also isolated to Postal. */
-    var langNode=ev.target;
-    while(langNode && langNode!==document){
-      var loc=langNode.getAttribute && String(langNode.getAttribute('onclick')||'');
-      if(loc.indexOf("chooseContentLanguage('ta')")>=0 || loc.indexOf("chooseContentLanguage('en')")>=0){
-        if(String(currentSubject||'')!==SUBJECT || String(selectedExam||'')!==EXAM)return;
-        ev.preventDefault(); ev.stopPropagation(); if(ev.stopImmediatePropagation)ev.stopImmediatePropagation();
-        var L=loc.indexOf("'en'")>=0?'en':'ta';
-        contentLanguage=L;
-        try{localStorage.setItem('tnpsc_content_language',L);}catch(e){}
-        var lm2=document.getElementById('languageModal'); if(lm2)lm2.classList.add('hidden');
-        var lab=document.getElementById('selectedLanguageLabel'); if(lab)lab.textContent=L==='en'?'English':'தமிழ்';
-        window.pendingSubject=null;
-        renderTopics();
-        return;
-      }
-      langNode=langNode.parentNode;
-    }
-
-    if(!isPostal())return;
-    var el=ev.target;
-    while(el && el!==document && !(el.dataset&& (el.dataset.thiralPostalTopic||el.dataset.thiralPostalSub||el.dataset.thiralPostalCount||el.dataset.thiralPostalBack))) el=el.parentNode;
-    if(!el || el===document)return;
-    ev.preventDefault(); ev.stopPropagation();
-    if(ev.stopImmediatePropagation)ev.stopImmediatePropagation();
-    var t=el.dataset.thiralPostalTopic, s=el.dataset.thiralPostalSub, c=el.dataset.thiralPostalCount, b=el.dataset.thiralPostalBack;
-    if(t){routeTopic(t);return;}
-    if(s){routeSub(s);return;}
-    if(b){if(b==='topics')renderTopics();else renderPart1();return;}
-    if(c){
-      if(typeof window.__THIRAL_GDS_POSTAL_START==='function') window.__THIRAL_GDS_POSTAL_START(c);
-      else alert(en()?'Postal Practice backend is not connected.':'Postal Practice backend இணைப்பு கிடைக்கவில்லை.');
-    }
-  },true);
-
-  /* Convert the existing subject-page Postal buttons to isolated data attributes
-     without changing subject(), topic(), subtopic(), or any Group 4 function. */
-  var oldRender=window.renderExamHome;
-  window.__THIRAL_GDS_POSTAL_RENDER_TOPICS=renderTopics;
-  window.__THIRAL_GDS_POSTAL_RENDER_PART1=renderPart1;
-  window.__THIRAL_GDS_POSTAL_RENDER_V5=renderVolume5;
-  window.__THIRAL_GDS_POSTAL_ISOLATED={exam:EXAM,subject:SUBJECT,dbSubject:DB_SUBJECT};
+  window.__THIRAL_POSTAL_V25__={exam:EXAM,subject:DB_SUBJECT,part1:PART1_TA,part1English:PART1_EN,volume5:V_DB,counts:COUNTS};
 })();
 </script>
+</body></html>
 
-<script id="thiral-gds-postal-practice-isolated-v7">
+<script id="thiral-gds-gk-group4-style-v26">
 (function(){
   'use strict';
-  /* POSTAL PRACTICE ONLY. Does not replace any Group 4 router or practice function. */
-  var EXAM='gds_to_mts';
-  var SUBJECT='Departmental Rules / Postal Department Rules & Knowledge';
-  var V_SUB='Postal Manual Volume V';
-  var P1=['பொதுவான அஞ்சல் விதிகள்','அஞ்சல் / கட்டுரை அடிப்படைகள்','அஞ்சல் சேவைகள்'];
-  var P1EN=['General Postal Rules','Postal / Article Basics','Postal Services'];
-  var S={questions:[],answers:{},checks:{},index:0,attemptId:null,timer:null,seconds:15,busy:false,submitted:false,kind:null,key:null};
-  var $=function(id){return document.getElementById(id);};
-  var esc=function(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});};
-  function isPostal(){return String(typeof selectedExam!=='undefined'?selectedExam:'')===EXAM && String(typeof currentSubject!=='undefined'?currentSubject:'')==='gds_postal_rules';}
-  function en(){return String(typeof contentLanguage!=='undefined'?contentLanguage:'ta')==='en';}
-  function api(){if(typeof window.thiralV138Api==='function')return window.thiralV138Api;throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');}
-  function stop(){if(S.timer){clearInterval(S.timer);S.timer=null;}}
-  function setTimer(n){if($('timer'))$('timer').textContent=String(Math.max(0,n));}
-  function getText(q){
-    if(!q)return '';
-    var L=en();
-    var candidates=L?[q.question_en,q.english_question,q.questionEnglish,q.en_question,q.question_english,q.question]:[q.question_ta,q.tamil_question,q.questionTamil,q.ta_question,q.question_tamil,q.question];
-    for(var i=0;i<candidates.length;i++)if(typeof candidates[i]==='string'&&candidates[i].trim())return candidates[i];
-    return '';
+  /* V26: GDS -> MTS -> General Knowledge (GK)
+     Group-4-style subject -> topic -> subtopic -> practice-count flow.
+     IMPORTANT: no Group-4 state/router/data is modified here. */
+  var EXAM='gds_to_mts', SUBJECT='gds_gk';
+  var DB_SUBJECT='General Knowledge (GK)';
+  var COUNTS=[10,20,50,100];
+
+  var TOPICS={
+    'வரலாறு':[
+      'சிந்து சமவெளி நாகரிகம்','வேதகாலம்','மகாஜனபதங்கள்','மௌரியர்','குப்தர்',
+      'தில்லி சுல்தானகம்','முகலாயர்','மராத்தியர்','சீக்கியர்','தென்னிந்திய வரலாறு',
+      'இந்திய வரலாறு','பண்டைய இந்திய வரலாறு','இடைக்கால இந்திய வரலாறு','நவீன இந்திய வரலாறு'
+    ],
+    'இந்திய தேசிய இயக்கம்':[
+      'ஆரம்ப தேசிய இயக்கம்','சுதேசி இயக்கம்','காந்திய இயக்கம்','புரட்சிகர இயக்கம்',
+      'சுதந்திரப் போராட்டம்','சுதந்திரம்'
+    ],
+    'புவியியல்':[
+      'இந்திய புவியியல்','உலக புவியியல்'
+    ],
+    'இந்திய அரசியல் மற்றும் அரசியலமைப்பு':[
+      'இந்திய அரசியலமைப்பு','அடிப்படை உரிமைகள்','அடிப்படை கடமைகள்','அரசுக் கொள்கை',
+      'குடியரசுத் தலைவர்','நாடாளுமன்றம்','நீதித்துறை','தேர்தல்','தணிக்கை','உள்ளாட்சி','அரசியலமைப்பு'
+    ],
+    'இந்திய கலாசாரம்':[
+      'இந்திய கலாசாரம்','இந்திய இசை','கட்டிடக்கலை','இலக்கியம்'
+    ],
+    'அறிவியல்':[
+      'இயற்பியல்','வேதியியல்','உயிரியல்','அறிவியல்','அறிவியல் - இயற்பியல்',
+      'அறிவியல் - வேதியியல்','அறிவியல் - உயிரியல்'
+    ],
+    'பொருளாதாரம்':[
+      'இந்திய பொருளாதாரம்','பொருளாதாரம்'
+    ],
+    'விளையாட்டு மற்றும் நிலையான பொது அறிவு':[
+      'விளையாட்டு','தேசியச் சின்னங்கள்','முக்கிய நிறுவனங்கள்','பொது நிலையான GK',
+      'தேசியச் சின்னங்கள் மற்றும் முக்கிய தினங்கள்','நிலையான பொது GK'
+    ]
+  };
+
+  var EN_TOPICS={
+    'History':['Indus Valley Civilization','Vedic Period','Mahajanapadas','Mauryas','Guptas','Delhi Sultanate','Mughals','Marathas','Sikhs','South Indian History','Indian History','Ancient Indian History','Medieval Indian History','Modern Indian History'],
+    'Indian National Movement':['Early National Movement','Swadeshi Movement','Gandhian Movement','Revolutionary Movement','Indian Freedom Struggle','Independence'],
+    'Geography':['Indian Geography','World Geography'],
+    'Indian Polity & Constitution':['Indian Constitution','Fundamental Rights','Fundamental Duties','Directive Principles of State Policy','President of India','Parliament','Judiciary','Elections','Audit','Local Government','Constitution'],
+    'Indian Culture':['Indian Culture','Indian Music','Architecture','Literature'],
+    'Science':['Physics','Chemistry','Biology','Science','Science - Physics','Science - Chemistry','Science - Biology'],
+    'Economy':['Indian Economy','Economics'],
+    'Sports & Static General Knowledge':['Sports','National Symbols','Important Institutions','General Static GK','National Symbols and Important Days','Static General GK']
+  };
+
+  function isGK(){return String(typeof selectedExam!=='undefined'?selectedExam:'')===EXAM && String(typeof currentSubject!=='undefined'?currentSubject:'')===SUBJECT;}
+  function lang(){return String(typeof contentLanguage!=='undefined'?contentLanguage:'ta')==='en'?'en':'ta';}
+  function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+  function api(){
+    if(typeof window.thiralV138Api==='function') return window.thiralV138Api;
+    return function(path,opt){
+      opt=opt||{};
+      var headers=Object.assign({'Content-Type':'application/json'},opt.headers||{});
+      return fetch('/api'+path,Object.assign({},opt,{credentials:'include',headers:headers})).then(async function(r){
+        var d={}; try{d=await r.json();}catch(e){}
+        if(!r.ok) throw new Error(d.error||('HTTP '+r.status));
+        return d;
+      });
+    };
   }
-  function getOptions(q){
-    if(!q)return [];
-    var L=en();
-    var arr=L?[q.options_en,q.english_options,q.optionsEnglish,q.en_options,q.options_english]:[q.options_ta,q.tamil_options,q.optionsTamil,q.ta_options,q.options_tamil];
-    for(var i=0;i<arr.length;i++)if(Array.isArray(arr[i])&&arr[i].length)return arr[i];
-    if(Array.isArray(q.options)&&q.options.length)return q.options;
-    if(Array.isArray(q.o)&&q.o.length)return q.o;
-    var sets=L?[[q.optionA_en,q.optionB_en,q.optionC_en,q.optionD_en],[q.a_en,q.b_en,q.c_en,q.d_en],[q.option_a_en,q.option_b_en,q.option_c_en,q.option_d_en]]:[[q.optionA_ta,q.optionB_ta,q.optionC_ta,q.optionD_ta],[q.a_ta,q.b_ta,q.c_ta,q.d_ta],[q.option_a_ta,q.option_b_ta,q.option_c_ta,q.option_d_ta]];
-    for(var s=0;s<sets.length;s++)if(sets[s].filter(function(x){return x!=null&&String(x).trim();}).length===4)return sets[s];
-    var generic=[[q.optionA,q.optionB,q.optionC,q.optionD],[q.a,q.b,q.c,q.d],[q.option_a,q.option_b,q.option_c,q.option_d]];
-    for(var g=0;g<generic.length;g++)if(generic[g].filter(function(x){return x!=null&&String(x).trim();}).length===4)return generic[g];
-    return [];
-  }
-  function rowLanguageOK(q){
-    var raw=q&&(q.language??q.lang??q.content_language??q.contentLanguage);
-    if(raw==null||String(raw).trim()==='')return true;
-    var x=String(raw).toLowerCase().trim();
-    return en()?['en','eng','english'].indexOf(x)>=0:['ta','tam','tamil'].indexOf(x)>=0;
-  }
-  function cleanRows(rows){
-    var out=[];
-    (Array.isArray(rows)?rows:[]).forEach(function(q){if(!q)return; if(!rowLanguageOK(q))return; if(!getText(q))return; if(getOptions(q).length<4)return; out.push(q);});
-    return out;
-  }
-  function shuffle(a){for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}return a;}
-  async function fetchRows(sub,limit){
-    var u='/practice/questions?exam='+encodeURIComponent(EXAM)+'&subject='+encodeURIComponent(SUBJECT)+'&language='+encodeURIComponent(en()?'en':'ta')+'&subtopic='+encodeURIComponent(sub)+'&limit='+encodeURIComponent(String(Math.min(limit,200)));
-    var d=await api()(u); return cleanRows(d&&d.questions);
-  }
-  async function fetchAllRows(sub){
-    /* Full Volume must read the complete active bank. The Practice endpoint
-       intentionally caps requests at 200 and also excludes previously-used
-       practice questions, so it is not suitable for a complete volume.
-       The existing /questions endpoint supports limit + offset and returns
-       pagination metadata. This does not modify Group 4 or the backend. */
-    var all=[], offset=0, pageSize=200, guard=0, total=null;
-    while(guard++<20){
-      var u='/questions?exam='+encodeURIComponent(EXAM)+'&subject='+encodeURIComponent(SUBJECT)+'&language='+encodeURIComponent(en()?'en':'ta')+'&subtopic='+encodeURIComponent(sub)+'&limit='+pageSize+'&offset='+offset;
-      var d=await api()(u);
-      var rows=cleanRows(d&&d.questions);
-      all=all.concat(rows);
-      var pg=d&&d.pagination;
-      total=pg&&Number.isFinite(Number(pg.total))?Number(pg.total):null;
-      if(!pg || !pg.hasMore || rows.length===0)break;
-      var next=Number(pg.nextOffset);
-      if(!Number.isFinite(next) || next<=offset)break;
-      offset=next;
-      if(total!==null && offset>=total)break;
+  function topicNames(){return lang()==='en'?Object.keys(EN_TOPICS):Object.keys(TOPICS);}
+  function subsForTopic(t){
+    if(lang()==='en'){
+      var ks=Object.keys(TOPICS), idx=topicNames().indexOf(t);
+      return idx>=0 ? TOPICS[ks[idx]] : [];
     }
-    return all;
+    return TOPICS[t]||[];
   }
-  async function load(kind,count){
-    if(!isPostal())return;
-    stop(); S={questions:[],answers:{},checks:{},index:0,attemptId:null,timer:null,seconds:15,busy:false,submitted:false,kind:kind,key:null};
-    if($('feedback'))$('feedback').innerHTML='<b>கேள்விகள் ஏற்றப்படுகின்றன...</b>';
+  function labelTopic(t){
+    if(lang()==='ta') return t;
+    var ks=Object.keys(TOPICS), idx=ks.indexOf(t);
+    return idx>=0?Object.keys(EN_TOPICS)[idx]:t;
+  }
+  function labelSub(s){
+    if(lang()==='ta') return s;
+    var ks=Object.keys(TOPICS), idx=-1;
+    for(var i=0;i<ks.length;i++){if(TOPICS[ks[i]].indexOf(s)>=0){idx=Object.keys(TOPICS[ks[i]]).indexOf(s);return (EN_TOPICS[Object.keys(EN_TOPICS)[i]]||[])[idx]||s;}}
+    return s;
+  }
+  function renderGKTopics(){
+    var title=document.getElementById('subjectTitle'), grid=document.getElementById('topicGrid');
+    if(title) title.textContent=(lang()==='en'?'📘 General Knowledge (GK) – Topics':'📘 பொது அறிவு (GK) – Topics');
+    if(!grid)return;
+    var keys=Object.keys(TOPICS);
+    grid.innerHTML=keys.map(function(k){return '<button type="button" onclick="thiralGDSGKTopic(\''+esc(k).replace(/'/g,"\\'")+'\')">'+esc(labelTopic(k))+'</button>';}).join('');
+    show('topics');
+  }
+  function renderSubtopics(t){
+    currentTopic=t; currentSub='';
+    var title=document.getElementById('topicTitle'), grid=document.getElementById('subtopicGrid');
+    if(title) title.textContent='📘 '+esc(labelTopic(t))+' – '+(lang()==='en'?'Subtopics':'உள்தலைப்புகள்');
+    if(grid){
+      grid.innerHTML=TOPICS[t].map(function(s){return '<button type="button" onclick="thiralGDSGKSubtopic(\''+esc(s).replace(/'/g,"\\'")+'\')">'+esc(labelSub(s))+'</button>';}).join('');
+    }
+    show('subtopics');
+  }
+  function renderActions(s){
+    currentSub=s;
+    var box=document.getElementById('actions'); if(!box)return;
+    var en=lang()==='en';
+    box.innerHTML='<h2 id="subTitle">📌 '+esc(labelSub(s))+'</h2>'+
+      '<p>'+(en?'Study material and practice questions for this GK subtopic.':s+' தொடர்பான Study Material மற்றும் Practice கேள்விகள்.')+'</p>'+ 
+      '<div class="grid">'+COUNTS.map(function(n){return '<button type="button" onclick="startGDSGKPractice('+n+')">📝 '+n+' '+(en?'Questions':'கேள்விகள்')+'</button>';}).join('')+
+      '<button type="button" onclick="startGDSGKPractice(9999)">📚 '+(en?'Full Question Bank':'முழு கேள்வி வங்கி')+'</button>'+ 
+      '</div><button type="button" class="secondary" onclick="show(\'subtopics\')">← '+(en?'Subtopics':'உள்தலைப்புகள்')+'</button>';
+    show('actions');
+  }
+  async function startPracticeGK(n){
+    if(!isGK()) return;
+    var L=lang(), sub=currentSub;
     try{
       var rows=[];
-      if(kind==='v5') rows=await fetchRows(V_SUB, count);
-      else if(kind==='p1-full' || kind==='p1-full-all'){
-        /* Full Volume: load the complete available bank from all three Part-I subtopics. */
-        for(var i=0;i<P1.length;i++) rows=rows.concat(await fetchAllRows(en()?P1EN[i]:P1[i]));
-        var seen={}; rows=rows.filter(function(q){var k=String(q.id);if(seen[k])return false;seen[k]=1;return true;}); shuffle(rows);
-      } else {
-        var idx=Number(kind.replace('p1-','')); rows=await fetchRows(en()?P1EN[idx]:P1[idx],count);
+      if(n===9999){
+        /* Full bank: /practice/questions is intentionally capped, so use the
+           paginated server-side question endpoint and collect every row. */
+        var offset=0, page=200;
+        while(true){
+          var fp='/questions?exam='+encodeURIComponent(EXAM)+'&subject='+encodeURIComponent(DB_SUBJECT)+'&language='+encodeURIComponent(L)+'&subtopic='+encodeURIComponent(sub)+'&limit='+page+'&offset='+offset;
+          var fd=await api()(fp);
+          var fr=Array.isArray(fd.questions)?fd.questions:[];
+          rows.push.apply(rows,fr);
+          var pg=fd.pagination||{};
+          if(!fr.length || fr.length<page || pg.hasMore===false) break;
+          offset+=fr.length;
+          if(offset>10000) break;
+        }
+      }else{
+        var path='/practice/questions?exam='+encodeURIComponent(EXAM)+'&subject='+encodeURIComponent(DB_SUBJECT)+'&language='+encodeURIComponent(L)+'&subtopic='+encodeURIComponent(sub)+'&limit='+encodeURIComponent(String(n));
+        var d=await api()(path);
+        rows=Array.isArray(d.questions)?d.questions:[];
       }
-      if(kind!=='p1-full' && kind!=='p1-full-all' && rows.length<count)throw new Error((en()?'Only ':'')+rows.length+(en()?' questions are available for the selected language.':' கேள்விகள் மட்டுமே கிடைத்துள்ளன. தேவையானது: '+count));
-      S.questions=(kind==='p1-full' || kind==='p1-full-all')?rows:rows.slice(0,count);
-      if(!S.questions.length) throw new Error(en()?'No questions were returned for the selected language and Part-I subtopics.':'தேர்ந்தெடுத்த மொழிக்கான Part-I கேள்விகள் backend-ல் கிடைக்கவில்லை.');
-      if($('feedback'))$('feedback').innerHTML='<b>'+(en()?'Questions loaded: ':'கேள்விகள் ஏற்றப்பட்டன: ')+S.questions.length+'</b>';
-      var a=await api()('/attempts',{method:'POST',body:JSON.stringify({exam:EXAM,subject:SUBJECT,mode:'practice',language:en()?'en':'ta',subtopic:(S.kind==='v5'?V_SUB:((S.kind==='p1-full' || S.kind==='p1-full-all')?'Post Office Guide Part-I':(en()?P1EN[Number(S.kind.replace('p1-',''))]:P1[Number(S.kind.replace('p1-',''))]))),questionIds:S.questions.map(function(q){return Number(q.id);})})});
-      if(!a||!a.id)throw new Error('Practice attempt உருவாக்கப்படவில்லை.');
-      S.attemptId=a.id;
-      if($('practiceReview')){$('practiceReview').innerHTML='';$('practiceReview').classList.add('hidden');$('practiceReview').style.display='none';}
-      ensureNav();
-      if(typeof show==='function')show('practice');
-      render();
-    }catch(e){stop();if($('feedback'))$('feedback').innerHTML='<b>Practice தொடங்க முடியவில்லை.</b><br>'+esc(e.message);}
+      if(n!==9999 && rows.length<n) throw new Error((L==='en'?'This GK subtopic has only ':'இந்த GK உள்தலைப்பில் தற்போது கிடைப்பது ') + rows.length + (L==='en'?' questions.':' கேள்விகள்.'));
+      if(!rows.length) throw new Error('இந்த GK உள்தலைப்பில் கேள்விகள் இல்லை.');
+      /* Use the existing tested practice renderer without changing Group 4.
+         The renderer receives only these GDS-GK rows through a temporary API bridge. */
+      if(typeof window.__thiralPostalPracticeV23==='function'){
+        var oldApi=window.thiralV138Api;
+        var safe=function(p,o){if(String(p||'').indexOf('/questions?')===0)return Promise.resolve({questions:rows,pagination:{limit:rows.length,offset:0,returned:rows.length,total:rows.length,hasMore:false}});return (typeof oldApi==='function'?oldApi:api())(p,o);};
+        window.thiralV138Api=safe;
+        try{
+          /* V23 renderer is scoped to Postal, so do not invoke it for GK. */
+        }finally{window.thiralV138Api=oldApi||api();}
+      }
+      /* Fall back to the existing global practice engine only after explicitly
+         setting the GDS-GK context. It is guarded by the GDS-specific wrapper below. */
+      window.__THIRAL_GDS_GK_ROWS__=rows;
+      window.__THIRAL_GDS_GK_COUNT__=n;
+      if(typeof window.startGDSGKRenderedPractice==='function') return window.startGDSGKRenderedPractice(rows,n);
+      throw new Error('GK Practice renderer இணைக்கப்படவில்லை.');
+    }catch(e){
+      console.error('THIRAL GDS GK V26',e);
+      alert('GK Practice தொடங்க முடியவில்லை. '+(e&&e.message?e.message:String(e)));
+    }
   }
-  function ensureNav(){
-    var p=$('options'); if(!p)return;
-    var n=$('thiralPostalNavV7'); if(!n){n=document.createElement('div');n.id='thiralPostalNavV7';n.className='top';n.style.marginTop='18px';p.parentNode.insertBefore(n,p.nextSibling);}
-    n.innerHTML='<button type="button" class="secondary" id="thiralPostalPrevV7">← '+(en()?'Previous':'முந்தைய')+'</button><div style="display:flex;gap:10px;align-items:center"><button type="button" id="thiralPostalNextV7">'+(en()?'Next →':'அடுத்து →')+'</button><button type="button" id="thiralPostalSubmitV7">'+(en()?'Submit':'சமர்ப்பிக்க')+'</button></div>';
-    $('thiralPostalPrevV7').onclick=function(){prev();}; $('thiralPostalNextV7').onclick=function(){next();}; $('thiralPostalSubmitV7').onclick=function(){submit();};
+
+  /* Lightweight adapter using the existing practice screen. It deliberately
+     does not replace window.startPractice, so Group 4 remains untouched. */
+  function renderPractice(rows,count){
+    var S={rows:rows,i:0,answers:new Array(rows.length).fill(-1),locked:false,timer:null,seconds:15,attemptId:null,submitted:false};
+    window.__THIRAL_GDS_GK_SESSION__=S;
+    function qtext(q){return q.question||q.q||'';}
+    function opts(q){return Array.isArray(q.options)?q.options:(Array.isArray(q.o)?q.o:[]);}
+    function stop(){if(S.timer){clearInterval(S.timer);S.timer=null;}}
+    function paint(){
+      var q=S.rows[S.i]; if(!q)return;
+      document.getElementById('level').textContent='GDS to MTS • GK';
+      document.getElementById('progress').textContent=(S.i+1)+' / '+S.rows.length;
+      document.getElementById('bar').style.width=((S.i+1)/S.rows.length*100)+'%';
+      document.getElementById('question').textContent=qtext(q);
+      var o=document.getElementById('options'); o.innerHTML='';
+      opts(q).forEach(function(v,j){var b=document.createElement('button');b.type='button';b.textContent=String.fromCharCode(65+j)+'. '+v;b.onclick=function(){answer(j);};o.appendChild(b);});
+      document.getElementById('feedback').textContent='';
+      S.seconds=15; document.getElementById('timer').textContent='15'; stop();
+      S.timer=setInterval(function(){S.seconds--;document.getElementById('timer').textContent=String(S.seconds);if(S.seconds<=0){stop();answer(-1,true);}},1000);
+    }
+    async function answer(idx,timeout){
+      if(S.locked)return; S.locked=true; stop(); S.answers[S.i]=idx;
+      var q=S.rows[S.i]; var correct=Number(q.correct_option);
+      var fb=document.getElementById('feedback');
+      fb.textContent=idx<0?(lang()==='en'?'Time out.':'நேரம் முடிந்தது.'):(idx===correct?(lang()==='en'?'Correct ✓':'சரி ✓'):(lang()==='en'?'Incorrect':'தவறு'));
+      setTimeout(function(){S.locked=false;if(S.i<S.rows.length-1){S.i++;paint();}else finish();},650);
+    }
+    function finish(){
+      stop(); var correct=0,unanswered=0;
+      S.rows.forEach(function(q,i){if(S.answers[i]<0)unanswered++;else if(S.answers[i]===Number(q.correct_option))correct++;});
+      document.getElementById('resultText').innerHTML='<p><b>மொத்த கேள்விகள்:</b> '+S.rows.length+'</p><p><b>சரி:</b> '+correct+'</p><p><b>தவறு:</b> '+(S.rows.length-correct-unanswered)+'</p><p><b>விடையளிக்கவில்லை:</b> '+unanswered+'</p><p><b>மதிப்பெண்:</b> '+((correct/S.rows.length*100).toFixed(2))+'%</p>';
+      var retry=document.querySelector('#result button[onclick^="startPractice("]');
+      if(retry){retry.setAttribute('onclick','startGDSGKPractice('+count+')');retry.textContent=lang()==='en'?'Practice Again':'மீண்டும் Practice';}
+      show('result');
+    }
+    window.__THIRAL_GDS_GK_RENDER_NEXT__=function(){if(!S.locked&&S.i<S.rows.length-1){S.i++;paint();}};
+    window.__THIRAL_GDS_GK_RENDER_PREV__=function(){if(!S.locked&&S.i>0){S.i--;paint();}};
+    show('practice'); paint();
   }
-  function render(){
-    var q=S.questions[S.index]; if(!q)return; stop();
-    if($('progress'))$('progress').textContent=(S.index+1)+' / '+S.questions.length;
-    if($('bar'))$('bar').style.width=((S.index+1)/S.questions.length*100)+'%';
-    if($('level'))$('level').textContent=q.difficulty||q.d||'சாதாரணம்';
-    if($('question'))$('question').textContent=getText(q);
-    var o=getOptions(q); if($('options'))$('options').innerHTML=o.map(function(x,i){return '<button class="option" type="button" data-postal-answer="'+i+'">'+String.fromCharCode(65+i)+'. '+esc(x)+'</button>';}).join('');
-    $('options').querySelectorAll('[data-postal-answer]').forEach(function(b){b.onclick=function(){answer(Number(b.getAttribute('data-postal-answer')),false);};});
-    if($('feedback'))$('feedback').innerHTML=''; ensureNav();
-    $('thiralPostalPrevV7').disabled=S.index===0; $('thiralPostalNextV7').disabled=S.index===S.questions.length-1;
-    S.seconds=15;setTimer(15);S.timer=setInterval(function(){S.seconds--;setTimer(S.seconds);if(S.seconds<=0){stop();answer(-1,true);}},1000);
-  }
-  async function answer(n,timed){
-    if(S.busy||S.submitted)return;var q=S.questions[S.index];if(!q)return;var key=String(q.id);if(Object.prototype.hasOwnProperty.call(S.checks,key))return;
-    S.busy=true;stop();S.answers[key]=Number(n);$('options').querySelectorAll('button').forEach(function(b){b.disabled=true;});
-    try{
-      var d=await api()('/attempts/'+S.attemptId+'/check-answer',{method:'POST',body:JSON.stringify({questionId:Number(q.id),answer:Number(n)})});S.checks[key]=d;
-      var o=getOptions(q),ci=Number(d.correct_option),h=timed?'<b>⏱️ நேரம் முடிந்தது</b>':(d.correct===true?'<b>✓ சரி</b>':'<b>✗ தவறு</b>');
-      h+='<p><b>சரியான பதில்:</b> '+esc(o[ci]||'')+'</p>';if(d.explanation)h+='<p><b>விளக்கம்:</b> '+esc(d.explanation)+'</p>';if($('feedback'))$('feedback').innerHTML=h;
-      S.busy=false;setTimeout(function(){if(S.index===S.questions.length-1)submit();else next();},900);
-    }catch(e){S.busy=false;delete S.answers[key];$('options').querySelectorAll('button').forEach(function(b){b.disabled=false;});if($('feedback'))$('feedback').innerHTML='<b>விடை சரிபார்க்க முடியவில்லை.</b><br>'+esc(e.message);if(!timed){S.seconds=15;setTimer(15);S.timer=setInterval(function(){S.seconds--;setTimer(S.seconds);if(S.seconds<=0){stop();answer(-1,true);}},1000);}}
-  }
-  function prev(){if(S.busy||S.submitted||S.index<=0)return;S.index--;render();}
-  function next(){if(S.busy||S.submitted||S.index>=S.questions.length-1)return;S.index++;render();}
-  async function submit(){if(S.submitted||!S.attemptId)return;S.submitted=true;stop();try{var d=await api()('/attempts/'+S.attemptId+'/submit',{method:'POST',body:JSON.stringify({answers:S.answers})});if($('resultText'))$('resultText').innerHTML='<h3>'+ (en()?'Postal Practice Result':'Postal Practice முடிவு') +'</h3><p>'+esc(d&&d.score!=null?'Score: '+d.score:(d&&d.message)||'Submitted')+'</p>';if(typeof show==='function')show('result');}catch(e){S.submitted=false;if($('feedback'))$('feedback').innerHTML='<b>Submit செய்ய முடியவில்லை.</b><br>'+esc(e.message);}}
-  window.__THIRAL_GDS_POSTAL_START=function(token){if(!isPostal())return;var parts=String(token).split('-');if(parts[0]==='v5')load('v5',Number(parts[1]));else if(String(token)==='p1-full-all')load('p1-full',0);else if(parts[0]==='p1')load('p1-'+parts[1],Number(parts[2]));};
+  window.startGDSGKRenderedPractice=renderPractice;
+  window.startGDSGKPractice=startPracticeGK;
+  window.thiralGDSGKTopic=renderSubtopics;
+  window.thiralGDSGKSubtopic=renderActions;
+
+  /* GDS subject language choice: only GK is handled here; all other GDS
+     subjects continue through the existing V21/V22/V25 routers. */
+  var oldChoose=window.chooseContentLanguage;
+  window.chooseContentLanguage=function(l){
+    if(String(typeof selectedExam!=='undefined'?selectedExam:'')===EXAM && String(typeof currentSubject!=='undefined'?currentSubject:'')===SUBJECT){
+      contentLanguage=String(l||'ta').toLowerCase()==='en'?'en':'ta';
+      try{localStorage.setItem('tnpsc_content_language',contentLanguage);}catch(e){}
+      var m=document.getElementById('languageModal');if(m)m.classList.add('hidden');
+      var lab=document.getElementById('selectedLanguageLabel');if(lab)lab.textContent=contentLanguage==='en'?'English':'தமிழ்';
+      renderGKTopics(); return;
+    }
+    return typeof oldChoose==='function'?oldChoose.apply(this,arguments):undefined;
+  };
+
+  /* The V21 subject handler calls openLanguageChooser after setting currentSubject.
+     We leave that behavior intact and only replace topic/subtopic rendering for GK. */
+  var oldTopic=window.topic;
+  window.topic=function(t){
+    if(isGK() && TOPICS[String(t||'')]) return renderSubtopics(String(t));
+    return typeof oldTopic==='function'?oldTopic.apply(this,arguments):undefined;
+  };
+  var oldSub=window.subtopic;
+  window.subtopic=function(s){
+    if(isGK() && Object.keys(TOPICS).some(function(k){return TOPICS[k].indexOf(String(s||''))>=0;})) return renderActions(String(s));
+    return typeof oldSub==='function'?oldSub.apply(this,arguments):undefined;
+  };
+
+  /* Re-entering the GK subject after another GDS subject must always show the
+     same Group-4-style Topics screen, never the empty data{} placeholder. */
+  var oldSubject=window.subject;
+  window.subject=function(s){
+    if(String(s||'')===SUBJECT && String(typeof selectedExam!=='undefined'?selectedExam:'')===EXAM){
+      currentSubject=SUBJECT; currentTopic=''; currentSub=''; window.pendingSubject=SUBJECT;
+      openLanguageChooser(); return;
+    }
+    return typeof oldSubject==='function'?oldSubject.apply(this,arguments):undefined;
+  };
+
+  window.__THIRAL_GDS_GK_V26__={exam:EXAM,subject:DB_SUBJECT,uiSubject:SUBJECT,counts:COUNTS,topics:Object.keys(TOPICS),group4DataUntouched:true};
 })();
 </script>
-
-</body></html>
