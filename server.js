@@ -312,41 +312,6 @@ async function enforceStudentDeviceBinding({req,res,user}){
   return {ok:true};
 }
 
-/* ===== LOGIN SECURITY V2 ===== */
-const LOGIN_DEVICE_V2_COOKIE = 'thiral_login_device_v2';
-function newLoginDeviceV2(){ return crypto.randomBytes(32).toString('hex'); }
-function loginDeviceV2Secret(){ return String(process.env.THIRAL_DEVICE_BINDING_SECRET || process.env.THIRAL_API_KEY || process.env.DATABASE_URL || 'thiral-login-device-v2-dev-only'); }
-function hashLoginDeviceV2(deviceId){ return crypto.createHmac('sha256',loginDeviceV2Secret()).update(String(deviceId||'')).digest('hex'); }
-function setLoginDeviceV2Cookie(res,deviceId){ res.cookie(LOGIN_DEVICE_V2_COOKIE,String(deviceId||''),{httpOnly:true,secure:isProd,sameSite:'strict',maxAge:365*24*60*60*1000,path:'/'}); }
-async function ensureLoginDeviceV2Table(){
-  await pool.query(`CREATE TABLE IF NOT EXISTS student_login_devices (user_id BIGINT PRIMARY KEY,device_hash TEXT NOT NULL,bound_at TIMESTAMPTZ NOT NULL DEFAULT now(),last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now())`);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_student_login_devices_last_seen ON student_login_devices(last_seen_at DESC)`);
-}
-async function bindOrVerifyLoginDeviceV2({req,res,user}){
-  if(!user || user.role!=='STUDENT') return {ok:true};
-  const presented=String(req.cookies?.[LOGIN_DEVICE_V2_COOKIE]||'').trim();
-  const existing=await pool.query(`SELECT device_hash FROM student_login_devices WHERE user_id=$1 LIMIT 1`,[user.id]);
-  const stored=String(existing.rows[0]?.device_hash||'').trim();
-  if(!stored){
-    const deviceId=presented||newLoginDeviceV2(); const deviceHash=hashLoginDeviceV2(deviceId);
-    const ins=await pool.query(`INSERT INTO student_login_devices(user_id,device_hash) VALUES($1,$2) ON CONFLICT(user_id) DO NOTHING RETURNING user_id`,[user.id,deviceHash]);
-    if(ins.rowCount){ setLoginDeviceV2Cookie(res,deviceId); return {ok:true,firstBinding:true}; }
-    const retry=await pool.query(`SELECT device_hash FROM student_login_devices WHERE user_id=$1 LIMIT 1`,[user.id]);
-    const rh=String(retry.rows[0]?.device_hash||'').trim();
-    if(presented && rh===hashLoginDeviceV2(presented)){ await pool.query(`UPDATE student_login_devices SET last_seen_at=now() WHERE user_id=$1`,[user.id]); return {ok:true}; }
-    return {ok:false};
-  }
-  if(!presented || stored!==hashLoginDeviceV2(presented)) return {ok:false};
-  await pool.query(`UPDATE student_login_devices SET last_seen_at=now() WHERE user_id=$1`,[user.id]);
-  return {ok:true};
-}
-async function requireLoginDeviceV2(req,res,user){
-  if(!user || user.role!=='STUDENT') return true;
-  const presented=String(req.cookies?.[LOGIN_DEVICE_V2_COOKIE]||'').trim(); if(!presented) return false;
-  const q=await pool.query(`SELECT 1 FROM student_login_devices WHERE user_id=$1 AND device_hash=$2 LIMIT 1`,[user.id,hashLoginDeviceV2(presented)]);
-  return q.rowCount===1;
-}
-
 async function getUserFromSession(req) {
   const sid = req.cookies?.thiral_session;
   if (!sid) return null;
@@ -362,12 +327,6 @@ async function requireAuth(req, res, next) {
   try {
     const user = await getUserFromSession(req);
     if (!user) return sendError(res, 401, 'ACCESS DENIED: Login required.');
-    if(user.role==='STUDENT' && !(await requireLoginDeviceV2(req,res,user))){
-      const sid=req.cookies?.thiral_session;
-      if(sid) await pool.query('DELETE FROM sessions WHERE id=$1',[sid]);
-      clearSessionCookie(res);
-      return sendError(res,401,'இந்த Login சாதனம் செல்லுபடியாகவில்லை. மீண்டும் பதிவு செய்யப்பட்ட சாதனத்தில் Login செய்யவும்.');
-    }
     req.user = user;
     next();
   } catch (e) {
@@ -486,15 +445,15 @@ api.post('/auth/login', authLimiter, async (req, res) => {
       return sendError(res, 401, 'Invalid ID/email or password.');
     }
 
-    /* One STUDENT account = one registered browser/device. Existing legacy
-       login_device_hash data is intentionally left untouched. */
-    if(u.role==='STUDENT'){
-      const deviceCheck=await bindOrVerifyLoginDeviceV2({req,res,user:u});
-      if(!deviceCheck.ok){
-        await logSecurityEvent({req,eventType:'LOGIN_DEVICE_V2_BLOCKED',userId:u.id,email:u.email,details:'Correct credentials used from an unregistered browser/device',sendAlert:true});
-        return sendError(res,403,'இந்த கணக்கு ஏற்கனவே ஒரு சாதனத்தில் பதிவு செய்யப்பட்டுள்ளது. வேறு சாதனத்தில் இந்த Email ID + Password மூலம் Login செய்ய முடியாது.');
-      }
-    }
+    /*
+     * Student login policy:
+     * Password verification is sufficient for Student Login.
+     * Do NOT block a correct password because of a previous browser/device.
+     *
+     * The old one-student/one-device check has intentionally been removed
+     * from the login path. Existing login_device_hash values may remain in
+     * the database, but they are no longer used to deny Student Login.
+     */
 
     const sid = newSessionId();
     await pool.query(`DELETE FROM sessions WHERE expires_at <= now()`);
@@ -1009,19 +968,6 @@ api.post('/auth/change-password', requireAuth, async (req,res)=>{
   }
 });
 
-api.post('/admin/students/:studentId/device/reset', requireAdmin, async (req,res)=>{
-  try{
-    const studentId=String(req.params.studentId||'').trim();
-    const q=await pool.query(`SELECT id,student_id,role FROM users WHERE student_id=$1 LIMIT 1`,[studentId]);
-    if(!q.rowCount) return sendError(res,404,'Student not found.');
-    if(q.rows[0].role!=='STUDENT') return sendError(res,400,'Only STUDENT accounts can be reset here.');
-    await pool.query(`DELETE FROM student_login_devices WHERE user_id=$1`,[q.rows[0].id]);
-    await pool.query(`DELETE FROM sessions WHERE user_id=$1`,[q.rows[0].id]);
-    await pool.query(`INSERT INTO activity_events(user_id,event_type,metadata) VALUES($1,'LOGIN_DEVICE_RESET',$2)`,[req.user.id,JSON.stringify({target_student_id:studentId})]);
-    res.json({ok:true,student_id:studentId,message:'Login device reset. The next successful login will register the new device.'});
-  }catch(e){ console.error('[ADMIN] Login device reset error:',e); sendError(res,500,'Login device reset service error.'); }
-});
-
 api.patch('/admin/students/:studentId/password', requireAdmin, async (req,res)=>{
   const client = await pool.connect();
   try{
@@ -1382,6 +1328,55 @@ api.post('/attempts/:id/submit', requirePasswordReady, async (req,res)=>{
     await pool.query(`INSERT INTO activity_events(user_id,event_type,metadata) VALUES($1,'ATTEMPT_SUBMITTED',$2)`,[req.user.id,JSON.stringify({attempt_id:id,mode:attempt.mode,exam:attempt.exam,score,used_questions:total,unanswered})]);
     res.json({score,correct,total,unanswered,usedQuestionIds:usedIds});
   }catch(e){console.error(e);sendError(res,500,'Grading service error.');}
+});
+
+/* ===== Mock/Practice submitted-attempt review =====
+   Correct answers are returned only after the attempt is SUBMITTED and only
+   to the authenticated owner of that attempt. The live exam never receives
+   correct_option through the normal question-loading API.
+*/
+api.get('/attempts/:id/review', requirePasswordReady, async (req,res)=>{
+  try{
+    const id=Number(req.params.id);
+    if(!Number.isInteger(id)) return sendError(res,400,'Invalid attempt id.');
+
+    const a=await pool.query(
+      `SELECT id,status,question_ids
+         FROM attempts
+        WHERE id=$1 AND user_id=$2
+        LIMIT 1`,
+      [id,req.user.id]
+    );
+    if(!a.rowCount) return sendError(res,404,'Attempt not found.');
+    const attempt=a.rows[0];
+    if(attempt.status!=='SUBMITTED') return sendError(res,409,'Review is available only after submission.');
+
+    const ids=Array.isArray(attempt.question_ids) ? attempt.question_ids.map(Number).filter(Number.isInteger) : [];
+    if(!ids.length) return res.json({review:[]});
+
+    const q=await pool.query(
+      `SELECT id,correct_option,explanation
+         FROM questions
+        WHERE id=ANY($1::bigint[])`,
+      [ids]
+    );
+    const byId=new Map(q.rows.map(row=>[Number(row.id),row]));
+
+    res.json({
+      review:ids.map((qid,i)=>{
+        const row=byId.get(Number(qid));
+        return {
+          question_no:i+1,
+          question_id:Number(qid),
+          correct_option:row ? Number(row.correct_option) : null,
+          explanation:row ? String(row.explanation || '') : ''
+        };
+      })
+    });
+  }catch(e){
+    console.error('Attempt review error:',e);
+    sendError(res,500,'Review service error.');
+  }
 });
 
 api.get('/results', requirePasswordReady, async (req,res)=>{
@@ -3315,7 +3310,6 @@ async function start(){
     await ensureSecurityEventsTable();
     await ensureMustChangePasswordColumn();
     await ensureLoginDeviceBindingColumn();
-    await ensureLoginDeviceV2Table();
     await ensurePasswordResetTables();
     await ensureQuestionHistory();
     await ensureModelExamTables();
