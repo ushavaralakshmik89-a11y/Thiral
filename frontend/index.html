@@ -6494,7 +6494,7 @@ function escapeHtmlAdmin(v){
     return fetch('/api'+path,Object.assign({},init,{credentials:'include',headers}))
       .then(async r=>{let d={};try{d=await r.json();}catch(e){}if(!r.ok)throw new Error(d.error||('HTTP '+r.status));return d;});
   }
-  function isPostalContext(){return String(window.selectedExam||'')===EXAM;}
+  function isPostalContext(){return String(typeof selectedExam!=='undefined'?selectedExam:'')===EXAM;}
 
   function languageName(){return S.language==='en'?'English':'தமிழ்';}
   function part1Title(){return S.language==='en'?PART1_EN:PART1_TA;}
@@ -6686,13 +6686,19 @@ function escapeHtmlAdmin(v){
 
   /* Intercept ONLY the GDS Postal subject button. No global function is replaced. */
   document.addEventListener('click',function(e){
-    const btn=e.target.closest('button[onclick]');
+    const btn=e.target.closest('#examSubjects button[onclick]');
     if(!btn)return;
-    if(String(window.selectedExam||'')!==EXAM)return;
     const oc=String(btn.getAttribute('onclick')||'');
-    if(/(?:^|\b)subject\(\s*['"]gds_postal_rules['"]\s*\)/.test(oc)){
-      e.preventDefault();e.stopImmediatePropagation();openRoot();
-    }
+    if(!/(?:^|\b)subject\(\s*['"]gds_postal_rules['"]\s*\)/.test(oc))return;
+    if(String(typeof selectedExam!=='undefined'?selectedExam:'')!==EXAM)return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    currentSubject=UI_SUBJECT;
+    currentTopic='';
+    currentSub='';
+    window.pendingSubject=UI_SUBJECT;
+    try{localStorage.setItem('tnpsc_selected_exam',EXAM);}catch(_){ }
+    openRoot();
   },true);
 
   window.ThiralGdsPostalPractice={
