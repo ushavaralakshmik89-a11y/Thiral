@@ -6400,14 +6400,15 @@ function escapeHtmlAdmin(v){
   }
   function renderPart1(){
     if(!isPostal())return;
-    currentTopic=PART1_TA; currentSub='';
+    currentTopic=PART1_TA; currentSub='Post Office Guide Part-I';
     var title=document.getElementById('topicTitle');
     var grid=subGrid();
-    var subs=en()?P1_SUBS_EN:P1_SUBS_TA;
-    if(title)title.textContent='📘 '+escHtml(en()?PART1_EN:PART1_TA)+' – '+(en()?'Subtopics':'உள்தலைப்புகள்');
+    if(title)title.textContent='📘 '+escHtml(en()?PART1_EN:PART1_TA)+' – '+(en()?'Full Volume':'முழு தொகுதி');
     if(!grid)return;
-    grid.innerHTML=subs.map(function(x,i){return '<button type="button" data-thiral-postal-sub="p1-'+i+'">'+escHtml(x)+'</button>';}).join('')+
-      '<button type="button" data-thiral-postal-sub="p1-full">📚 '+(en()?'Full Volume':'முழு தொகுதி')+'</button>';
+    /* Part-I is intentionally one complete volume here. The three DB
+       subtopics are combined by the practice loader, so the student sees
+       one Full Volume entry containing every available question. */
+    grid.innerHTML='<button type="button" data-thiral-postal-sub="p1-full">📚 '+(en()?'Full Volume – All Questions':'முழு தொகுதி – அனைத்து கேள்விகளும்')+'</button>';
     showSafe('subtopics');
   }
   function renderVolume5(){
@@ -6434,7 +6435,19 @@ function escapeHtmlAdmin(v){
     showSafe('actions');
   }
   function routeTopic(kind){if(kind==='p1')renderPart1();else if(kind==='v5')renderVolume5();}
-  function routeSub(key){if(key==='p1-full')renderP1Actions('full');else if(/^p1-[0-2]$/.test(key))renderP1Actions(key.slice(3));}
+  function routeSub(key){
+    if(key==='p1-full'){
+      currentTopic=PART1_TA; currentSub='Post Office Guide Part-I';
+      if(typeof window.__THIRAL_GDS_POSTAL_START==='function'){
+        window.__THIRAL_GDS_POSTAL_START('p1-full-all');
+      }else{
+        renderP1Actions('full');
+      }
+      return;
+    }
+    /* Individual Part-I DB subtopic buttons are intentionally not exposed
+       in this UI. Full Volume contains all three subtopics. */
+  }
 
   document.addEventListener('click',function(ev){
     /* Subject entry is intercepted only for the single GDS Postal subject.
@@ -6481,7 +6494,6 @@ function escapeHtmlAdmin(v){
     if(s){routeSub(s);return;}
     if(b){if(b==='topics')renderTopics();else renderPart1();return;}
     if(c){
-      /* Practice controller is deliberately not installed here yet. Navigation is isolated first. */
       if(typeof window.__THIRAL_GDS_POSTAL_START==='function') window.__THIRAL_GDS_POSTAL_START(c);
       else alert(en()?'Postal Practice backend is not connected.':'Postal Practice backend இணைப்பு கிடைக்கவில்லை.');
     }
@@ -6555,16 +6567,16 @@ function escapeHtmlAdmin(v){
     try{
       var rows=[];
       if(kind==='v5') rows=await fetchRows(V_SUB, count);
-      else if(kind==='p1-full'){
+      else if(kind==='p1-full' || kind==='p1-full-all'){
         /* Full Volume: load the complete available bank from all three Part-I subtopics. */
         for(var i=0;i<P1.length;i++) rows=rows.concat(await fetchRows(en()?P1EN[i]:P1[i],500));
         var seen={}; rows=rows.filter(function(q){var k=String(q.id);if(seen[k])return false;seen[k]=1;return true;}); shuffle(rows);
       } else {
         var idx=Number(kind.replace('p1-','')); rows=await fetchRows(en()?P1EN[idx]:P1[idx],count);
       }
-      if(kind!=='p1-full' && rows.length<count)throw new Error((en()?'Only ':'')+rows.length+(en()?' questions are available for the selected language.':' கேள்விகள் மட்டுமே கிடைத்துள்ளன. தேவையானது: '+count));
-      S.questions=(kind==='p1-full')?rows:rows.slice(0,count);
-      var a=await api()('/attempts',{method:'POST',body:JSON.stringify({exam:EXAM,subject:SUBJECT,mode:'practice',language:en()?'en':'ta',subtopic:S.kind==='v5'?V_SUB:(S.kind==='p1-full'?'Post Office Guide Part-I':(en()?P1EN[Number(S.kind.replace('p1-',''))]:P1[Number(S.kind.replace('p1-',''))])),questionIds:S.questions.map(function(q){return Number(q.id);})})});
+      if(kind!=='p1-full' && kind!=='p1-full-all' && rows.length<count)throw new Error((en()?'Only ':'')+rows.length+(en()?' questions are available for the selected language.':' கேள்விகள் மட்டுமே கிடைத்துள்ளன. தேவையானது: '+count));
+      S.questions=(kind==='p1-full' || kind==='p1-full-all')?rows:rows.slice(0,count);
+      var a=await api()('/attempts',{method:'POST',body:JSON.stringify({exam:EXAM,subject:SUBJECT,mode:'practice',language:en()?'en':'ta',subtopic:(S.kind==='v5'?V_SUB:((S.kind==='p1-full' || S.kind==='p1-full-all')?'Post Office Guide Part-I':(en()?P1EN[Number(S.kind.replace('p1-',''))]:P1[Number(S.kind.replace('p1-',''))]))),questionIds:S.questions.map(function(q){return Number(q.id);})})});
       if(!a||!a.id)throw new Error('Practice attempt உருவாக்கப்படவில்லை.');
       S.attemptId=a.id;
       if($('practiceReview')){$('practiceReview').innerHTML='';$('practiceReview').classList.add('hidden');$('practiceReview').style.display='none';}
