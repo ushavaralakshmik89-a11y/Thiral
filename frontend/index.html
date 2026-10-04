@@ -3380,10 +3380,10 @@ window.V91_ADV_NUM=V91_ADV_NUM;
     var d = {};
     try { d = await r.json(); } catch(e) {}
     if(!r.ok){
+      if(r.status === 403 && path === '/auth/login'){
+        throw new Error('ACCESS DENIED\nஇந்த கணக்கு தற்போது மற்றொருவரால் பயன்படுத்தப்படுகிறது.\nதொடர்ந்து பயன்படுத்த New Registration மூலம் பதிவு செய்து கொள்ளவும்.');
+      }
       if(r.status === 401 || r.status === 403){
-        if(path === '/auth/login' && r.status === 403){
-          throw new Error('ACCESS DENIED\nஇந்த கணக்கு தற்போது மற்றொருவரால் பயன்படுத்தப்படுகிறது.\nதொடர்ந்து பயன்படுத்த New Registration மூலம் பதிவு செய்து கொள்ளவும்.');
-        }
         throw new Error('ACCESS DENIED: இந்த தரவை அணுக உங்களுக்கு அனுமதி இல்லை.');
       }
       throw new Error(d.error || ('HTTP ' + r.status));
@@ -3468,7 +3468,15 @@ window.V91_ADV_NUM=V91_ADV_NUM;
       }
       enterV138(d.user);
     }catch(e){
-      if(msg){ msg.className='bad'; msg.textContent='Login failed: ' + e.message; }
+      if(msg){
+        msg.className='bad';
+        var em=String(e && e.message || '');
+        if(em.indexOf('ACCESS DENIED\n') === 0){
+          msg.innerHTML='<b>Access Denied</b><br>'+em.slice('ACCESS DENIED\n'.length).replace(/\n/g,'<br>');
+        }else{
+          msg.textContent='Login failed: ' + em;
+        }
+      }
     }
   };
 
@@ -5833,21 +5841,33 @@ window.startPractice=async function(n){
     if(result){result.classList.remove('hidden');result.style.display='block';}
     window.scrollTo({top:0,behavior:'instant'});
   }
-  function renderReview(){
+  function renderReview(reviewRows){
     var qs=getQs(), ans=getAns(), root=document.getElementById('screenReview'), legacy=document.getElementById('mockReview');
     if(!qs.length) return;
+    var byId=new Map((Array.isArray(reviewRows)?reviewRows:[]).map(function(r){return [String(r.question_id),r];}));
     var html=qs.map(function(q,i){
       var opts=Array.isArray(q.o)?q.o:(Array.isArray(q.options)?q.options:[]);
       var a=Number(ans[i]);
       var your=(a>=0&&a<opts.length)?String(opts[a]):'விடையளிக்கவில்லை';
-      var ex=String(q.e||q.explanation||'').trim();
-      return '<div class="card" style="box-shadow:none;border:1px solid #e5e7eb;margin-bottom:12px;">'+
+      var r=byId.get(String(q.id))||{};
+      var ci=Number(r.correct_option);
+      var right=(Number.isInteger(ci)&&ci>=0&&ci<opts.length)?String(opts[ci]):'-';
+      var status;
+      var cls;
+      if(a<0){status='⚪ விடையளிக்கவில்லை';cls='warn';}
+      else if(Number.isInteger(ci)&&a===ci){status='✅ சரி';cls='good';}
+      else{status='❌ தவறு';cls='bad';}
+      var ex=String(r.explanation||q.e||q.explanation||'').trim();
+      return '<div class="card" style="box-shadow:none;border:1px solid #e5e7eb;margin-bottom:12px;padding:15px;">'+
         '<div><b>'+esc(i+1)+'. '+esc(q.q||q.question||'')+'</b></div>'+
-        '<p>உங்கள் விடை: <b>'+esc(your)+'</b></p>'+
-        (ex?'<p class="small"><b>விளக்கம்:</b> '+esc(ex)+'</p>':'')+'</div>';
+        '<p><b>உங்கள் விடை:</b> '+esc(your)+'</p>'+
+        '<p><b>சரியான விடை:</b> '+esc(right)+'</p>'+
+        '<p class="'+cls+'" style="font-size:18px;font-weight:800;">'+status+'</p>'+
+        (ex?'<p class="small"><b>விளக்கம்:</b> '+esc(ex)+'</p>':'')+
+        '</div>';
     }).join('');
     if(legacy) legacy.innerHTML=html;
-    if(root) root.innerHTML='<h3>Mock Test Review – '+qs.length+' கேள்விகள்</h3>'+html;
+    if(root) root.innerHTML='<h3>📝 Question Review – '+qs.length+' கேள்விகள்</h3>'+html;
   }
   window.submitMock=async function(auto){
     if(submitting) return;
@@ -5867,12 +5887,13 @@ window.startPractice=async function(n){
       if(typeof api!=='function') throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
       var d=await api('/attempts/'+encodeURIComponent(attemptId)+'/submit',{method:'POST',body:JSON.stringify({answers:answers})});
       var total=Number(d.total||qs.length), correct=Number(d.correct||0), unanswered=Number(d.unanswered||0), score=Number(d.score||0), wrong=Math.max(0,total-correct-unanswered);
+      var reviewData=await api('/attempts/'+encodeURIComponent(attemptId)+'/review',{method:'GET'});
       var summary=document.getElementById('mockSummary');
       if(summary) summary.innerHTML='<p><b>மொத்த கேள்விகள்:</b> '+total+'</p><p><b>சரி:</b> '+correct+'</p><p><b>தவறு:</b> '+wrong+'</p><p><b>விடையளிக்காதது:</b> '+unanswered+'</p><p><b>மதிப்பெண்:</b> '+score+'%</p>';
       var student=document.getElementById('studentResultSummary');
       if(student) student.innerHTML='<p><b>Mock Test முடிந்தது.</b></p><p>மொத்தம்: '+total+' | சரி: '+correct+' | தவறு: '+wrong+' | விடையளிக்காதது: '+unanswered+' | மதிப்பெண்: '+score+'%</p>';
       try{localStorage.setItem('tnpsc_last_result',JSON.stringify({type:'Mock Test',total:total,correct:correct,wrong:wrong,unanswered:unanswered,score:score}));}catch(e){}
-      renderReview();
+      renderReview(reviewData && Array.isArray(reviewData.review)?reviewData.review:[]);
       showResult();
     }catch(e){
       submitting=false;
