@@ -6649,10 +6649,11 @@ function escapeHtmlAdmin(v){
   function isPostal(){return String(typeof selectedExam!=='undefined'?selectedExam:'')===EXAM && String(typeof currentSubject!=='undefined'?currentSubject:'')===UI_SUBJECT;}
   function lang(){return String(typeof contentLanguage!=='undefined'?contentLanguage:'ta')==='en'?'en':'ta';}
   function api(){
-    if(typeof window.thiralV138Api==='function') return window.thiralV138Api;
     return function(path,opt){
-      opt=opt||{}; const headers=Object.assign({'Content-Type':'application/json'},opt.headers||{});
-      return fetch('/api'+path,Object.assign({},opt,{credentials:'include',headers})).then(async r=>{let d={};try{d=await r.json()}catch(e){} if(!r.ok)throw new Error(d.error||('HTTP '+r.status));return d;});
+      opt=opt||{};
+      const headers=Object.assign({'Content-Type':'application/json'},opt.headers||{});
+      return fetch('/api'+path,Object.assign({},opt,{credentials:'include',headers}))
+        .then(async r=>{let d={};try{d=await r.json()}catch(e){} if(!r.ok)throw new Error((d&&d.error)||((d&&d.message)||('HTTP '+r.status)));return d;});
     };
   }
   function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -6697,8 +6698,8 @@ function escapeHtmlAdmin(v){
   }
   function injectNav(){
     const p=$('practice'); if(!p||$('thiralPostalNav'))return;
-    const el=document.createElement('div');el.id='thiralPostalNav';el.style.cssText='display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:16px';
-    el.innerHTML='<button type="button" id="thiralPostalPrev" class="secondary">← Previous</button><button type="button" id="thiralPostalNext">Next →</button><button type="button" id="thiralPostalSubmit" class="secondary">Submit</button>';
+    const el=document.createElement('div');el.id='thiralPostalNav';el.style.cssText='display:flex;gap:10px;justify-content:space-between;align-items:center;flex-wrap:wrap;margin-top:16px';
+    el.innerHTML='<button type="button" id="thiralPostalPrev" class="secondary">← Previous</button><span style="display:flex;gap:10px;align-items:center;margin-left:auto"><button type="button" id="thiralPostalNext">Next →</button><button type="button" id="thiralPostalSubmit" class="secondary">Submit</button></span>';
     const fb=$('feedback'); if(fb)fb.insertAdjacentElement('afterend',el); else p.appendChild(el);
     $('thiralPostalPrev').onclick=()=>previous(); $('thiralPostalNext').onclick=()=>next(); $('thiralPostalSubmit').onclick=()=>submit();
   }
