@@ -6394,8 +6394,8 @@ function escapeHtmlAdmin(v){
     var grid=topicGrid();
     if(title) title.textContent=(en()?'📮 Departmental Rules / Postal Department Rules & Knowledge':'📮 அஞ்சல் துறை விதிகள் / அறிவு')+' – Topics';
     if(!grid)return;
-    grid.innerHTML='<button type="button" data-thiral-postal-topic="p1">📘 '+escHtml(en()?PART1_EN:PART1_TA)+'</button>'+
-                   '<button type="button" data-thiral-postal-topic="v5">📗 '+escHtml(en()?V_EN:V_TA)+'</button>';
+    grid.innerHTML='<button type="button" data-thiral-postal-topic="p1" onclick="window.__THIRAL_GDS_POSTAL_RENDER_PART1()">📘 '+escHtml(en()?PART1_EN:PART1_TA)+'</button>'+
+                   '<button type="button" data-thiral-postal-topic="v5" onclick="window.__THIRAL_GDS_POSTAL_RENDER_V5()">📗 '+escHtml(en()?V_EN:V_TA)+'</button>';
     showSafe('topics');
   }
   function renderPart1(){
@@ -6408,7 +6408,7 @@ function escapeHtmlAdmin(v){
     /* Part-I is intentionally one complete volume here. The three DB
        subtopics are combined by the practice loader, so the student sees
        one Full Volume entry containing every available question. */
-    grid.innerHTML='<button type="button" data-thiral-postal-sub="p1-full">📚 '+(en()?'Full Volume – All Questions':'முழு தொகுதி – அனைத்து கேள்விகளும்')+'</button>';
+    grid.innerHTML='<button type="button" data-thiral-postal-sub="p1-full" onclick="window.__THIRAL_GDS_POSTAL_START(\'p1-full-all\')">📚 '+(en()?'Full Volume – All Questions':'முழு தொகுதி – அனைத்து கேள்விகளும்')+'</button>';
     showSafe('subtopics');
   }
   function renderVolume5(){
@@ -6503,6 +6503,8 @@ function escapeHtmlAdmin(v){
      without changing subject(), topic(), subtopic(), or any Group 4 function. */
   var oldRender=window.renderExamHome;
   window.__THIRAL_GDS_POSTAL_RENDER_TOPICS=renderTopics;
+  window.__THIRAL_GDS_POSTAL_RENDER_PART1=renderPart1;
+  window.__THIRAL_GDS_POSTAL_RENDER_V5=renderVolume5;
   window.__THIRAL_GDS_POSTAL_ISOLATED={exam:EXAM,subject:SUBJECT,dbSubject:DB_SUBJECT};
 })();
 </script>
