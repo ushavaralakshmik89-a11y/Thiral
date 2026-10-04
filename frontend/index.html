@@ -6664,4 +6664,20 @@ function escapeHtmlAdmin(v){
 })();
 </script>
 
+
+
+<script id="thiral-activity-logout-final">
+(function(){
+  'use strict';
+  window.thiralLogoutFromActivity=async function(){
+    try{ if(typeof window.__THIRAL_RESET_PRACTICE_SESSION==='function') window.__THIRAL_RESET_PRACTICE_SESSION(); }catch(e){}
+    try{ if(typeof window.__THIRAL_RESET_MOCK_SESSION==='function') window.__THIRAL_RESET_MOCK_SESSION(); }catch(e){}
+    window.pendingPracticeStart=null;
+    window.pendingMockStart=null;
+    window._practiceReentry=false;
+    try{ var picker=document.getElementById('thiralMockLanguagePicker'); if(picker) picker.remove(); }catch(e){}
+    try{ if(typeof window.logout==='function') await window.logout(); else show('home'); }catch(e){ try{ show('home'); }catch(_){} }
+  };
+})();
+</script>
 </body></html>
