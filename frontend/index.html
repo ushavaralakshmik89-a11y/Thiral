@@ -6495,4 +6495,116 @@ function escapeHtmlAdmin(v){
 })();
 </script>
 
+<script id="thiral-gds-postal-practice-isolated-v7">
+(function(){
+  'use strict';
+  /* POSTAL PRACTICE ONLY. Does not replace any Group 4 router or practice function. */
+  var EXAM='gds_to_mts';
+  var SUBJECT='Departmental Rules / Postal Department Rules & Knowledge';
+  var V_SUB='Postal Manual Volume V';
+  var P1=['பொதுவான அஞ்சல் விதிகள்','அஞ்சல் / கட்டுரை அடிப்படைகள்','அஞ்சல் சேவைகள்'];
+  var P1EN=['General Postal Rules','Postal / Article Basics','Postal Services'];
+  var S={questions:[],answers:{},checks:{},index:0,attemptId:null,timer:null,seconds:15,busy:false,submitted:false,kind:null,key:null};
+  var $=function(id){return document.getElementById(id);};
+  var esc=function(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});};
+  function isPostal(){return String(typeof selectedExam!=='undefined'?selectedExam:'')===EXAM && String(typeof currentSubject!=='undefined'?currentSubject:'')==='gds_postal_rules';}
+  function en(){return String(typeof contentLanguage!=='undefined'?contentLanguage:'ta')==='en';}
+  function api(){if(typeof window.thiralV138Api==='function')return window.thiralV138Api;throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');}
+  function stop(){if(S.timer){clearInterval(S.timer);S.timer=null;}}
+  function setTimer(n){if($('timer'))$('timer').textContent=String(Math.max(0,n));}
+  function getText(q){
+    if(!q)return '';
+    var L=en();
+    var candidates=L?[q.question_en,q.english_question,q.questionEnglish,q.en_question,q.question_english,q.question]:[q.question_ta,q.tamil_question,q.questionTamil,q.ta_question,q.question_tamil,q.question];
+    for(var i=0;i<candidates.length;i++)if(typeof candidates[i]==='string'&&candidates[i].trim())return candidates[i];
+    return '';
+  }
+  function getOptions(q){
+    if(!q)return [];
+    var L=en();
+    var arr=L?[q.options_en,q.english_options,q.optionsEnglish,q.en_options,q.options_english]:[q.options_ta,q.tamil_options,q.optionsTamil,q.ta_options,q.options_tamil];
+    for(var i=0;i<arr.length;i++)if(Array.isArray(arr[i])&&arr[i].length)return arr[i];
+    if(Array.isArray(q.options)&&q.options.length)return q.options;
+    if(Array.isArray(q.o)&&q.o.length)return q.o;
+    var sets=L?[[q.optionA_en,q.optionB_en,q.optionC_en,q.optionD_en],[q.a_en,q.b_en,q.c_en,q.d_en],[q.option_a_en,q.option_b_en,q.option_c_en,q.option_d_en]]:[[q.optionA_ta,q.optionB_ta,q.optionC_ta,q.optionD_ta],[q.a_ta,q.b_ta,q.c_ta,q.d_ta],[q.option_a_ta,q.option_b_ta,q.option_c_ta,q.option_d_ta]];
+    for(var s=0;s<sets.length;s++)if(sets[s].filter(function(x){return x!=null&&String(x).trim();}).length===4)return sets[s];
+    var generic=[[q.optionA,q.optionB,q.optionC,q.optionD],[q.a,q.b,q.c,q.d],[q.option_a,q.option_b,q.option_c,q.option_d]];
+    for(var g=0;g<generic.length;g++)if(generic[g].filter(function(x){return x!=null&&String(x).trim();}).length===4)return generic[g];
+    return [];
+  }
+  function rowLanguageOK(q){
+    var raw=q&&(q.language??q.lang??q.content_language??q.contentLanguage);
+    if(raw==null||String(raw).trim()==='')return true;
+    var x=String(raw).toLowerCase().trim();
+    return en()?['en','eng','english'].indexOf(x)>=0:['ta','tam','tamil'].indexOf(x)>=0;
+  }
+  function cleanRows(rows){
+    var out=[];
+    (Array.isArray(rows)?rows:[]).forEach(function(q){if(!q)return; if(!rowLanguageOK(q))return; if(!getText(q))return; if(getOptions(q).length<4)return; out.push(q);});
+    return out;
+  }
+  function shuffle(a){for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}return a;}
+  async function fetchRows(sub,limit){
+    var u='/practice/questions?exam='+encodeURIComponent(EXAM)+'&subject='+encodeURIComponent(SUBJECT)+'&language='+encodeURIComponent(en()?'en':'ta')+'&subtopic='+encodeURIComponent(sub)+'&limit='+encodeURIComponent(String(limit));
+    var d=await api()(u); return cleanRows(d&&d.questions);
+  }
+  async function load(kind,count){
+    if(!isPostal())return;
+    stop(); S={questions:[],answers:{},checks:{},index:0,attemptId:null,timer:null,seconds:15,busy:false,submitted:false,kind:kind,key:null};
+    if($('feedback'))$('feedback').innerHTML='<b>கேள்விகள் ஏற்றப்படுகின்றன...</b>';
+    try{
+      var rows=[];
+      if(kind==='v5') rows=await fetchRows(V_SUB, count);
+      else if(kind==='p1-full'){
+        for(var i=0;i<P1.length;i++) rows=rows.concat(await fetchRows(en()?P1EN[i]:P1[i],count));
+        var seen={}; rows=rows.filter(function(q){var k=String(q.id);if(seen[k])return false;seen[k]=1;return true;}); shuffle(rows);
+      } else {
+        var idx=Number(kind.replace('p1-','')); rows=await fetchRows(en()?P1EN[idx]:P1[idx],count);
+      }
+      if(rows.length<count)throw new Error((en()?'Only ':'')+rows.length+(en()?' questions are available for the selected language.':' கேள்விகள் மட்டுமே கிடைத்துள்ளன. தேவையானது: '+count));
+      S.questions=rows.slice(0,count);
+      var a=await api()('/attempts',{method:'POST',body:JSON.stringify({exam:EXAM,subject:SUBJECT,mode:'practice',language:en()?'en':'ta',subtopic:S.kind==='v5'?V_SUB:(S.kind==='p1-full'?'Post Office Guide Part-I':(en()?P1EN[Number(S.kind.replace('p1-',''))]:P1[Number(S.kind.replace('p1-',''))])),questionIds:S.questions.map(function(q){return Number(q.id);})})});
+      if(!a||!a.id)throw new Error('Practice attempt உருவாக்கப்படவில்லை.');
+      S.attemptId=a.id;
+      if($('practiceReview')){$('practiceReview').innerHTML='';$('practiceReview').classList.add('hidden');$('practiceReview').style.display='none';}
+      ensureNav();
+      if(typeof show==='function')show('practice');
+      render();
+    }catch(e){stop();if($('feedback'))$('feedback').innerHTML='<b>Practice தொடங்க முடியவில்லை.</b><br>'+esc(e.message);}
+  }
+  function ensureNav(){
+    var p=$('options'); if(!p)return;
+    var n=$('thiralPostalNavV7'); if(!n){n=document.createElement('div');n.id='thiralPostalNavV7';n.className='top';n.style.marginTop='18px';p.parentNode.insertBefore(n,p.nextSibling);}
+    n.innerHTML='<button type="button" class="secondary" id="thiralPostalPrevV7">← '+(en()?'Previous':'முந்தைய')+'</button><div style="display:flex;gap:10px;align-items:center"><button type="button" id="thiralPostalNextV7">'+(en()?'Next →':'அடுத்து →')+'</button><button type="button" id="thiralPostalSubmitV7">'+(en()?'Submit':'சமர்ப்பிக்க')+'</button></div>';
+    $('thiralPostalPrevV7').onclick=function(){prev();}; $('thiralPostalNextV7').onclick=function(){next();}; $('thiralPostalSubmitV7').onclick=function(){submit();};
+  }
+  function render(){
+    var q=S.questions[S.index]; if(!q)return; stop();
+    if($('progress'))$('progress').textContent=(S.index+1)+' / '+S.questions.length;
+    if($('bar'))$('bar').style.width=((S.index+1)/S.questions.length*100)+'%';
+    if($('level'))$('level').textContent=q.difficulty||q.d||'சாதாரணம்';
+    if($('question'))$('question').textContent=getText(q);
+    var o=getOptions(q); if($('options'))$('options').innerHTML=o.map(function(x,i){return '<button class="option" type="button" data-postal-answer="'+i+'">'+String.fromCharCode(65+i)+'. '+esc(x)+'</button>';}).join('');
+    $('options').querySelectorAll('[data-postal-answer]').forEach(function(b){b.onclick=function(){answer(Number(b.getAttribute('data-postal-answer')),false);};});
+    if($('feedback'))$('feedback').innerHTML=''; ensureNav();
+    $('thiralPostalPrevV7').disabled=S.index===0; $('thiralPostalNextV7').disabled=S.index===S.questions.length-1;
+    S.seconds=15;setTimer(15);S.timer=setInterval(function(){S.seconds--;setTimer(S.seconds);if(S.seconds<=0){stop();answer(-1,true);}},1000);
+  }
+  async function answer(n,timed){
+    if(S.busy||S.submitted)return;var q=S.questions[S.index];if(!q)return;var key=String(q.id);if(Object.prototype.hasOwnProperty.call(S.checks,key))return;
+    S.busy=true;stop();S.answers[key]=Number(n);$('options').querySelectorAll('button').forEach(function(b){b.disabled=true;});
+    try{
+      var d=await api()('/attempts/'+S.attemptId+'/check-answer',{method:'POST',body:JSON.stringify({questionId:Number(q.id),answer:Number(n)})});S.checks[key]=d;
+      var o=getOptions(q),ci=Number(d.correct_option),h=timed?'<b>⏱️ நேரம் முடிந்தது</b>':(d.correct===true?'<b>✓ சரி</b>':'<b>✗ தவறு</b>');
+      h+='<p><b>சரியான பதில்:</b> '+esc(o[ci]||'')+'</p>';if(d.explanation)h+='<p><b>விளக்கம்:</b> '+esc(d.explanation)+'</p>';if($('feedback'))$('feedback').innerHTML=h;
+      S.busy=false;setTimeout(function(){if(S.index===S.questions.length-1)submit();else next();},900);
+    }catch(e){S.busy=false;delete S.answers[key];$('options').querySelectorAll('button').forEach(function(b){b.disabled=false;});if($('feedback'))$('feedback').innerHTML='<b>விடை சரிபார்க்க முடியவில்லை.</b><br>'+esc(e.message);if(!timed){S.seconds=15;setTimer(15);S.timer=setInterval(function(){S.seconds--;setTimer(S.seconds);if(S.seconds<=0){stop();answer(-1,true);}},1000);}}
+  }
+  function prev(){if(S.busy||S.submitted||S.index<=0)return;S.index--;render();}
+  function next(){if(S.busy||S.submitted||S.index>=S.questions.length-1)return;S.index++;render();}
+  async function submit(){if(S.submitted||!S.attemptId)return;S.submitted=true;stop();try{var d=await api()('/attempts/'+S.attemptId+'/submit',{method:'POST',body:JSON.stringify({answers:S.answers})});if($('resultText'))$('resultText').innerHTML='<h3>'+ (en()?'Postal Practice Result':'Postal Practice முடிவு') +'</h3><p>'+esc(d&&d.score!=null?'Score: '+d.score:(d&&d.message)||'Submitted')+'</p>';if(typeof show==='function')show('result');}catch(e){S.submitted=false;if($('feedback'))$('feedback').innerHTML='<b>Submit செய்ய முடியவில்லை.</b><br>'+esc(e.message);}}
+  window.__THIRAL_GDS_POSTAL_START=function(token){if(!isPostal())return;var parts=String(token).split('-');if(parts[0]==='v5')load('v5',Number(parts[1]));else if(parts[0]==='p1'&&parts[1]==='full')load('p1-full',Number(parts[2]));else if(parts[0]==='p1')load('p1-'+parts[1],Number(parts[2]));};
+})();
+</script>
+
 </body></html>
