@@ -6657,27 +6657,40 @@ function escapeHtmlAdmin(v){
     };
   }
   function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-  function qtext(q){return q?.question||q?.q||q?.question_ta||q?.tamil_question||q?.english_question||'';}
-  function arr(v){if(Array.isArray(v))return v; if(typeof v==='string'){try{const x=JSON.parse(v);if(Array.isArray(x))return x}catch(e){} return v.split(/\s*[|]\s*/).filter(Boolean)} return []}
-  function qopts(q){
-    let o=q?.options||q?.o;
-    if(!arr(o).length)o=q?.tamil_options||q?.options_ta||q?.ta_options||q?.optionsTamil||q?.options_tamil||q?.taOptions;
-    if(!arr(o).length)o=q?.english_options||q?.options_en||q?.en_options||q?.optionsEnglish||q?.options_english||q?.enOptions;
-    if(!arr(o).length && q?.tamil)o=q.tamil.options;
-    if(!arr(o).length && q?.english)o=q.english.options;
-    if(!arr(o).length){o=[q?.option_a,q?.option_b,q?.option_c,q?.option_d];}
-    return arr(o).slice(0,4);
-  }
-  function qdisplay(q){
+  function qtext(q){
     const en=lang()==='en';
     if(en){
-      const tq=q?.english_question||q?.question_en||q?.en_question||q?.questionEnglish||q?.question_english||q?.en||q?.english?.question;
-      const to=arr(q?.english_options||q?.options_en||q?.en_options||q?.optionsEnglish||q?.options_english||q?.enOptions||q?.english?.options);
-      if(tq && to.length>=4)return {q:tq,o:to};
+      return q?.english_question||q?.question_en||q?.en_question||q?.questionEnglish||q?.question_english||q?.english?.question||((String(q?.language||'').toLowerCase() in {'en':1,'english':1})?(q?.question||q?.q):'')||'';
     }
-    const tq=q?.tamil_question||q?.question_ta||q?.ta_question||q?.questionTamil||q?.question_tamil||q?.taQuestion||q?.q||q?.question||q?.tamil?.question;
-    const to=arr(q?.tamil_options||q?.options_ta||q?.ta_options||q?.optionsTamil||q?.options_tamil||q?.taOptions||q?.tamil?.options);
-    return {q:tq||qtext(q),o:to.length>=4?to:qopts(q)};
+    return q?.tamil_question||q?.question_ta||q?.ta_question||q?.questionTamil||q?.question_tamil||q?.taQuestion||q?.tamil?.question||((String(q?.language||'').toLowerCase() in {'ta':1,'tamil':1})?(q?.question||q?.q):'')||'';
+  }
+  function arr(v){if(Array.isArray(v))return v; if(typeof v==='string'){try{const x=JSON.parse(v);if(Array.isArray(x))return x}catch(e){} return v.split(/\s*[|]\s*/).filter(Boolean)} return []}
+  function qopts(q){
+    const en=lang()==='en';
+    let o=en
+      ? (q?.english_options||q?.options_en||q?.en_options||q?.optionsEnglish||q?.options_english||q?.enOptions||q?.english?.options)
+      : (q?.tamil_options||q?.options_ta||q?.ta_options||q?.optionsTamil||q?.options_tamil||q?.taOptions||q?.tamil?.options);
+    if(arr(o).length>=4)return arr(o).slice(0,4);
+    const qlang=String(q?.language||'').trim().toLowerCase();
+    if((en && (qlang==='en'||qlang==='english')) || (!en && (qlang==='ta'||qlang==='tamil'))){
+      o=q?.options||q?.o;
+      if(arr(o).length>=4)return arr(o).slice(0,4);
+      const direct=[q?.option_a,q?.option_b,q?.option_c,q?.option_d];
+      if(direct.every(v=>v!==undefined&&v!==null&&String(v)!==''))return direct.map(String);
+    }
+    const nested=en?q?.english:q?.tamil;
+    o=nested?.options;
+    if(arr(o).length>=4)return arr(o).slice(0,4);
+    return [];
+  }
+  function qdisplay(q){
+    return {q:qtext(q),o:qopts(q)};
+  }
+  function rowMatchesLanguage(q,language){
+    const l=String(q?.language||q?.lang||'').trim().toLowerCase();
+    if(!l)return true;
+    if(language==='en')return l==='en'||l==='english'||l==='en-us'||l==='en_in';
+    return l==='ta'||l==='tamil'||l==='ta-in'||l==='ta_in';
   }
   async function fetchPractice(subtopic,language,limit){
     const path='/practice/questions?exam='+encodeURIComponent(EXAM)+'&subject='+encodeURIComponent(DB_SUBJECT)+'&language='+encodeURIComponent(language)+'&subtopic='+encodeURIComponent(subtopic)+'&limit='+encodeURIComponent(String(limit));
@@ -6685,14 +6698,14 @@ function escapeHtmlAdmin(v){
   }
   async function part1Rows(language,count){
     const names=language==='en'?PART1_EN_SUBS:PART1_TA_SUBS; let all=[];
-    for(const n of names){const d=await fetchPractice(n,language,Math.min(200,count));all.push(...(Array.isArray(d.questions)?d.questions:[]));}
+    for(const n of names){const d=await fetchPractice(n,language,Math.min(200,count));all.push(...(Array.isArray(d.questions)?d.questions:[]).filter(q=>rowMatchesLanguage(q,language)));}
     const seen=new Set(); all=all.filter(q=>{const id=String(q?.id||'');if(!id||seen.has(id))return false;seen.add(id);return true;});
     for(let i=all.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[all[i],all[j]]=[all[j],all[i]];}
     if(all.length<count)throw new Error((language==='en'?PART1_EN:PART1_TA)+' Full Volume-ல் '+count+' கேள்விகள் கிடைக்கவில்லை. கிடைத்தது: '+all.length+'.');
     return all.slice(0,count);
   }
   async function volume5Rows(language,count){
-    const d=await fetchPractice(V_DB,language,count); const rows=Array.isArray(d.questions)?d.questions:[];
+    const d=await fetchPractice(V_DB,language,count); const rows=(Array.isArray(d.questions)?d.questions:[]).filter(q=>rowMatchesLanguage(q,language));
     if(rows.length<count)throw new Error((language==='en'?V_EN:V_TA)+' பகுதியில் '+count+' கேள்விகள் கிடைக்கவில்லை. கிடைத்தது: '+rows.length+'.');
     return rows.slice(0,count);
   }
@@ -6756,8 +6769,13 @@ function escapeHtmlAdmin(v){
   async function start(kind,count){
     count=Number(count);if(COUNTS.indexOf(count)<0)return; if(!isPostal()){try{selectedExam=EXAM;currentSubject=UI_SUBJECT;}catch(e){}}
     try{
-      const rows=kind==='p'?await part1Rows(lang(),count):await volume5Rows(lang(),count);
-      S.questions=rows;S.answers={};S.checks={};S.index=0;S.attemptId=null;S.submitted=false;S.kind=kind;
+      const requestedLanguage=lang();
+      const rows=kind==='p'?await part1Rows(requestedLanguage,count):await volume5Rows(requestedLanguage,count);
+      const languageRows=rows.filter(q=>rowMatchesLanguage(q,requestedLanguage));
+      if(languageRows.length<count){
+        throw new Error((requestedLanguage==='en'?'English':'தமிழ்')+' மொழிக்கான '+count+' கேள்விகள் கிடைக்கவில்லை. கிடைத்தது: '+languageRows.length+'.');
+      }
+      S.questions=languageRows.slice(0,count);S.answers={};S.checks={};S.index=0;S.attemptId=null;S.submitted=false;S.kind=kind;
       const a=await api()('/attempts',{method:'POST',body:JSON.stringify({exam:EXAM,subject:DB_SUBJECT,mode:'practice',language:lang(),questionIds:rows.map(q=>Number(q.id))})});
       if(!a||!a.id)throw new Error('Practice attempt உருவாக்கப்படவில்லை.');S.attemptId=a.id;
       injectNav();if(typeof show==='function')show('practice');renderQuestion();
