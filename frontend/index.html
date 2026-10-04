@@ -6428,7 +6428,7 @@ function escapeHtmlAdmin(v){
     currentSub=key==='full'?'Post Office Guide Part-I':(subs[Number(key)]||'');
     var box=actions(); if(!box)return;
     if(key==='full'){
-      box.innerHTML='<h2 id="subTitle">📘 '+escHtml(en()?PART1_EN:PART1_TA)+' • '+(en()?'Full Volume':'முழு தொகுதி')+'</h2>'+        '<p>'+(en()?'All available Post Office Guide Part-I questions will be loaded in English only.':'Post Office Guide Part-I-ல் உள்ள அனைத்து கிடைக்கும் கேள்விகளும் தமிழ் மொழியில் மட்டும் முழுமையாக ஏற்றப்படும்.')+'</p>'+        '<div class="grid"><button type="button" data-thiral-postal-count="p1-full-all">📚 '+(en()?'Full Volume':'முழு தொகுதி')+'</button></div>'+        '<button type="button" class="secondary" data-thiral-postal-back="p1">← '+(en()?'Subtopics':'உள்தலைப்புகள்')+'</button>';
+      box.innerHTML='<h2 id="subTitle">📘 '+escHtml(en()?PART1_EN:PART1_TA)+' • '+(en()?'Full Volume':'முழு தொகுதி')+'</h2>'+        '<p>'+(en()?'All available Post Office Guide Part-I questions will be loaded in the selected language.':'தேர்ந்தெடுத்த மொழியில் Post Office Guide Part-I-ல் உள்ள அனைத்து கிடைக்கும் கேள்விகளும் முழுமையாக ஏற்றப்படும்.')+'</p>'+        '<div class="grid"><button type="button" data-thiral-postal-count="p1-full-all">📚 '+(en()?'Full Volume':'முழு தொகுதி')+'</button></div>'+        '<button type="button" class="secondary" data-thiral-postal-back="p1">← '+(en()?'Subtopics':'உள்தலைப்புகள்')+'</button>';
     }else{
       box.innerHTML='<h2 id="subTitle">📘 '+escHtml(en()?PART1_EN:PART1_TA)+' • '+escHtml(label)+'</h2>'+        '<p>'+(en()?'Practice questions for this section.':'இந்தப் பகுதிக்கான Practice கேள்விகள்.')+'</p>'+        '<div class="grid">'+COUNTS.map(function(n){return '<button type="button" data-thiral-postal-count="p1-'+key+'-'+n+'">📝 '+n+' '+(en()?'Questions':'கேள்விகள்')+'</button>';}).join('')+'</div>'+        '<button type="button" class="secondary" data-thiral-postal-back="p1">← '+(en()?'Subtopics':'உள்தலைப்புகள்')+'</button>';
     }
@@ -6559,8 +6559,30 @@ function escapeHtmlAdmin(v){
   }
   function shuffle(a){for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}return a;}
   async function fetchRows(sub,limit){
-    var u='/practice/questions?exam='+encodeURIComponent(EXAM)+'&subject='+encodeURIComponent(SUBJECT)+'&language='+encodeURIComponent(en()?'en':'ta')+'&subtopic='+encodeURIComponent(sub)+'&limit='+encodeURIComponent(String(limit));
+    var u='/practice/questions?exam='+encodeURIComponent(EXAM)+'&subject='+encodeURIComponent(SUBJECT)+'&language='+encodeURIComponent(en()?'en':'ta')+'&subtopic='+encodeURIComponent(sub)+'&limit='+encodeURIComponent(String(Math.min(limit,200)));
     var d=await api()(u); return cleanRows(d&&d.questions);
+  }
+  async function fetchAllRows(sub){
+    /* Full Volume must read the complete active bank. The Practice endpoint
+       intentionally caps requests at 200 and also excludes previously-used
+       practice questions, so it is not suitable for a complete volume.
+       The existing /questions endpoint supports limit + offset and returns
+       pagination metadata. This does not modify Group 4 or the backend. */
+    var all=[], offset=0, pageSize=200, guard=0, total=null;
+    while(guard++<20){
+      var u='/questions?exam='+encodeURIComponent(EXAM)+'&subject='+encodeURIComponent(SUBJECT)+'&language='+encodeURIComponent(en()?'en':'ta')+'&subtopic='+encodeURIComponent(sub)+'&limit='+pageSize+'&offset='+offset;
+      var d=await api()(u);
+      var rows=cleanRows(d&&d.questions);
+      all=all.concat(rows);
+      var pg=d&&d.pagination;
+      total=pg&&Number.isFinite(Number(pg.total))?Number(pg.total):null;
+      if(!pg || !pg.hasMore || rows.length===0)break;
+      var next=Number(pg.nextOffset);
+      if(!Number.isFinite(next) || next<=offset)break;
+      offset=next;
+      if(total!==null && offset>=total)break;
+    }
+    return all;
   }
   async function load(kind,count){
     if(!isPostal())return;
@@ -6571,13 +6593,15 @@ function escapeHtmlAdmin(v){
       if(kind==='v5') rows=await fetchRows(V_SUB, count);
       else if(kind==='p1-full' || kind==='p1-full-all'){
         /* Full Volume: load the complete available bank from all three Part-I subtopics. */
-        for(var i=0;i<P1.length;i++) rows=rows.concat(await fetchRows(en()?P1EN[i]:P1[i],500));
+        for(var i=0;i<P1.length;i++) rows=rows.concat(await fetchAllRows(en()?P1EN[i]:P1[i]));
         var seen={}; rows=rows.filter(function(q){var k=String(q.id);if(seen[k])return false;seen[k]=1;return true;}); shuffle(rows);
       } else {
         var idx=Number(kind.replace('p1-','')); rows=await fetchRows(en()?P1EN[idx]:P1[idx],count);
       }
       if(kind!=='p1-full' && kind!=='p1-full-all' && rows.length<count)throw new Error((en()?'Only ':'')+rows.length+(en()?' questions are available for the selected language.':' கேள்விகள் மட்டுமே கிடைத்துள்ளன. தேவையானது: '+count));
       S.questions=(kind==='p1-full' || kind==='p1-full-all')?rows:rows.slice(0,count);
+      if(!S.questions.length) throw new Error(en()?'No questions were returned for the selected language and Part-I subtopics.':'தேர்ந்தெடுத்த மொழிக்கான Part-I கேள்விகள் backend-ல் கிடைக்கவில்லை.');
+      if($('feedback'))$('feedback').innerHTML='<b>'+(en()?'Questions loaded: ':'கேள்விகள் ஏற்றப்பட்டன: ')+S.questions.length+'</b>';
       var a=await api()('/attempts',{method:'POST',body:JSON.stringify({exam:EXAM,subject:SUBJECT,mode:'practice',language:en()?'en':'ta',subtopic:(S.kind==='v5'?V_SUB:((S.kind==='p1-full' || S.kind==='p1-full-all')?'Post Office Guide Part-I':(en()?P1EN[Number(S.kind.replace('p1-',''))]:P1[Number(S.kind.replace('p1-',''))]))),questionIds:S.questions.map(function(q){return Number(q.id);})})});
       if(!a||!a.id)throw new Error('Practice attempt உருவாக்கப்படவில்லை.');
       S.attemptId=a.id;
