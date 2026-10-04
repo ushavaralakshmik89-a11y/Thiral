@@ -6385,12 +6385,24 @@ function escapeHtmlAdmin(v){
 
   function renderGDSTopics(){
     var S=String(currentSubject||'');
-    var info=(typeof data!=='undefined') ? data[S] : null;
     var title=document.getElementById('subjectTitle');
     var grid=document.getElementById('topicGrid');
-    if(title) title.textContent=labelForSubject(S)+' – Topics';
+    if(title) title.textContent=(S==='gds_postal_rules' ? 'Departmental Rules / Postal Department Rules & Knowledge – Topics' : labelForSubject(S)+' – Topics');
     if(!grid) return;
 
+    /* Postal topics are explicit DB-backed topics. Do not depend on the generic
+       frontend data map, because Postal Part-I / Volume-V are maintained in
+       Supabase under their own subtopics. */
+    if(S==='gds_postal_rules' && String(selectedExam||'')===GDS_EXAM){
+      var en=String(contentLanguage||'ta')==='en';
+      grid.innerHTML=
+        '<button type="button" onclick="topic(\''+(en?'Post Office Guide Part-I':'அஞ்சல் வழிகாட்டி பகுதி-I')+'\')">📘 '+(en?'Post Office Guide Part-I':'அஞ்சல் வழிகாட்டி பகுதி-I')+'</button>'+
+        '<button type="button" onclick="topic(\'Postal Manual Volume V\')">📗 '+(en?'Postal Manual Volume V':'அஞ்சல் கையேடு தொகுதி-V')+'</button>';
+      show('topics');
+      return;
+    }
+
+    var info=(typeof data!=='undefined') ? data[S] : null;
     var topics=(info && info.topics) ? Object.keys(info.topics) : [];
     if(!topics.length){
       grid.innerHTML='<p class="small">இந்த பாடத்திற்கான Topics / கேள்வி வங்கி இன்னும் சேர்க்கப்படவில்லை.</p>';
