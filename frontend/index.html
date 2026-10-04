@@ -3381,6 +3381,9 @@ window.V91_ADV_NUM=V91_ADV_NUM;
     try { d = await r.json(); } catch(e) {}
     if(!r.ok){
       if(r.status === 401 || r.status === 403){
+        if(path === '/auth/login' && r.status === 403){
+          throw new Error('ACCESS DENIED\nஇந்த கணக்கு தற்போது மற்றொருவரால் பயன்படுத்தப்படுகிறது.\nதொடர்ந்து பயன்படுத்த New Registration மூலம் பதிவு செய்து கொள்ளவும்.');
+        }
         throw new Error('ACCESS DENIED: இந்த தரவை அணுக உங்களுக்கு அனுமதி இல்லை.');
       }
       throw new Error(d.error || ('HTTP ' + r.status));
