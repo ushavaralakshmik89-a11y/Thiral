@@ -6599,7 +6599,7 @@ function escapeHtmlAdmin(v){
     if(!postal())return;
     var en=lang()==='en', box=document.getElementById('actions'); if(!box)return;
     box.innerHTML='<h2 id="subTitle">📘 '+(en?'Post Office Guide Part-I • Full Volume':'அஞ்சல் வழிகாட்டி பகுதி-I • முழு தொகுதி')+'</h2>'+
-      '<p>'+(en?'Complete Post Office Guide Part-I question bank: all 339 questions.':'Post Office Guide Part-I-ன் முழு 339 கேள்விகளும் ஒரே தொகுதியாக.')+'</p>'+ 
+      '<p>'+(en?'Complete question bank: all 339 questions.':'முழுமையான கேள்வி வங்கி: மொத்தம் 339 கேள்விகள்.')+'</p>'+ 
       '<div class="grid"><button type="button" onclick="window.__THIRAL_GDS_POSTAL_V30_START(\'p\')">📚 '+(en?'Full Volume – 339 Questions':'முழு தொகுதி – 339 கேள்விகள்')+'</button></div>'+ 
       '<button type="button" class="secondary" onclick="show(\'topics\')">← '+(en?'Topics':'தலைப்புகள்')+'</button>';
     show('actions');
