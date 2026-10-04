@@ -6789,4 +6789,64 @@ function escapeHtmlAdmin(v){
   const oldSub=window.subtopic;window.subtopic=function(s){if(isPostal()&&(String(s)===PART1_TA||String(s)===PART1_EN||String(s)==='Post Office Guide Part-I'))return renderPart1();if(isPostal()&&String(s)===V_DB)return renderV();return typeof oldSub==='function'?oldSub.apply(this,arguments):undefined;};
 })();
 </script>
+
+<script id="thiral-gds-postal-language-authoritative-v27">
+(function(){
+  'use strict';
+  const EXAM='gds_to_mts';
+  const SUBJECT='gds_postal_rules';
+  const PART1_TA='அஞ்சல் வழிகாட்டி பகுதி-I';
+  const PART1_EN='Post Office Guide Part-I';
+  const V_TA='அஞ்சல் கையேடு தொகுதி-V';
+  const V_EN='Postal Manual Volume V';
+  function isPostal(){
+    return String(typeof selectedExam!=='undefined'?selectedExam:'')===EXAM &&
+           String(typeof currentSubject!=='undefined'?currentSubject:'')===SUBJECT;
+  }
+  function setLanguage(lang){
+    const L=String(lang||'ta').toLowerCase()==='en'?'en':'ta';
+    /* IMPORTANT: contentLanguage is the real lexical state used by the app.
+       Do not write only window.contentLanguage, because that leaves the
+       actual state unchanged and causes Tamil/English to cross over. */
+    try{ contentLanguage=L; }catch(e){}
+    window.contentLanguage=L;
+    try{ localStorage.setItem('tnpsc_content_language',L); }catch(e){}
+    const modal=document.getElementById('languageModal');
+    if(modal) modal.classList.add('hidden');
+    const label=document.getElementById('selectedLanguageLabel');
+    if(label) label.textContent=L==='en'?'English':'தமிழ்';
+    return L;
+  }
+  function renderPostalTopics(){
+    const en=(typeof contentLanguage!=='undefined' && contentLanguage==='en');
+    const title=document.getElementById('subjectTitle');
+    const grid=document.getElementById('topicGrid');
+    if(title) title.textContent=(en?'📮 Departmental Rules / Postal Department Rules & Knowledge':'📮 அஞ்சல் துறை விதிகள் / அறிவு')+' – Topics';
+    if(!grid) return;
+    const p=en?PART1_EN:PART1_TA;
+    const v=en?V_EN:V_TA;
+    const ep=p.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    const ev=v.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    grid.innerHTML='<button type="button" onclick="topic(\''+ep+'\')">📘 '+p+'</button>'+
+                   '<button type="button" onclick="topic(\''+ev+'\')">📗 '+v+'</button>';
+    if(typeof show==='function') show('topics');
+  }
+  const oldChoose=window.chooseContentLanguage;
+  window.chooseContentLanguage=function(lang){
+    if(!isPostal()){
+      return typeof oldChoose==='function'?oldChoose.apply(this,arguments):undefined;
+    }
+    setLanguage(lang);
+    try{ currentTopic=''; currentSub=''; }catch(e){}
+    window.pendingSubject=null;
+    renderPostalTopics();
+  };
+  window.__THIRAL_POSTAL_LANGUAGE_V27__={
+    authoritative:true,
+    usesLexicalContentLanguage:true,
+    exam:EXAM,
+    subject:SUBJECT
+  };
+})();
+</script>
 </body></html>
