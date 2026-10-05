@@ -215,6 +215,11 @@ function clearSessionCookie(res) {
   res.clearCookie('thiral_session', { httpOnly: true, secure: isProd, sameSite: 'strict', path: '/' });
 }
 
+/* ===== LEGACY DEVICE-BINDING DATA =====
+   login_device_hash / thiral_device are retained for backward compatibility,
+   but Student Login no longer rejects a correct password because of device
+   binding. Do not call enforceStudentDeviceBinding() from /auth/login.
+*/
 /* ===== ONE-STUDENT / ONE-DEVICE ACCOUNT BINDING =====
    Student credentials alone are not enough to move an account to another
    browser/device. The first successful student registration/login binds the
@@ -440,22 +445,15 @@ api.post('/auth/login', authLimiter, async (req, res) => {
       return sendError(res, 401, 'Invalid ID/email or password.');
     }
 
-    /* One student account = one registered browser/device. A second device
-       with the same email + password is rejected before a new session is made. */
-    if(u.role === 'STUDENT'){
-      const deviceCheck=await enforceStudentDeviceBinding({req,res,user:u});
-      if(!deviceCheck.ok){
-        await logSecurityEvent({
-          req,
-          eventType:'DEVICE_BINDING_BLOCKED',
-          userId:u.id,
-          email:u.email,
-          details:'Correct password used from an unregistered browser/device',
-          sendAlert:true
-        });
-        return sendError(res,403,'இந்த கணக்கு ஏற்கனவே ஒரு சாதனத்தில் பதிவு செய்யப்பட்டுள்ளது. வேறு சாதனத்தில் இந்த Email ID + Password மூலம் Login செய்ய முடியாது.');
-      }
-    }
+    /*
+     * Student login policy:
+     * Password verification is sufficient for Student Login.
+     * Do NOT block a correct password because of a previous browser/device.
+     *
+     * The old one-student/one-device check has intentionally been removed
+     * from the login path. Existing login_device_hash values may remain in
+     * the database, but they are no longer used to deny Student Login.
+     */
 
     const sid = newSessionId();
     await pool.query(`DELETE FROM sessions WHERE expires_at <= now()`);
@@ -1332,6 +1330,55 @@ api.post('/attempts/:id/submit', requirePasswordReady, async (req,res)=>{
   }catch(e){console.error(e);sendError(res,500,'Grading service error.');}
 });
 
+/* ===== Mock/Practice submitted-attempt review =====
+   Correct answers are returned only after the attempt is SUBMITTED and only
+   to the authenticated owner of that attempt. The live exam never receives
+   correct_option through the normal question-loading API.
+*/
+api.get('/attempts/:id/review', requirePasswordReady, async (req,res)=>{
+  try{
+    const id=Number(req.params.id);
+    if(!Number.isInteger(id)) return sendError(res,400,'Invalid attempt id.');
+
+    const a=await pool.query(
+      `SELECT id,status,question_ids
+         FROM attempts
+        WHERE id=$1 AND user_id=$2
+        LIMIT 1`,
+      [id,req.user.id]
+    );
+    if(!a.rowCount) return sendError(res,404,'Attempt not found.');
+    const attempt=a.rows[0];
+    if(attempt.status!=='SUBMITTED') return sendError(res,409,'Review is available only after submission.');
+
+    const ids=Array.isArray(attempt.question_ids) ? attempt.question_ids.map(Number).filter(Number.isInteger) : [];
+    if(!ids.length) return res.json({review:[]});
+
+    const q=await pool.query(
+      `SELECT id,correct_option,explanation
+         FROM questions
+        WHERE id=ANY($1::bigint[])`,
+      [ids]
+    );
+    const byId=new Map(q.rows.map(row=>[Number(row.id),row]));
+
+    res.json({
+      review:ids.map((qid,i)=>{
+        const row=byId.get(Number(qid));
+        return {
+          question_no:i+1,
+          question_id:Number(qid),
+          correct_option:row ? Number(row.correct_option) : null,
+          explanation:row ? String(row.explanation || '') : ''
+        };
+      })
+    });
+  }catch(e){
+    console.error('Attempt review error:',e);
+    sendError(res,500,'Review service error.');
+  }
+});
+
 api.get('/results', requirePasswordReady, async (req,res)=>{
   try{
     const q=await pool.query(`SELECT id,exam,subject,mode,language,score,correct_count,total_count,started_at,submitted_at FROM attempts WHERE user_id=$1 AND status='SUBMITTED' ORDER BY started_at DESC LIMIT 100`,[req.user.id]);
@@ -1376,8 +1423,269 @@ api.get('/admin/exam-results', requireAdmin, async (req,res)=>{
     const maxPct = req.query.max_pct === undefined || req.query.max_pct === '' ? 100 : Number(req.query.max_pct);
     const page = Math.max(parseInt(req.query.page || '1',10) || 1,1);
     const limit = Math.min(Math.max(parseInt(req.query.limit || '100',10) || 100,1),200);
+
     if(!Number.isFinite(minPct) || !Number.isFinite(maxPct) || minPct<0 || maxPct>100 || minPct>maxPct){
       return sendError(res,400,'Invalid percentage range.');
+    }
+
+    /*
+     * ALL EXAM TYPES:
+     * The legacy attempts table contains Practice / Mock / Question Bank /
+     * 10/20/50/100-question results, while Model Exam results live in
+     * model_exam_results. Previously type="" queried only attempts, so Model
+     * Exam disappeared when "அனைத்தும்" was selected.
+     *
+     * Keep the existing type-specific branches unchanged. When type is empty,
+     * fetch both sources, normalize them to the same row shape, merge, sort,
+     * paginate, and combine their summaries.
+     */
+    if(!type || type==='all'){
+      // ---------- Legacy attempts ----------
+      const legacyWhere=[`a.status='SUBMITTED'`];
+      const legacyParams=[];
+      const addLegacy=(sql,val)=>{legacyParams.push(val);legacyWhere.push(sql.replace('?', '$'+legacyParams.length));};
+
+      if(exam) addLegacy(`a.exam=?`,exam);
+      if(subjectFilter){
+        const subjectList=subjectCandidates(subjectFilter);
+        legacyWhere.push(`a.subject = ANY($${legacyParams.length+1}::text[])`);
+        legacyParams.push(subjectList);
+      }
+      if(from) addLegacy(`a.submitted_at::date >= ?::date`,from);
+      if(to) addLegacy(`a.submitted_at::date <= ?::date`,to);
+
+      if(requestedSubtopic){
+        legacyWhere.push(`EXISTS (
+          SELECT 1 FROM unnest(a.question_ids) AS aqid
+          JOIN questions qq ON qq.id=aqid
+          WHERE qq.subtopic = ANY($${legacyParams.length+1}::text[])
+        )`);
+        legacyParams.push(requestedSubtopicCandidatesSingle);
+      }else if(requestedSubtopics.length){
+        legacyWhere.push(`EXISTS (
+          SELECT 1 FROM unnest(a.question_ids) AS aqid
+          JOIN questions qq ON qq.id=aqid
+          WHERE qq.subtopic = ANY($${legacyParams.length+1}::text[])
+        )`);
+        legacyParams.push(requestedSubtopicCandidates);
+      }
+
+      legacyWhere.push(`COALESCE(a.score,0) >= $${legacyParams.length+1}`); legacyParams.push(minPct);
+      legacyWhere.push(`COALESCE(a.score,0) <= $${legacyParams.length+1}`); legacyParams.push(maxPct);
+
+      const legacySql=legacyWhere.join(' AND ');
+      const legacyRowsQ=await pool.query(`
+        SELECT
+          a.id AS attempt_id,
+          u.name,u.email,
+          a.exam,
+          CASE
+            WHEN lower(a.exam) LIKE '%model%' THEN 'Model Exam'
+            WHEN a.mode='mock' THEN 'Mock Test'
+            WHEN a.mode='bank' THEN 'Question Bank'
+            WHEN a.total_count=10 THEN '10 Questions'
+            WHEN a.total_count=20 THEN '20 Questions'
+            WHEN a.total_count=50 THEN '50 Questions'
+            WHEN a.total_count=100 THEN '100 Questions'
+            ELSE 'Practice'
+          END AS exam_type,
+          to_char(COALESCE(a.submitted_at,a.started_at),'DD-MM-YYYY HH24:MI') AS date,
+          COALESCE(a.total_count,0)::int AS questions,
+          COALESCE(a.correct_count,0)::int AS marks,
+          COALESCE(a.total_count,0)::int AS total_marks,
+          COALESCE(a.score,0)::numeric(10,2) AS percentage,
+          COALESCE((
+            SELECT string_agg(DISTINCT qq.subtopic, ' | ' ORDER BY qq.subtopic)
+            FROM unnest(a.question_ids) AS aqid
+            JOIN questions qq ON qq.id=aqid
+          ),'') AS subtopics,
+          COALESCE(a.submitted_at,a.started_at) AS sort_date
+        FROM attempts a
+        JOIN users u ON u.id=a.user_id
+        WHERE ${legacySql}
+      `,legacyParams);
+
+      // ---------- Model Exam results ----------
+      const modelWhere=[];
+      const modelParams=[];
+      const addModel=(sql,val)=>{modelParams.push(val);modelWhere.push(sql.replace('?', '$'+modelParams.length));};
+
+      if(exam) addModel(`(r.exam_id=? OR me.title=?)`,exam);
+      if(subjectFilter){
+        modelWhere.push(`EXISTS (
+          SELECT 1 FROM model_exam_questions mq
+          WHERE mq.exam_id=r.exam_id AND mq.subject = ANY($${modelParams.length+1}::text[])
+        )`);
+        modelParams.push(subjectCandidates(subjectFilter));
+      }
+      if(from) addModel(`r.submitted_at::date >= ?::date`,from);
+      if(to) addModel(`r.submitted_at::date <= ?::date`,to);
+
+      if(requestedSubtopic){
+        modelWhere.push(`EXISTS (
+          SELECT 1
+          FROM model_exam_questions mq
+          WHERE mq.exam_id=r.exam_id
+            AND mq.topic IS NOT NULL
+            AND (mq.topic = ANY($${modelParams.length+1}::text[]) OR mq.subject = ANY($${modelParams.length+1}::text[]))
+        )`);
+        modelParams.push(requestedSubtopicCandidatesSingle);
+      }else if(requestedSubtopics.length){
+        modelWhere.push(`EXISTS (
+          SELECT 1
+          FROM model_exam_questions mq
+          WHERE mq.exam_id=r.exam_id
+            AND (mq.topic = ANY($${modelParams.length+1}::text[]) OR mq.subject = ANY($${modelParams.length+1}::text[]))
+        )`);
+        modelParams.push(requestedSubtopicCandidates);
+      }
+
+      modelWhere.push(`COALESCE(r.percentage,0) >= $${modelParams.length+1}`); modelParams.push(minPct);
+      modelWhere.push(`COALESCE(r.percentage,0) <= $${modelParams.length+1}`); modelParams.push(maxPct);
+
+      const modelSql=modelWhere.length ? 'WHERE '+modelWhere.join(' AND ') : '';
+      const modelRowsQ=await pool.query(`
+        SELECT
+          r.attempt_id,
+          u.name,u.email,
+          me.title AS exam,
+          'Model Exam' AS exam_type,
+          to_char(r.submitted_at,'DD-MM-YYYY HH24:MI') AS date,
+          r.total_questions::int AS questions,
+          r.marks::numeric AS marks,
+          r.total_questions::numeric AS total_marks,
+          r.percentage::numeric(10,2) AS percentage,
+          '' AS subtopics,
+          r.submitted_at AS sort_date
+        FROM model_exam_results r
+        JOIN model_exams me ON me.exam_id=r.exam_id
+        JOIN users u ON u.id=r.user_id
+        ${modelSql}
+      `,modelParams);
+
+      const allRows=[
+        ...legacyRowsQ.rows.map(r=>({
+          ...r,
+          topic:[...new Set(String(r.subtopics||'').split(' | ').map(group4TopicForSubtopic).filter(Boolean))].join(' | ')
+        })),
+        ...modelRowsQ.rows.map(r=>({...r,topic:''}))
+      ].sort((a,b)=>new Date(b.sort_date||0)-new Date(a.sort_date||0));
+
+      const total=allRows.length;
+      const participants=new Set(allRows.map(r=>String(r.email||'').toLowerCase()).filter(Boolean)).size;
+      const totalQuestions=allRows.reduce((n,r)=>n+Number(r.questions||0),0);
+      const averagePct=total ? allRows.reduce((n,r)=>n+Number(r.percentage||0),0)/total : 0;
+      const highestPct=total ? Math.max(...allRows.map(r=>Number(r.percentage||0))) : 0;
+      const lowestPct=total ? Math.min(...allRows.map(r=>Number(r.percentage||0))) : 0;
+
+      const offset=(page-1)*limit;
+      const rows=allRows.slice(offset,offset+limit).map(({sort_date,...r})=>r);
+
+      // Union the exam dropdown values from both result stores.
+      const legacyExams=await pool.query(`SELECT DISTINCT a.exam FROM attempts a WHERE a.status='SUBMITTED' ORDER BY a.exam`);
+      const modelExams=await pool.query(`
+        SELECT DISTINCT me.exam_id,me.title
+        FROM model_exam_results r
+        JOIN model_exams me ON me.exam_id=r.exam_id
+        ORDER BY me.title
+      `);
+      const exams=[...new Set([
+        ...legacyExams.rows.map(x=>x.exam).filter(Boolean),
+        ...modelExams.rows.map(x=>x.exam_id||x.title).filter(Boolean)
+      ])];
+
+      return res.json({
+        ok:true,
+        rows,
+        total,
+        limit,
+        page,
+        exams,
+        summary:{
+          participants,
+          attempts:total,
+          total_questions:totalQuestions,
+          average_pct:Number(averagePct.toFixed(2)),
+          highest_pct:Number(highestPct.toFixed(2)),
+          lowest_pct:Number(lowestPct.toFixed(2))
+        }
+      });
+    }
+
+    // ---------- Existing type-specific result handling ----------
+    if(type === 'model'){
+      const w=[];
+      const p=[];
+      if(exam){
+        w.push(`(r.exam_id=$${p.length+1} OR me.title=$${p.length+1})`);
+        p.push(exam);
+      }
+      if(subjectFilter){
+        w.push(`EXISTS (SELECT 1 FROM model_exam_questions mq WHERE mq.exam_id=r.exam_id AND mq.subject=$${p.length+1})`);
+        p.push(subjectFilter);
+      }
+      if(from){ w.push(`r.submitted_at::date >= $${p.length+1}::date`); p.push(from); }
+      if(to){ w.push(`r.submitted_at::date <= $${p.length+1}::date`); p.push(to); }
+      w.push(`r.percentage >= $${p.length+1}`); p.push(minPct);
+      w.push(`r.percentage <= $${p.length+1}`); p.push(maxPct);
+
+      const whereModel=w.length ? 'WHERE '+w.join(' AND ') : '';
+      const count=await pool.query(`
+        SELECT count(*)::int AS total,
+               count(DISTINCT r.user_id)::int AS participants,
+               COALESCE(sum(r.total_questions),0)::bigint AS total_questions,
+               COALESCE(avg(r.percentage),0)::numeric(10,2) AS average_pct,
+               COALESCE(max(r.percentage),0)::numeric(10,2) AS highest_pct,
+               COALESCE(min(r.percentage),0)::numeric(10,2) AS lowest_pct
+        FROM model_exam_results r
+        JOIN model_exams me ON me.exam_id=r.exam_id
+        ${whereModel}
+      `,p);
+
+      const pp=p.slice();
+      pp.push(limit,(page-1)*limit);
+      const rows=await pool.query(`
+        SELECT r.attempt_id,
+               u.name,u.email,
+               me.title AS exam,
+               'Model Exam' AS exam_type,
+               to_char(r.submitted_at,'DD-MM-YYYY HH24:MI') AS date,
+               r.total_questions::int AS questions,
+               r.marks::numeric AS marks,
+               r.total_questions::numeric AS total_marks,
+               r.percentage::numeric(10,2) AS percentage,
+               '' AS topic,
+               '' AS subtopics
+        FROM model_exam_results r
+        JOIN model_exams me ON me.exam_id=r.exam_id
+        JOIN users u ON u.id=r.user_id
+        ${whereModel}
+        ORDER BY r.submitted_at DESC,r.id DESC
+        LIMIT $${pp.length-1} OFFSET $${pp.length}
+      `,pp);
+
+      const c=count.rows[0]||{};
+      const examsQ=await pool.query(`
+        SELECT DISTINCT me.exam_id,me.title
+        FROM model_exam_results r
+        JOIN model_exams me ON me.exam_id=r.exam_id
+        ORDER BY me.title
+      `);
+      return res.json({
+        ok:true,
+        rows:rows.rows,
+        total:Number(c.total||0),
+        limit,page,
+        exams:examsQ.rows.map(x=>x.exam_id||x.title).filter(Boolean),
+        summary:{
+          participants:Number(c.participants||0),
+          attempts:Number(c.total||0),
+          total_questions:Number(c.total_questions||0),
+          average_pct:Number(c.average_pct||0),
+          highest_pct:Number(c.highest_pct||0),
+          lowest_pct:Number(c.lowest_pct||0)
+        }
+      });
     }
 
     const where=[`a.status='SUBMITTED'`];
@@ -1408,6 +1716,7 @@ api.get('/admin/exam-results', requireAdmin, async (req,res)=>{
       WHEN a.total_count=10 THEN '10 Questions'
       WHEN a.total_count=20 THEN '20 Questions'
       WHEN a.total_count=50 THEN '50 Questions'
+      WHEN a.total_count=100 THEN '100 Questions'
       ELSE 'Practice'
     END`;
     if(type && ['model','mock','practice','bank','10','20','50','100'].includes(type)){
@@ -1444,6 +1753,186 @@ api.get('/admin/exam-results/export', requireAdmin, async (req,res)=>{
     const minPct=req.query.min_pct===''||req.query.min_pct===undefined?0:Number(req.query.min_pct);
     const maxPct=req.query.max_pct===''||req.query.max_pct===undefined?100:Number(req.query.max_pct);
     if(!Number.isFinite(minPct)||!Number.isFinite(maxPct)||minPct<0||maxPct>100||minPct>maxPct)return sendError(res,400,'Invalid percentage range.');
+
+    if(type === 'model'){
+      const w=[];
+      const p=[];
+      if(exam){
+        w.push(`(r.exam_id=$${p.length+1} OR me.title=$${p.length+1})`);
+        p.push(exam);
+      }
+      if(subjectFilter){
+        w.push(`EXISTS (SELECT 1 FROM model_exam_questions mq WHERE mq.exam_id=r.exam_id AND mq.subject=$${p.length+1})`);
+        p.push(subjectFilter);
+      }
+      if(from){ w.push(`r.submitted_at::date >= $${p.length+1}::date`); p.push(from); }
+      if(to){ w.push(`r.submitted_at::date <= $${p.length+1}::date`); p.push(to); }
+      w.push(`r.percentage >= $${p.length+1}`); p.push(minPct);
+      w.push(`r.percentage <= $${p.length+1}`); p.push(maxPct);
+
+      const whereModel=w.length ? 'WHERE '+w.join(' AND ') : '';
+      const q=await pool.query(`
+        SELECT u.name,u.email,
+               me.title AS exam,
+               'Model Exam' AS exam_type,
+               '' AS topic,
+               '' AS subtopics,
+               to_char(r.submitted_at,'DD-MM-YYYY HH24:MI') AS date,
+               r.total_questions::int AS questions,
+               r.marks::numeric AS marks,
+               r.total_questions::numeric AS total_marks,
+               r.percentage::numeric(10,2) AS percentage
+        FROM model_exam_results r
+        JOIN model_exams me ON me.exam_id=r.exam_id
+        JOIN users u ON u.id=r.user_id
+        ${whereModel}
+        ORDER BY r.submitted_at DESC,r.id DESC
+      `,p);
+
+      /*
+       * When Exam Type = All, append the legacy result sources to the same
+       * export. Model-only export remains unchanged when type='model'.
+       */
+      if(type === '' || type === 'all'){
+        const legacyWhere=[`a.status='SUBMITTED'`];
+        const legacyParams=[];
+        const addLegacy=(sql,val)=>{legacyParams.push(val);legacyWhere.push(sql.replace('?', '$'+legacyParams.length));};
+
+        if(exam) addLegacy(`a.exam=?`,exam);
+        if(subjectFilter){
+          const subjectList=subjectCandidates(subjectFilter);
+          legacyWhere.push(`a.subject = ANY($${legacyParams.length+1}::text[])`);
+          legacyParams.push(subjectList);
+        }
+        if(from) addLegacy(`a.submitted_at::date >= ?::date`,from);
+        if(to) addLegacy(`a.submitted_at::date <= ?::date`,to);
+        if(requestedSubtopic){
+          legacyWhere.push(`EXISTS (
+            SELECT 1 FROM unnest(a.question_ids) AS aqid
+            JOIN questions qq ON qq.id=aqid
+            WHERE qq.subtopic = ANY($${legacyParams.length+1}::text[])
+          )`);
+          legacyParams.push(requestedSubtopicCandidatesSingle);
+        }else if(requestedSubtopics.length){
+          legacyWhere.push(`EXISTS (
+            SELECT 1 FROM unnest(a.question_ids) AS aqid
+            JOIN questions qq ON qq.id=aqid
+            WHERE qq.subtopic = ANY($${legacyParams.length+1}::text[])
+          )`);
+          legacyParams.push(requestedSubtopicCandidates);
+        }
+        legacyWhere.push(`COALESCE(a.score,0) >= $${legacyParams.length+1}`); legacyParams.push(minPct);
+        legacyWhere.push(`COALESCE(a.score,0) <= $${legacyParams.length+1}`); legacyParams.push(maxPct);
+
+        const legacyTypeSql=`CASE
+          WHEN lower(a.exam) LIKE '%model%' THEN 'Model Exam'
+          WHEN a.mode='mock' THEN 'Mock Test'
+          WHEN a.mode='bank' THEN 'Question Bank'
+          WHEN a.total_count=10 THEN '10 Questions'
+          WHEN a.total_count=20 THEN '20 Questions'
+          WHEN a.total_count=50 THEN '50 Questions'
+          WHEN a.total_count=100 THEN '100 Questions'
+          ELSE 'Practice'
+        END`;
+
+        const legacyQ=await pool.query(`
+          SELECT u.name,u.email,a.exam,
+                 ${legacyTypeSql} AS exam_type,
+                 '' AS topic,
+                 COALESCE((
+                   SELECT string_agg(DISTINCT qq.subtopic, ' | ' ORDER BY qq.subtopic)
+                   FROM unnest(a.question_ids) AS aqid
+                   JOIN questions qq ON qq.id=aqid
+                 ),'') AS subtopics,
+                 to_char(COALESCE(a.submitted_at,a.started_at),'DD-MM-YYYY HH24:MI') AS date,
+                 COALESCE(a.total_count,0)::int AS questions,
+                 COALESCE(a.correct_count,0)::int AS marks,
+                 COALESCE(a.total_count,0)::int AS total_marks,
+                 COALESCE(a.score,0)::numeric(10,2) AS percentage
+          FROM attempts a
+          JOIN users u ON u.id=a.user_id
+          WHERE ${legacyWhere.join(' AND ')}
+          ORDER BY COALESCE(a.submitted_at,a.started_at) DESC,a.id DESC
+        `,legacyParams);
+
+        for(const r of legacyQ.rows){
+          r.topic=[...new Set(String(r.subtopics||'').split(' | ').map(group4TopicForSubtopic).filter(Boolean))].join(' | ');
+          q.rows.push(r);
+        }
+      }
+
+      /* Jump directly to the shared XLSX generator below. */
+      const escXml=v=>String(v??'')
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/\"/g,'&quot;').replace(/'/g,'&apos;');
+      const colName=n=>{
+        let z=''; n=Number(n)+1;
+        while(n){const rr=(n-1)%26;z=String.fromCharCode(65+rr)+z;n=Math.floor((n-1)/26);}
+        return z;
+      };
+      const inlineCell=(ref,value,style)=>{
+        const text=escXml(value);
+        return `<c r="${ref}" t="inlineStr"${style?` s="${style}"`:''}><is><t xml:space="preserve">${text}</t></is></c>`;
+      };
+      const numCell=(ref,value,style)=>`<c r="${ref}" t="n"${style?` s="${style}"`:''}><v>${Number(value)||0}</v></c>`;
+      const sheetXml=(rows)=>{
+        const headers=['Name','Email','Exam','Exam Type','Topic','Subtopics','Date','Questions','Marks','Total Marks','Percentage'];
+        const out=[];
+        out.push('<row r="1">'+headers.map((h,i)=>inlineCell(`${colName(i)}1`,h,1)).join('')+'</row>');
+        rows.forEach((r,ri)=>{
+          const rowNo=ri+2;
+          const vals=[r.name,r.email,r.exam,r.exam_type,r.topic,r.subtopics,r.date];
+          const cells=[];
+          vals.forEach((v,i)=>cells.push(inlineCell(`${colName(i)}${rowNo}`,v)));
+          cells.push(numCell(`H${rowNo}`,r.questions));
+          cells.push(numCell(`I${rowNo}`,r.marks));
+          cells.push(numCell(`J${rowNo}`,r.total_marks));
+          cells.push(numCell(`K${rowNo}`,r.percentage));
+          out.push(`<row r="${rowNo}">${cells.join('')}</row>`);
+        });
+        return `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"/></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols><col min="1" max="1" width="24"/><col min="2" max="2" width="32"/><col min="3" max="4" width="18"/><col min="5" max="6" width="28"/><col min="7" max="7" width="20"/><col min="8" max="11" width="14"/></cols><sheetData>${out.join('')}</sheetData><autoFilter ref="A1:K${Math.max(1,rows.length+1)}"/></worksheet>`;
+      };
+      const safeSheetName=(name,used)=>{
+        let n=String(name||'Model Exam').replace(/[\\\/\?\*\[\]:]/g,' ').trim()||'Model Exam';
+        n=n.slice(0,31); const base=n; let i=2;
+        while(used.has(n)){const suffix=` (${i++})`;n=base.slice(0,31-suffix.length)+suffix;}
+        used.add(n); return n;
+      };
+      const groups=new Map();
+      for(const r of q.rows){const key=String(r.exam||'Model Exam');if(!groups.has(key))groups.set(key,[]);groups.get(key).push(r);}
+      if(!groups.size)groups.set('No Results',[]);
+      const sheets=[];const rels=[];const content=[];const usedNames=new Set();let idx=1;
+      for(const [examName,rows] of groups.entries()){
+        const sheetName=safeSheetName(examName,usedNames);
+        sheets.push(`<sheet name="${escXml(sheetName)}" sheetId="${idx}" r:id="rId${idx}"/>`);
+        rels.push(`<Relationship Id="rId${idx}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${idx}.xml"/>`);
+        content.push(`<Override PartName="/xl/worksheets/sheet${idx}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`);
+        idx++;
+      }
+      const files=[
+        {name:'[Content_Types].xml',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${content.join('')}</Types>`},
+        {name:'_rels/.rels',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`},
+        {name:'xl/workbook.xml',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView/></bookViews><sheets>${sheets.join('')}</sheets></workbook>`},
+        {name:'xl/_rels/workbook.xml.rels',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${rels.join('')}<Relationship Id="rId${idx}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`},
+        {name:'xl/styles.xml',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="10"/><name val="Arial"/></font><font><b/><sz val="10"/><name val="Arial"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0"/></cellXfs></styleSheet>`}
+      ];
+      idx=1; for(const [examName,rows] of groups.entries()){files.push({name:`xl/worksheets/sheet${idx}.xml`,data:sheetXml(rows)});idx++;}
+      const crcTable=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1);t[n]=c>>>0;}return t;})();
+      const crc32=buf=>{let c=0xFFFFFFFF;for(const b of buf)c=crcTable[(c^b)&255]^(c>>>8);return(c^0xFFFFFFFF)>>>0;};
+      const zipParts=[];const central=[];let offset=0;const now=new Date();const dosTime=(now.getHours()<<11)|(now.getMinutes()<<5)|Math.floor(now.getSeconds()/2);const dosDate=((now.getFullYear()-1980)<<9)|((now.getMonth()+1)<<5)|now.getDate();
+      for(const f of files){
+        const nameBuf=Buffer.from(f.name,'utf8'),dataBuf=Buffer.from(f.data,'utf8'),crc=crc32(dataBuf);
+        const local=Buffer.alloc(30+nameBuf.length);local.writeUInt32LE(0x04034b50,0);local.writeUInt16LE(20,4);local.writeUInt16LE(0,6);local.writeUInt16LE(0,8);local.writeUInt16LE(dosTime,10);local.writeUInt16LE(dosDate,12);local.writeUInt32LE(crc,14);local.writeUInt32LE(dataBuf.length,18);local.writeUInt32LE(dataBuf.length,22);local.writeUInt16LE(nameBuf.length,26);local.writeUInt16LE(0,28);nameBuf.copy(local,30);zipParts.push(local,dataBuf);
+        const c=Buffer.alloc(46+nameBuf.length);c.writeUInt32LE(0x02014b50,0);c.writeUInt16LE(20,4);c.writeUInt16LE(20,6);c.writeUInt16LE(0,8);c.writeUInt16LE(0,10);c.writeUInt16LE(dosTime,12);c.writeUInt16LE(dosDate,14);c.writeUInt32LE(crc,16);c.writeUInt32LE(dataBuf.length,20);c.writeUInt32LE(dataBuf.length,24);c.writeUInt16LE(nameBuf.length,28);c.writeUInt16LE(0,30);c.writeUInt16LE(0,32);c.writeUInt16LE(0,34);c.writeUInt16LE(0,36);c.writeUInt16LE(0,38);c.writeUInt32LE(offset,42);nameBuf.copy(c,46);central.push(c);offset+=local.length+dataBuf.length;
+      }
+      const centralBuf=Buffer.concat(central);const end=Buffer.alloc(22);end.writeUInt32LE(0x06054b50,0);end.writeUInt16LE(0,4);end.writeUInt16LE(0,6);end.writeUInt16LE(files.length,8);end.writeUInt16LE(files.length,10);end.writeUInt32LE(centralBuf.length,12);end.writeUInt32LE(offset,16);
+      const xlsx=Buffer.concat([...zipParts,centralBuf,end]);
+      const filename=(type===''?'thiral_all_exam_results_':'thiral_model_exam_results_')+new Date().toISOString().slice(0,10)+'.xlsx';
+      res.setHeader('Content-Type','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition',`attachment; filename="${filename}"`);
+      res.setHeader('Content-Length',String(xlsx.length));
+      return res.end(xlsx);
+    }
 
     const where=[`a.status='SUBMITTED'`],params=[];
     const add=(sql,val)=>{params.push(val);where.push(sql.replace('?', '$'+params.length));};
@@ -1924,17 +2413,15 @@ app.use('/api/admin', async (req, res, next) => {
 });
 
 
-/* ===== GROUP 4 MOCK ROTATION API : SAFE QUALITY MODE =====
-   Only this Mock route is changed.
-   - 200 questions: 100 Tamil + 75 GS + 25 Aptitude.
-   - Never recycles a question for a student.
-   - Never uses the same question/content twice in one Mock.
-   - Excludes that student's previous Mock questions by ID and normalized content.
-   - Rejects malformed questions (missing text, not 4 options, invalid correct option).
-   - Prefers Moderate/Hard/Very Hard and concept/application questions.
-   - If the database does not have enough valid fresh questions, FAILS safely
-     instead of filling the Mock with recycled/weak/malformed questions.
-   - Does not delete or modify question-bank rows.
+/* ===== GROUP 4 MOCK ROTATION API =====
+   Final Group 4 Mock selector.
+   - Exactly 200 questions when the database has at least 200 unique unused rows.
+   - Q1-Q100 Tamil; Q101-Q200 = 75 GS + 25 Aptitude.
+   - Excludes this student's previous Mock history by both question ID and content.
+   - Removes duplicate content even when duplicate DB rows have different IDs/options order.
+   - Prefers Moderate/Hard/Very Hard questions and strongly penalizes short direct-fact items.
+   - Never deletes or rewrites question-bank rows.
+   - Practice 10/20/50/100 routes are not changed here.
 */
 api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
   const exam=String(req.query.exam||'').trim();
@@ -1946,16 +2433,42 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
   const client=await pool.connect();
   try{
     await client.query('BEGIN');
+
+    /* Prevent two simultaneous Mock starts for the same student from taking
+       overlapping fresh pools. */
     await client.query(
       `SELECT pg_advisory_xact_lock(hashtext($1))`,
       [`thiral-group4-mock:${req.user.id}`]
     );
 
     const specs=[
-      {name:'tamil',candidates:['tamil','தமிழ்'],language:'ta',required:100},
-      {name:'gs',candidates:['பொது அறிவு','General Knowledge','general knowledge','பொது அறிவு / General Studies','General Studies','general studies'],language:requestedLanguage,required:75},
-      {name:'apt',candidates:['apt','திறனறிவு / Aptitude','Aptitude','aptitude'],language:requestedLanguage,required:25}
+      {name:'tamil',candidates:['tamil','தமிழ்'],language:'ta'},
+      {name:'gs',candidates:['பொது அறிவு','General Knowledge','general knowledge','பொது அறிவு / General Studies','General Studies','general studies'],language:requestedLanguage},
+      {name:'apt',candidates:['apt','திறனறிவு / Aptitude','Aptitude','aptitude'],language:requestedLanguage}
     ];
+
+    const all=[];
+    for(const spec of specs){
+      const r=await client.query(
+        `SELECT id,exam,subject,subtopic,language,question,options,explanation,
+                COALESCE(to_jsonb(questions)->>'difficulty',to_jsonb(questions)->>'level','') AS difficulty
+           FROM questions
+          WHERE exam=$1
+            AND subject=ANY($2::text[])
+            AND language=$3
+            AND is_active=true
+            AND NOT EXISTS (
+              SELECT 1 FROM question_history h
+               WHERE h.user_id=$4
+                 AND h.question_id=questions.id
+                 AND h.mode='mock'
+            )
+          ORDER BY id
+          LIMIT 3000`,
+        [exam,spec.candidates,spec.language,req.user.id]
+      );
+      all.push(...r.rows.map(q=>({...q,_mockSubject:spec.name})));
+    }
 
     const normalizeText=(v)=>String(v??'')
       .normalize('NFKC')
@@ -1965,6 +2478,8 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
       .trim()
       .toLowerCase();
 
+    /* Content key intentionally sorts options, so changing A/B/C/D order does
+       not create a fake new question. */
     const contentKey=(q)=>{
       const qKey=normalizeText(q.question);
       const opts=Array.isArray(q.options)
@@ -1974,10 +2489,8 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
     };
     const questionOnlyKey=(q)=>normalizeText(q.question);
 
-    /* Pull prior Mock content for this student so duplicate DB rows cannot
-       reappear merely because their IDs/options differ. */
     const oldHistory=await client.query(
-      `SELECT q.id,q.question,q.options
+      `SELECT q.question,q.options
          FROM question_history h
          JOIN questions q ON q.id=h.question_id
         WHERE h.user_id=$1 AND h.mode='mock'`,
@@ -1991,79 +2504,17 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
       blockedQuestion.add(questionOnlyKey(q));
     }
 
-    const difficultyInfo=(q)=>{
-      const raw=String(q.difficulty||'').trim().toLowerCase();
-      const text=normalizeText(q.question);
-      const words=text.split(' ').filter(Boolean).length;
-      const directFact=/^(who|where|when|what is|what was|which is|which was|identify|name the|who was|where was|when was)\b/.test(text)
-        || /^(யார்|எவர்|எங்கு|எப்போது|எது|எவை|எந்த|அடையாளம் காண்க|பெயரிடுக)\b/.test(text);
-      const complex=/statement|statements|assertion|reason|cause|effect|match|matching|pair|sequence|arrange|order|select the correct|which of the following|கூற்று|கூற்றுகள்|காரணம்|விளைவு|பொருத்துக|வரிசை|சரியான இணை|பின்வருவனவற்றில் எவை|கீழ்கண்டவற்றுள்/.test(text);
-      const quantitative=/percentage|ratio|average|profit|loss|interest|discount|time and work|speed|distance|mixture|age|probability|data interpretation|series|equation|fraction|சதவீதம்|விகிதம்|சராசரி|இலாபம்|நட்டம்|வட்டி|தள்ளுபடி|வேலை|வேகம்|தூரம்|கலவை|வயது|நிகழ்தகவு|தரவு|வரிசை|சமன்பாடு|பின்னம்/.test(text);
-      const long=words>=24 || text.length>=125;
-      const optionText=Array.isArray(q.options)?q.options.map(normalizeText).join(' '):'';
-      const richOptions=optionText.split(' ').filter(Boolean).length>=18;
-      let score=0;
-      if(complex) score+=3;
-      if(quantitative) score+=3;
-      if(long) score+=2;
-      if(richOptions) score+=1;
-      if(directFact && !complex && !quantitative && words<18) score-=3;
-      let bucket=null;
-      if(/very\s*hard|veryhard|மிக\s*கடினம்|மிகக்கடினம்/.test(raw)) bucket=3;
-      else if(/\bhard\b|கடினம்/.test(raw)) bucket=2;
-      else if(/moderate|medium|normal|மிதமானது|சாதாரணம்/.test(raw)) bucket=1;
-      else if(/easy|basic|எளிது|அடிப்படை/.test(raw)) bucket=0;
-      if(bucket===3 && score<2 && directFact) bucket=1;
-      if(bucket===2 && score<1 && directFact) bucket=1;
-      if(bucket===null) bucket=score>=5?3:score>=3?2:score>=1?1:0;
-      const rank=(bucket*20)+(score*5)+(complex?3:0)+(quantitative?3:0)+(long?2:0);
-      return {bucket,rank};
-    };
-
-    const fetchRows=[];
-    for(const spec of specs){
-      const r=await client.query(
-        `SELECT id,exam,subject,subtopic,language,question,options,explanation,correct_option,
-                COALESCE(to_jsonb(questions)->>'difficulty',to_jsonb(questions)->>'level','') AS difficulty
-           FROM questions
-          WHERE exam=$1
-            AND subject=ANY($2::text[])
-            AND language=$3
-            AND is_active=true
-            AND correct_option IS NOT NULL
-            AND correct_option BETWEEN 0 AND 3
-          ORDER BY id
-          LIMIT 5000`,
-        [exam,spec.candidates,spec.language]
-      );
-      for(const q of r.rows) fetchRows.push({...q,_mockSubject:spec.name,_required:spec.required});
-    }
-
-    /* Strict structural/content sanity checks. This does not pretend to
-       fact-check the world; factual correctness still depends on the source
-       question bank. It does prevent broken answer indexes and malformed items. */
-    const valid=[];
-    for(const q of fetchRows){
-      const text=normalizeText(q.question);
-      const opts=Array.isArray(q.options) ? q.options.map(v=>String(v??'').trim()) : [];
-      if(!text || text.length<12) continue;
-      if(opts.length!==4) continue;
-      if(opts.some(v=>!normalizeText(v))) continue;
-      if(Number(q.correct_option)<0 || Number(q.correct_option)>3) continue;
+    /* Remove duplicates in the current fresh pool and also block previous
+       Mock content even when it exists under another database ID. */
+    const seenContent=new Set(blockedContent);
+    const seenQuestion=new Set(blockedQuestion);
+    const unique=[];
+    for(const q of all){
       const ck=contentKey(q);
       const qk=questionOnlyKey(q);
-      if(!ck || !qk || blockedContent.has(ck) || blockedQuestion.has(qk)) continue;
-      valid.push(q);
-    }
-
-    /* De-duplicate current pool globally, even when IDs differ. */
-    const seenContent=new Set();
-    const seenQuestion=new Set();
-    const unique=[];
-    for(const q of valid){
-      const ck=contentKey(q), qk=questionOnlyKey(q);
-      if(seenContent.has(ck) || seenQuestion.has(qk)) continue;
-      seenContent.add(ck); seenQuestion.add(qk);
+      if(!qk || seenContent.has(ck) || seenQuestion.has(qk)) continue;
+      seenContent.add(ck);
+      seenQuestion.add(qk);
       unique.push(q);
     }
 
@@ -2076,23 +2527,70 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
       return a;
     };
 
-    const selectBest=(rows,count)=>{
+    /* Difficulty is not inferred from the number of options. That was the
+       previous problem: four options do not magically make a Taj Mahal fact
+       question difficult. Explicit DB difficulty wins, but obvious direct-fact
+       questions are capped at Moderate unless their wording has real complexity. */
+    const difficultyInfo=(q)=>{
+      const raw=String(q.difficulty||'').trim().toLowerCase();
+      const text=normalizeText(q.question);
+      const words=text.split(' ').filter(Boolean).length;
+      const directFact=/^(who|where|when|what is|what was|which is|which was|identify|name the|who was|where was|when was)\b/.test(text)
+        || /^(யார்|எவர்|எங்கு|எப்போது|எது|எவை|எந்த|அடையாளம் காண்க|பெயரிடுக)\b/.test(text);
+      const complex=/statement|statements|assertion|reason|cause|effect|match|matching|pair|sequence|arrange|order|select the correct|which of the following|கூற்று|கூற்றுகள்|காரணம்|விளைவு|பொருத்துக|வரிசை|சரியான இணை|பின்வருவனவற்றில் எவை|கீழ்கண்டவற்றுள்/.test(text);
+      const quantitative=/percentage|ratio|average|profit|loss|interest|discount|time and work|speed|distance|mixture|age|probability|data interpretation|series|equation|fraction|சதவீதம்|விகிதம்|சராசரி|இலாபம்|நட்டம்|வட்டி|தள்ளுபடி|வேலை|வேகம்|தூரம்|கலவை|வயது|நிகழ்தகவு|தரவு|வரிசை|சமன்பாடு|பின்னம்/.test(text);
+      const long=words>=24 || text.length>=125;
+      const optionText=Array.isArray(q.options)?q.options.map(normalizeText).join(' '):'';
+      const richOptions=optionText.split(' ').filter(Boolean).length>=18;
+
+      let score=0;
+      if(complex) score+=3;
+      if(quantitative) score+=3;
+      if(long) score+=2;
+      if(richOptions) score+=1;
+      if(directFact && !complex && !quantitative && words<18) score-=3;
+
+      let bucket=null;
+      if(/very\s*hard|veryhard|மிக\s*கடினம்|மிகக்கடினம்/.test(raw)) bucket=3;
+      else if(/\bhard\b|கடினம்/.test(raw)) bucket=2;
+      else if(/moderate|medium|normal|மிதமானது|சாதாரணம்/.test(raw)) bucket=1;
+      else if(/easy|basic|எளிது|அடிப்படை/.test(raw)) bucket=0;
+
+      if(bucket===3 && score<2 && directFact) bucket=1;
+      if(bucket===2 && score<1 && directFact) bucket=1;
+      if(bucket===null){
+        bucket=score>=5?3:score>=3?2:score>=1?1:0;
+      }
+
+      /* A ranking score is also kept, so when a preferred bucket is short the
+         strongest available questions fill the remaining slots. */
+      const rank=(bucket*20)+(score*5)+(complex?3:0)+(quantitative?3:0)+(long?2:0);
+      return {bucket,rank};
+    };
+
+    const selectBest=(rows,count,quotas)=>{
       const meta=rows.map(q=>({q,info:difficultyInfo(q)}));
       const chosen=[];
       const used=new Set();
-      /* Target quality mix. If a bucket is short, fill by rank, never recycle. */
-      const quotas={3:Math.round(count*0.20),2:Math.round(count*0.60),1:Math.round(count*0.20)};
-      for(const bucket of [3,2,1]){
+
+      const takeBucket=(bucket,n)=>{
+        if(n<=0) return;
         meta.filter(x=>x.info.bucket===bucket)
           .sort((a,b)=>b.info.rank-a.info.rank || Math.random()-.5)
-          .forEach(x=>{
-            if(chosen.length>=count) return;
-            if(used.has(String(x.q.id))) return;
-            const current=chosen.filter(y=>difficultyInfo(y).bucket===bucket).length;
-            if(current>=quotas[bucket]) return;
+          .some(x=>{
+            if(chosen.length>=count || used.has(String(x.q.id))) return false;
             chosen.push(x.q); used.add(String(x.q.id));
+            return chosen.filter(y=>difficultyInfo(y).bucket===bucket).length>=n;
           });
-      }
+      };
+
+      /* Preferred distribution: Moderate 20%, Hard 60%, Very Hard 20%.
+         If the DB has fewer genuinely difficult questions, fill from the next
+         strongest unused questions instead of returning a broken Mock. */
+      takeBucket(3,quotas[3]||0);
+      takeBucket(2,quotas[2]||0);
+      takeBucket(1,quotas[1]||0);
+
       if(chosen.length<count){
         meta.sort((a,b)=>b.info.rank-a.info.rank || Math.random()-.5);
         for(const x of meta){
@@ -2105,36 +2603,106 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
       return chosen.slice(0,count);
     };
 
-    const tamilRows=unique.filter(q=>q._mockSubject==='tamil');
-    const gsRows=unique.filter(q=>q._mockSubject==='gs');
-    const aptRows=unique.filter(q=>q._mockSubject==='apt');
+    let tamilRows=unique.filter(q=>q._mockSubject==='tamil');
+    let gsRows=unique.filter(q=>q._mockSubject==='gs');
+    let aptRows=unique.filter(q=>q._mockSubject==='apt');
 
-    /* No recycling. If the live bank is short, tell the student/admin exactly
-       what is missing instead of showing repeated questions. */
-    if(tamilRows.length<100 || gsRows.length<75 || aptRows.length<25){
+    /* If this student has already consumed the fresh pool, do not leave the
+       Mock screen empty. Reuse old Mock questions only after the fresh pool
+       for that subject is exhausted. The current Mock still avoids duplicate
+       content until its unique pool is exhausted. */
+    const need={tamil:100,gs:75,apt:25};
+    const freshCount={tamil:tamilRows.length,gs:gsRows.length,apt:aptRows.length};
+    if(freshCount.tamil<100 || freshCount.gs<75 || freshCount.apt<25){
+      const recycleAll=[];
+      for(const spec of specs){
+        const r=await client.query(
+          `SELECT id,exam,subject,subtopic,language,question,options,explanation,
+                  COALESCE(to_jsonb(questions)->>'difficulty',to_jsonb(questions)->>'level','') AS difficulty
+             FROM questions
+            WHERE exam=$1
+              AND subject=ANY($2::text[])
+              AND language=$3
+              AND is_active=true
+            ORDER BY id
+            LIMIT 5000`,
+          [exam,spec.candidates,spec.language]
+        );
+        recycleAll.push(...r.rows.map(q=>({...q,_mockSubject:spec.name})));
+      }
+
+      const addRecycled=(name,current,required)=>{
+        if(current.length>=required) return current;
+        const localSeen=new Set(current.map(contentKey));
+        for(const q of recycleAll){
+          if(q._mockSubject!==name) continue;
+          const ck=contentKey(q);
+          if(!ck || localSeen.has(ck)) continue;
+          localSeen.add(ck);
+          current.push(q);
+          if(current.length>=required) break;
+        }
+        return current;
+      };
+
+      tamilRows=addRecycled('tamil',tamilRows,100);
+      gsRows=addRecycled('gs',gsRows,75);
+      aptRows=addRecycled('apt',aptRows,25);
+    }
+
+    /* A Mock must contain 200 slots. If a subject has fewer than its required
+       number of unique questions even after recycling, cycle only after that
+       subject's unique pool is exhausted. This prevents an empty Mock while
+       preserving uniqueness for as long as the database permits. */
+    const cycleTo=(rows,count)=>{
+      if(!rows.length) return [];
+      const out=[];
+      for(let i=0;i<count;i++) out.push(rows[i%rows.length]);
+      return out;
+    };
+
+    const tamilSelected=selectBest(tamilRows,Math.min(100,tamilRows.length),{1:20,2:60,3:20});
+    const gsSelected=selectBest(gsRows,Math.min(75,gsRows.length),{1:15,2:45,3:15});
+    const aptSelected=selectBest(aptRows,Math.min(25,aptRows.length),{1:5,2:15,3:5});
+
+    const tamilFinal=tamilSelected.length>=100?tamilSelected:cycleTo(tamilRows,100);
+    const gsFinal=gsSelected.length>=75?gsSelected:cycleTo(gsRows,75);
+    const aptFinal=aptSelected.length>=25?aptSelected:cycleTo(aptRows,25);
+
+    if(!tamilFinal.length || !gsFinal.length || !aptFinal.length){
       await client.query('ROLLBACK');
       return sendError(res,409,
-        `தரமான புதிய Mock கேள்விகள் போதவில்லை. தமிழ்: ${tamilRows.length}/100, GS: ${gsRows.length}/75, Aptitude: ${aptRows.length}/25. கேள்விகளை மீண்டும் பயன்படுத்தாமல் புதிய கேள்விகள் தேவை.`
+        `Mock-க்கு தேவையான கேள்விகள் இல்லை. தமிழ்: ${tamilRows.length}, GS: ${gsRows.length}, Aptitude: ${aptRows.length}.` 
       );
     }
 
-    const tamilSelected=selectBest(tamilRows,100);
-    const gsSelected=selectBest(gsRows,75);
-    const aptSelected=selectBest(aptRows,25);
-
-    /* Final duplicate guard after selection. */
-    const finalSeen=new Set();
-    const selected=[];
-    for(const q of [...shuffle(tamilSelected),...shuffle(gsSelected),...shuffle(aptSelected)]){
-      const ck=contentKey(q);
-      if(finalSeen.has(ck)) continue;
-      finalSeen.add(ck);
-      selected.push(q);
+    /* Aptitude gets a second diversity pass across subtopics, without allowing
+       a weaker question to displace a much stronger one unnecessarily. */
+    const aptBySub=new Map();
+    for(const q of aptSelected){
+      const k=normalizeText(q.subtopic)||'__no_subtopic__';
+      if(!aptBySub.has(k)) aptBySub.set(k,[]);
+      aptBySub.get(k).push(q);
     }
+    const aptTopics=shuffle(Array.from(aptBySub.keys()));
+    const aptMixed=[];
+    let more=true;
+    while(more){
+      more=false;
+      for(const k of aptTopics){
+        const arr=aptBySub.get(k);
+        if(arr&&arr.length){aptMixed.push(arr.shift());more=true;}
+      }
+    }
+
+    const selected=[
+      ...shuffle(tamilFinal).slice(0,100),
+      ...shuffle([...gsFinal.slice(0,75),...aptMixed.slice(0,25)])
+    ];
 
     if(selected.length!==200){
       await client.query('ROLLBACK');
-      return sendError(res,409,'Mock Test-ல் 200 தனித்துவமான கேள்விகளை உருவாக்க முடியவில்லை. கேள்விகளை மீண்டும் பயன்படுத்தாமல் புதிய கேள்விகள் தேவை.');
+      return sendError(res,500,'Mock Test-க்கு 200 கேள்விகளை உருவாக்க முடியவில்லை.');
     }
 
     const clean=selected.map(q=>Number(q.id));
@@ -2159,8 +2727,7 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
       attemptId:ins.rows[0].id,
       questions:selected,
       count:200,
-      recycled:0,
-      qualityPolicy:'SAFE_QUALITY_NO_RECYCLING'
+      recycled:0
     });
   }catch(e){
     try{await client.query('ROLLBACK');}catch(_){ }
