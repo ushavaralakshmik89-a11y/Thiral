@@ -4541,6 +4541,41 @@ function stop(){if(P.timer){clearInterval(P.timer);P.timer=null;}}
 function tick(n){if($('timer'))$('timer').textContent=String(Math.max(0,n));}
 function startTimer(){stop();P.seconds=15;tick(15);P.timer=setInterval(()=>{P.seconds--;tick(P.seconds);if(P.seconds<=0){stop();answer(-1,true);}},1000);}
 function lockButtons(v){if(!$('options'))return;$('options').querySelectorAll('button').forEach(b=>b.disabled=v);}
+function ensurePracticeNav(){
+ const p=$('options');if(!p)return;
+ let n=$('thiralPracticeNavFinal');
+ if(!n){
+  n=document.createElement('div');
+  n.id='thiralPracticeNavFinal';
+  n.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:16px;';
+  p.parentNode.insertBefore(n,p.nextSibling);
+ }
+ const isEn=(typeof contentLanguage!=='undefined'&&contentLanguage==='en');
+ n.innerHTML=
+  '<button type="button" class="secondary" id="thiralPracticePrevFinal">← '+(isEn?'Previous':'முந்தைய')+'</button>'+
+  '<div style="display:flex;gap:4px;align-items:center;">'+
+   '<button type="button" id="thiralPracticeNextFinal">'+(isEn?'Next →':'அடுத்து →')+'</button>'+
+   '<button type="button" id="thiralPracticeSubmitFinal">'+(isEn?'Submit':'சமர்ப்பிக்க')+'</button>'+
+  '</div>';
+ $('thiralPracticePrevFinal').disabled=P.index===0;
+ $('thiralPracticeNextFinal').disabled=P.index===P.questions.length-1;
+ $('thiralPracticePrevFinal').onclick=function(){
+  if(P.busy||P.submitted||P.index<=0)return;
+  P.index--;
+  render();
+ };
+ $('thiralPracticeNextFinal').onclick=function(){
+  if(P.busy||P.submitted)return;
+  if(P.index<P.questions.length-1){
+   P.index++;
+   render();
+  }
+ };
+ $('thiralPracticeSubmitFinal').onclick=function(){
+  if(P.busy||P.submitted)return;
+  submit();
+ };
+}
 function render(){
  const q=P.questions[P.index];if(!q)return;stop();P.busy=false;
  if($('level'))$('level').textContent=q.difficulty||q.d||'சாதாரணம்';
@@ -4549,6 +4584,7 @@ function render(){
  if($('question'))$('question').textContent=qtext(q);
  if($('feedback'))$('feedback').innerHTML='';
  if($('options'))$('options').innerHTML=opts(q).map((o,i)=>'<button class="option" type="button" onclick="window.__thiralPracticeAnswer('+i+',false)">'+String.fromCharCode(65+i)+'. '+esc(o)+'</button>').join('');
+ ensurePracticeNav();
  startTimer();
 }
 async function answer(n,timedOut){
@@ -4587,7 +4623,7 @@ async function start(n){
 }
 window.startPractice=start;
 window.__thiralPracticeAnswer=answer;
-window.__thiralPracticeNext=function(){if(P.busy||P.submitted)return;const q=P.questions[P.index];if(!q||!P.checks[String(q.id)])return;if(P.index<P.questions.length-1){P.index++;render();}else submit();};
+window.__thiralPracticeNext=function(){if(P.busy||P.submitted)return;if(P.index<P.questions.length-1){P.index++;render();}else submit();};
 async function submit(){if(P.submitted||!P.attemptId)return;P.submitted=true;stop();try{
  const d=await api()('/attempts/'+P.attemptId+'/submit',{method:'POST',body:JSON.stringify({answers:P.answers})});
  const total=Number(d.total||P.questions.length),correct=Number(d.correct||0),unanswered=Object.values(P.answers).filter(v=>Number(v)===-1).length,wrong=Math.max(0,total-correct-unanswered),score=d.score!=null?Number(d.score):Math.round(correct*100/Math.max(1,total));
@@ -4627,36 +4663,6 @@ async function api(path,init={}){
 function stop(){if(T.timer){clearInterval(T.timer);T.timer=null;}}
 function timer(n){if($('timer'))$('timer').textContent=String(Math.max(0,n));}
 function lock(v){if($('options'))$('options').querySelectorAll('button').forEach(b=>b.disabled=v);}
-function ensurePracticeNav(){
-  var p=$('options');
-  if(!p)return;
-  var n=$('thiralPracticeNavFinal');
-  if(!n){
-    n=document.createElement('div');
-    n.id='thiralPracticeNavFinal';
-    n.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:16px;';
-    p.parentNode.insertBefore(n,p.nextSibling);
-  }
-  n.innerHTML=
-    '<button type="button" class="secondary" id="thiralPracticePrevFinal">← '+(lang()==='en'?'Previous':'முந்தைய')+'</button>'+
-    '<div style="display:flex;gap:4px;align-items:center;">'+
-      '<button type="button" id="thiralPracticeNextFinal">'+(lang()==='en'?'Next →':'அடுத்து →')+'</button>'+
-      '<button type="button" id="thiralPracticeSubmitFinal">'+(lang()==='en'?'Submit':'சமர்ப்பிக்க')+'</button>'+
-    '</div>';
-  $('thiralPracticePrevFinal').disabled=T.i===0;
-  $('thiralPracticeNextFinal').disabled=!T.checks[String(T.q[T.i]?.id)] || T.i===T.q.length-1;
-  $('thiralPracticePrevFinal').onclick=function(){
-    if(T.busy||T.submitted||T.i<=0)return;
-    T.i--;
-    render();
-  };
-  $('thiralPracticeNextFinal').onclick=function(){
-    window.__THIRAL_FINAL_NEXT();
-  };
-  $('thiralPracticeSubmitFinal').onclick=function(){
-    submit();
-  };
-}
 function render(){
   const q=T.q[T.i]; if(!q)return;
   stop(); T.busy=false;
@@ -4669,7 +4675,6 @@ function render(){
     '<button class="option" type="button" onclick="window.__THIRAL_FINAL_ANSWER('+j+')">'+
     String.fromCharCode(65+j)+'. '+esc(o)+'</button>'
   ).join('');
-  ensurePracticeNav();
   T.seconds=15; timer(15);
   T.timer=setInterval(()=>{
     T.seconds--; timer(T.seconds);
