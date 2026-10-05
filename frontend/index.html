@@ -6873,4 +6873,40 @@ function escapeHtmlAdmin(v){
 })();
 </script>
 
+
+<script id="thiral-gs51-frontend-alias">
+(function () {
+  const GS51_DB_ALIASES_EN = {
+    "Early Uprisings against British Rule": "Early Resistance to British Rule",
+    "Early Agitations against British Rule": "Early Resistances to British Rule",
+    "Role of Tamil Nadu in Freedom Struggle": "Role of Tamil Nadu in the Freedom Struggle",
+    "Industrial Growth": "Industrial Development",
+    "Rural Welfare Programmes": "Rural Welfare Schemes",
+    "Population and Social Problems": "Population and Social Issues",
+    "Government Welfare Schemes in Tamil Nadu": "Tamil Nadu Government Welfare Schemes",
+    "Geography of Tamil Nadu and Economic Growth": "Geography and Economic Development of Tamil Nadu",
+    "Current Socio-Economic Affairs": "Current Socio-Economic Events"
+  };
+
+  window.THIRAL_GS51_DB_ALIASES_EN = GS51_DB_ALIASES_EN;
+
+  const originalFetch = window.fetch;
+  window.fetch = function(input, init) {
+    try {
+      const url = typeof input === "string" ? input : (input && input.url);
+      if (url && url.includes("/questions?")) {
+        const u = new URL(url, window.location.href);
+        const subtopic = u.searchParams.get("subtopic");
+        const mapped = GS51_DB_ALIASES_EN[subtopic];
+        if (mapped) {
+          u.searchParams.set("subtopic", mapped);
+          input = u.toString();
+        }
+      }
+    } catch (_) {}
+    return originalFetch.call(this, input, init);
+  };
+})();
+</script>
+
 </body></html>
