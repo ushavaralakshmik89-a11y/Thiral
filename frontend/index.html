@@ -6655,7 +6655,7 @@ function escapeHtmlAdmin(v){
   function ensureNav(){
     var p=$('options'); if(!p)return;
     var n=$('thiralPostalNavV7'); if(!n){n=document.createElement('div');n.id='thiralPostalNavV7';n.className='top';n.style.marginTop='18px';p.parentNode.insertBefore(n,p.nextSibling);}
-    n.innerHTML='<button type="button" class="secondary" id="thiralPostalPrevV7">← '+(en()?'Previous':'முந்தைய')+'</button><div style="display:flex;gap:10px;align-items:center"><button type="button" id="thiralPostalNextV7">'+(en()?'Next →':'அடுத்து →')+'</button><button type="button" id="thiralPostalSubmitV7">'+(en()?'Submit':'சமர்ப்பிக்க')+'</button></div>';
+    n.innerHTML='<button type="button" class="secondary" id="thiralPostalPrevV7">← '+(en()?'Previous':'முந்தைய')+'</button><div style="display:flex;gap:4px;align-items:center"><button type="button" id="thiralPostalNextV7">'+(en()?'Next →':'அடுத்து →')+'</button><button type="button" id="thiralPostalSubmitV7">'+(en()?'Submit':'சமர்ப்பிக்க')+'</button></div>';
     $('thiralPostalPrevV7').onclick=function(){prev();}; $('thiralPostalNextV7').onclick=function(){next();}; $('thiralPostalSubmitV7').onclick=function(){submit();};
   }
   function render(){
