@@ -1165,11 +1165,11 @@ api.get('/practice/questions', requirePasswordReady, async (req, res) => {
       return sendError(res, 400, 'Invalid question request.');
     }
 
+    const examSqlCandidates = normalizedSqlCandidates(examCandidatesList);
+    const subjectSqlCandidates = normalizedSqlCandidates(subjectCandidatesList);
     const params = [req.user.id, examSqlCandidates, subjectSqlCandidates, language.toLowerCase()];
     let n = 5;
 
-    const examSqlCandidates = normalizedSqlCandidates(examCandidatesList);
-    const subjectSqlCandidates = normalizedSqlCandidates(subjectCandidatesList);
     let where = `
       LOWER(BTRIM(q.exam)) = ANY($2::text[])
       AND LOWER(BTRIM(q.subject)) = ANY($3::text[])
