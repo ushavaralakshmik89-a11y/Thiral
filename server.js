@@ -1181,7 +1181,28 @@ api.get('/practice/questions', requirePasswordReady, async (req, res) => {
       AND q.is_active = true
     `;
 
-    const subCandidates = subtopicCandidates(subtopic);
+    const NEW_TAMIL_G4_APT_MAP = {
+      'எளிமைப்படுத்துதல்': 'எளிமைப்படுத்தல்',
+      'மீ.பொ.வ (HCF)': 'மீ.பெ.வ',
+      'மீ.சி.ம (LCM)': 'மீ.சி.பொ.ம',
+      'எளிய வட்டி': 'தனிவட்டி',
+      'கூட்டு வட்டி': 'கூட்டு வட்டி',
+      'தர்க்க சிந்தனை': 'தர்க்கரீதியான சிந்தனை',
+      'புதிர்கள்': 'புதிர்கள்',
+      'பகடை': 'பகடை',
+      'காட்சித் தர்க்கம்': 'காட்சித் தர்க்கம்',
+      'எண்-எழுத்து தர்க்கம்': 'எழுத்து-எண் தர்க்கம்'
+    };
+
+    const isNewTamil =
+      exam === 'group4' &&
+      subject === 'apt' &&
+      language === 'ta' &&
+      Object.prototype.hasOwnProperty.call(NEW_TAMIL_G4_APT_MAP, subtopic);
+
+    const subCandidates = isNewTamil
+      ? [NEW_TAMIL_G4_APT_MAP[subtopic]]
+      : subtopicCandidates(subtopic);
     if (subCandidates.length === 1) {
       where += ` AND q.subtopic = $${n}`;
       params.push(subCandidates[0]);
