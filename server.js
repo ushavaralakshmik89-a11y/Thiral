@@ -190,23 +190,32 @@ function subjectCandidates(raw){
     .map(([label])=>label);
   return [...new Set([canonical,s,...aliases].filter(Boolean))];
 }
-const GROUP4_TAMIL_NEW_SUBTOPIC_ALIASES = {
-  'எளிமைப்படுத்துதல்':'எளிமைப்படுத்தல்',
-  'மீ.பொ.வ (HCF)':'மீ.பெ.வ',
-  'மீ.சி.ம (LCM)':'மீ.சி.பொ.ம',
-  'எளிய வட்டி':'தனிவட்டி',
-  'கூட்டு வட்டி':'கூட்டு வட்டி',
-  'தர்க்க சிந்தனை':'தர்க்கரீதியான சிந்தனை',
-  'புதிர்கள்':'புதிர்கள்',
-  'பகடை':'பகடை',
-  'காட்சித் தர்க்கம்':'காட்சித் தர்க்கம்',
-  'எண்-எழுத்து தர்க்கம்':'எழுத்து-எண் தர்க்கம்'
+const NEW_GS_EN_SUBTOPIC_ALIASES = {
+  'Early Uprisings against British Rule':'Early Resistance to British Rule',
+  'Early Agitations against British Rule':'Early Resistances to British Rule',
+  'Role of Tamil Nadu in Freedom Struggle':'Role of Tamil Nadu in the Freedom Struggle',
+  'Industrial Growth':'Industrial Development',
+  'Rural Welfare Programmes':'Rural Welfare Schemes',
+  'Population and Social Problems':'Population and Social Issues',
+  'Government Welfare Schemes in Tamil Nadu':'Tamil Nadu Government Welfare Schemes',
+  'Geography of Tamil Nadu and Economic Growth':'Geography and Economic Development of Tamil Nadu',
+  'Current Socio-Economic Affairs':'Current Socio-Economic Events'
 };
 
+function normalizeExamForDb(raw){
+  const s=String(raw||'').normalize('NFKC').trim().replace(/\s+/g,' ');
+  if(!s) return '';
+  return s.toLowerCase() === 'group4' ? 'Group 4' : s;
+}
+
 function subtopicCandidates(raw){
-  const s=String(raw||'').trim();
+  const s=String(raw||'').normalize('NFKC').trim().replace(/\s+/g,' ');
   if(!s) return [];
-  const a=[s, GROUP4_SUBTOPIC_ALIASES[s] || '', GROUP4_TAMIL_NEW_SUBTOPIC_ALIASES[s] || ''];
+  const a=[
+    s,
+    GROUP4_SUBTOPIC_ALIASES[s] || '',
+    NEW_GS_EN_SUBTOPIC_ALIASES[s] || ''
+  ];
   return [...new Set(a.filter(Boolean))];
 }
 
@@ -1061,7 +1070,7 @@ api.post('/auth/logout', async (req, res) => {
 
 api.get('/questions', requirePasswordReady, async (req, res) => {
   try {
-    const exam = String(req.query.exam || '').trim();
+    const exam = normalizeExamForDb(req.query.exam);
     const rawSubject = String(req.query.subject || '').trim();
     const subject = canonicalSubject(rawSubject);
     const subjectCandidatesList = subjectCandidates(rawSubject);
@@ -1072,45 +1081,10 @@ api.get('/questions', requirePasswordReady, async (req, res) => {
     const offset = Math.max(parseInt(req.query.offset || '0',10) || 0,0);
     if (!exam || !subject || !['ta','en'].includes(language)) return sendError(res,400,'Invalid question request.');
 
-    /*
-       ISOLATED FIX: NEW TAMIL GROUP 4 APTITUDE TOPICS ONLY.
-       Every existing Tamil path, every English path, and every other subject
-       keeps the original query logic. This special branch activates only for
-       the ten newly imported Tamil Aptitude topics.
-    */
-    const NEW_TAMIL_G4_APT_MAP = {
-      'எளிமைப்படுத்துதல்':'எளிமைப்படுத்தல்',
-      'மீ.பொ.வ (HCF)':'மீ.பெ.வ',
-      'மீ.சி.ம (LCM)':'மீ.சி.பொ.ம',
-      'எளிய வட்டி':'தனிவட்டி',
-      'கூட்டு வட்டி':'கூட்டு வட்டி',
-      'தர்க்க சிந்தனை':'தர்க்கரீதியான சிந்தனை',
-      'புதிர்கள்':'புதிர்கள்',
-      'பகடை':'பகடை',
-      'காட்சித் தர்க்கம்':'காட்சித் தர்க்கம்',
-      'எண்-எழுத்து தர்க்கம்':'எழுத்து-எண் தர்க்கம்'
-    };
-
-    const isNewTamilG4Apt =
-      exam === 'group4' &&
-      subject === 'apt' &&
-      language === 'ta' &&
-      Object.prototype.hasOwnProperty.call(NEW_TAMIL_G4_APT_MAP, subtopic);
-
-    /* Existing requests retain the original exact exam/subject behavior. */
-    const where = isNewTamilG4Apt
-      ? ['exam = ANY($1::text[])','subject = ANY($2::text[])','language=$3','is_active=true']
-      : ['exam=$1','subject = ANY($2::text[])','language=$3','is_active=true'];
-
-    const params = isNewTamilG4Apt
-      ? [['group4','Group 4','Group4'], ['apt','Aptitude'], language]
-      : [exam, subjectCandidatesList, language];
-
+    const where = ['exam=$1','subject = ANY($2::text[])','language=$3','is_active=true'];
+    const params = [exam, subjectCandidatesList, language];
     let n = 4;
-    const subCandidates = isNewTamilG4Apt
-      ? [NEW_TAMIL_G4_APT_MAP[subtopic]]
-      : subtopicCandidates(subtopic);
-
+    const subCandidates = subtopicCandidates(subtopic);
     if (subCandidates.length === 1) {
       where.push(`subtopic=$${n++}`); params.push(subCandidates[0]);
     } else if (subCandidates.length > 1) {
@@ -1156,7 +1130,7 @@ api.get('/questions', requirePasswordReady, async (req, res) => {
 */
 api.get('/practice/questions', requirePasswordReady, async (req, res) => {
   try {
-    const exam = String(req.query.exam || '').trim();
+    const exam = normalizeExamForDb(req.query.exam);
     const rawSubject = String(req.query.subject || '').trim();
     const subject = canonicalSubject(rawSubject);
     const subjectCandidatesList = subjectCandidates(rawSubject);
@@ -1171,41 +1145,17 @@ api.get('/practice/questions', requirePasswordReady, async (req, res) => {
       return sendError(res, 400, 'Invalid question request.');
     }
 
-    const NEW_TAMIL_G4_APT_MAP = {
-      'எளிமைப்படுத்துதல்':'எளிமைப்படுத்தல்',
-      'மீ.பொ.வ (HCF)':'மீ.பெ.வ',
-      'மீ.சி.ம (LCM)':'மீ.சி.பொ.ம',
-      'எளிய வட்டி':'தனிவட்டி',
-      'கூட்டு வட்டி':'கூட்டு வட்டி',
-      'தர்க்க சிந்தனை':'தர்க்கரீதியான சிந்தனை',
-      'புதிர்கள்':'புதிர்கள்',
-      'பகடை':'பகடை',
-      'காட்சித் தர்க்கம்':'காட்சித் தர்க்கம்',
-      'எண்-எழுத்து தர்க்கம்':'எழுத்து-எண் தர்க்கம்'
-    };
-
-    const isNewTamilG4Apt =
-      exam === 'group4' &&
-      subject === 'apt' &&
-      language === 'ta' &&
-      Object.prototype.hasOwnProperty.call(NEW_TAMIL_G4_APT_MAP, subtopic);
-
-    const params = isNewTamilG4Apt
-      ? [req.user.id, ['group4','Group 4','Group4'], ['apt','Aptitude'], language]
-      : [req.user.id, exam, subjectCandidatesList, language];
-
+    const params = [req.user.id, exam, subjectCandidatesList, language];
     let n = 5;
 
     let where = `
-      q.exam ${isNewTamilG4Apt ? '= ANY($2::text[])' : '= $2'}
+      q.exam = $2
       AND q.subject = ANY($3::text[])
       AND q.language = $4
       AND q.is_active = true
     `;
 
-    const subCandidates = isNewTamilG4Apt
-      ? [NEW_TAMIL_G4_APT_MAP[subtopic]]
-      : subtopicCandidates(subtopic);
+    const subCandidates = subtopicCandidates(subtopic);
     if (subCandidates.length === 1) {
       where += ` AND q.subtopic = $${n}`;
       params.push(subCandidates[0]);
@@ -1400,6 +1350,55 @@ api.post('/attempts/:id/submit', requirePasswordReady, async (req,res)=>{
     await pool.query(`INSERT INTO activity_events(user_id,event_type,metadata) VALUES($1,'ATTEMPT_SUBMITTED',$2)`,[req.user.id,JSON.stringify({attempt_id:id,mode:attempt.mode,exam:attempt.exam,score,used_questions:total,unanswered})]);
     res.json({score,correct,total,unanswered,usedQuestionIds:usedIds});
   }catch(e){console.error(e);sendError(res,500,'Grading service error.');}
+});
+
+/* ===== Mock/Practice submitted-attempt review =====
+   Correct answers are returned only after the attempt is SUBMITTED and only
+   to the authenticated owner of that attempt. The live exam never receives
+   correct_option through the normal question-loading API.
+*/
+api.get('/attempts/:id/review', requirePasswordReady, async (req,res)=>{
+  try{
+    const id=Number(req.params.id);
+    if(!Number.isInteger(id)) return sendError(res,400,'Invalid attempt id.');
+
+    const a=await pool.query(
+      `SELECT id,status,question_ids
+         FROM attempts
+        WHERE id=$1 AND user_id=$2
+        LIMIT 1`,
+      [id,req.user.id]
+    );
+    if(!a.rowCount) return sendError(res,404,'Attempt not found.');
+    const attempt=a.rows[0];
+    if(attempt.status!=='SUBMITTED') return sendError(res,409,'Review is available only after submission.');
+
+    const ids=Array.isArray(attempt.question_ids) ? attempt.question_ids.map(Number).filter(Number.isInteger) : [];
+    if(!ids.length) return res.json({review:[]});
+
+    const q=await pool.query(
+      `SELECT id,correct_option,explanation
+         FROM questions
+        WHERE id=ANY($1::bigint[])`,
+      [ids]
+    );
+    const byId=new Map(q.rows.map(row=>[Number(row.id),row]));
+
+    res.json({
+      review:ids.map((qid,i)=>{
+        const row=byId.get(Number(qid));
+        return {
+          question_no:i+1,
+          question_id:Number(qid),
+          correct_option:row ? Number(row.correct_option) : null,
+          explanation:row ? String(row.explanation || '') : ''
+        };
+      })
+    });
+  }catch(e){
+    console.error('Attempt review error:',e);
+    sendError(res,500,'Review service error.');
+  }
 });
 
 api.get('/results', requirePasswordReady, async (req,res)=>{
