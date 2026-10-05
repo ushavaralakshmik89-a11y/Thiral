@@ -213,11 +213,25 @@ function examCandidates(raw){
   if(x==='group4' || x==='group 4') return ['group4','Group 4'];
   return [...new Set([s])];
 }
+function normalizedSqlCandidates(values){
+  return [...new Set((Array.isArray(values)?values:[])
+    .map(v=>String(v??'').normalize('NFKC').trim().replace(/\s+/g,' ').toLowerCase())
+    .filter(Boolean))];
+}
 function subtopicCandidates(raw){
-  const s=String(raw||'').trim();
+  const s=String(raw||'').normalize('NFKC').trim().replace(/\s+/g,' ');
   if(!s) return [];
-  const a=[s, GROUP4_SUBTOPIC_ALIASES[s] || ''];
-  return [...new Set(a.filter(Boolean))];
+  const out=[s, GROUP4_SUBTOPIC_ALIASES[s] || ''];
+  const key=s.toLowerCase();
+  for(const [a,b] of Object.entries(GROUP4_SUBTOPIC_ALIASES)){
+    if(String(a).normalize('NFKC').trim().replace(/\s+/g,' ').toLowerCase()===key){ out.push(a,b); }
+  }
+  /* Common punctuation/spelling variants found in imported Group 4 banks. */
+  const n=s.toLowerCase();
+  if(n==='alpha-numeric reasoning' || n==='alpha numeric reasoning') out.push('Alpha-Numeric Reasoning','Alpha Numeric Reasoning');
+  if(n==='hcf' || n==='h.c.f') out.push('HCF','H.C.F','மீ.பொ.வ (HCF)','மீ.பொ.வ. (HCF)');
+  if(n==='lcm' || n==='l.c.m') out.push('LCM','L.C.M','மீ.சி.ம (LCM)','மீ.சி.ம. (LCM)');
+  return [...new Set(out.map(x=>String(x||'').trim()).filter(Boolean))];
 }
 
 function newSessionId() {
@@ -1083,14 +1097,17 @@ api.get('/questions', requirePasswordReady, async (req, res) => {
     const offset = Math.max(parseInt(req.query.offset || '0',10) || 0,0);
     if (!exam || !subject || !['ta','en'].includes(language)) return sendError(res,400,'Invalid question request.');
 
-    const where = ['exam = ANY($1::text[])','subject = ANY($2::text[])','language=$3','is_active=true'];
-    const params = [examCandidatesList, subjectCandidatesList, language];
+    const examSqlCandidates = normalizedSqlCandidates(examCandidatesList);
+    const subjectSqlCandidates = normalizedSqlCandidates(subjectCandidatesList);
+    const where = ['LOWER(BTRIM(exam)) = ANY($1::text[])','LOWER(BTRIM(subject)) = ANY($2::text[])','LOWER(BTRIM(language))=$3','is_active=true'];
+    const params = [examSqlCandidates, subjectSqlCandidates, language.toLowerCase()];
     let n = 4;
     const subCandidates = subtopicCandidates(subtopic);
-    if (subCandidates.length === 1) {
-      where.push(`subtopic=$${n++}`); params.push(subCandidates[0]);
-    } else if (subCandidates.length > 1) {
-      where.push(`subtopic = ANY($${n}::text[])`); params.push(subCandidates); n++;
+    const subSqlCandidates = normalizedSqlCandidates(subCandidates);
+    if (subSqlCandidates.length === 1) {
+      where.push(`LOWER(BTRIM(subtopic))=$${n++}`); params.push(subSqlCandidates[0]);
+    } else if (subSqlCandidates.length > 1) {
+      where.push(`LOWER(BTRIM(subtopic)) = ANY($${n}::text[])`); params.push(subSqlCandidates); n++;
     }
 
     /* Question Bank continuation: exclude only questions already used
@@ -1148,24 +1165,27 @@ api.get('/practice/questions', requirePasswordReady, async (req, res) => {
       return sendError(res, 400, 'Invalid question request.');
     }
 
-    const params = [req.user.id, examCandidatesList, subjectCandidatesList, language];
+    const params = [req.user.id, examSqlCandidates, subjectSqlCandidates, language.toLowerCase()];
     let n = 5;
 
+    const examSqlCandidates = normalizedSqlCandidates(examCandidatesList);
+    const subjectSqlCandidates = normalizedSqlCandidates(subjectCandidatesList);
     let where = `
-      q.exam = ANY($2::text[])
-      AND q.subject = ANY($3::text[])
-      AND q.language = $4
+      LOWER(BTRIM(q.exam)) = ANY($2::text[])
+      AND LOWER(BTRIM(q.subject)) = ANY($3::text[])
+      AND LOWER(BTRIM(q.language)) = $4
       AND q.is_active = true
     `;
 
     const subCandidates = subtopicCandidates(subtopic);
-    if (subCandidates.length === 1) {
-      where += ` AND q.subtopic = $${n}`;
-      params.push(subCandidates[0]);
+    const subSqlCandidates = normalizedSqlCandidates(subCandidates);
+    if (subSqlCandidates.length === 1) {
+      where += ` AND LOWER(BTRIM(q.subtopic)) = $${n}`;
+      params.push(subSqlCandidates[0]);
       n++;
-    } else if (subCandidates.length > 1) {
-      where += ` AND q.subtopic = ANY($${n}::text[])`;
-      params.push(subCandidates);
+    } else if (subSqlCandidates.length > 1) {
+      where += ` AND LOWER(BTRIM(q.subtopic)) = ANY($${n}::text[])`;
+      params.push(subSqlCandidates);
       n++;
     }
 
@@ -3299,4 +3319,3 @@ async function start(){
 }
 
 start();
-
