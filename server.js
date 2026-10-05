@@ -141,6 +141,17 @@ const SUBJECT_ALIASES = {
   'திறனறிவு / Aptitude':'apt','Aptitude':'apt','aptitude':'apt'
 };
 const GROUP4_SUBTOPIC_ALIASES = {
+  /* New Group 4 Aptitude topics: frontend Tamil labels <-> DB English labels */
+  'எளிமைப்படுத்துதல்':'Simplification','Simplification':'எளிமைப்படுத்துதல்',
+  'மீ.பொ.வ (HCF)':'HCF','HCF':'மீ.பொ.வ (HCF)',
+  'மீ.சி.ம (LCM)':'LCM','LCM':'மீ.சி.ம (LCM)',
+  'எளிய வட்டி':'Simple Interest','Simple Interest':'எளிய வட்டி',
+  'கூட்டு வட்டி':'Compound Interest','Compound Interest':'கூட்டு வட்டி',
+  'தர்க்க சிந்தனை':'Logical Reasoning','Logical Reasoning':'தர்க்க சிந்தனை',
+  'புதிர்கள்':'Puzzles','Puzzles':'புதிர்கள்',
+  'பகடை':'Dice','Dice':'பகடை',
+  'காட்சித் தர்க்கம்':'Visual Reasoning','Visual Reasoning':'காட்சித் தர்க்கம்',
+  'எண்-எழுத்து தர்க்கம்':'Alpha-Numeric Reasoning','Alpha-Numeric Reasoning':'எண்-எழுத்து தர்க்கம்',
   'பண்டைய இந்தியா':'Ancient India','Ancient India':'பண்டைய இந்தியா',
   'இடைக்கால இந்தியா':'Medieval India','Medieval India':'இடைக்கால இந்தியா',
   'நவீன இந்தியா':'Modern India','Modern India':'நவீன இந்தியா',
@@ -160,19 +171,6 @@ const GROUP4_SUBTOPIC_ALIASES = {
   'அடிப்படை பொருளாதாரம்':'Basic Economics','Basic Economics':'அடிப்படை பொருளாதாரம்',
   'இந்திய பொருளாதாரம்':'Indian Economy','Indian Economy':'இந்திய பொருளாதாரம்',
   'தமிழ்நாடு பொருளாதாரம்':'Tamil Nadu Economy','Tamil Nadu Economy':'தமிழ்நாடு பொருளாதாரம்',
-  /* ===== Group 4 new Aptitude / Reasoning topics =====
-     UI labels and database labels are matched in both directions.
-     Existing question rows are NOT changed. */
-  'எளிமைப்படுத்துதல்':'Simplification','Simplification':'எளிமைப்படுத்துதல்',
-  'மீ.பொ.வ (HCF)':'HCF','HCF':'மீ.பொ.வ (HCF)',
-  'மீ.சி.ம (LCM)':'LCM','LCM':'மீ.சி.ம (LCM)',
-  'எளிய வட்டி':'Simple Interest','Simple Interest':'எளிய வட்டி',
-  'கூட்டு வட்டி':'Compound Interest','Compound Interest':'கூட்டு வட்டி',
-  'தர்க்க சிந்தனை':'Logical Reasoning','Logical Reasoning':'தர்க்க சிந்தனை',
-  'புதிர்கள்':'Puzzles','Puzzles':'புதிர்கள்',
-  'பகடை':'Dice','Dice':'பகடை',
-  'காட்சித் தர்க்கம்':'Visual Reasoning','Visual Reasoning':'காட்சித் தர்க்கம்',
-  'எண்-எழுத்து தர்க்கம்':'Alpha-Numeric Reasoning','Alpha-Numeric Reasoning':'எண்-எழுத்து தர்க்கம்',
   'எண்கள்':'Numbers','Numbers':'எண்கள்','பின்னங்கள்':'Fractions','Fractions':'பின்னங்கள்',
   'சதவீதம்':'Percentage','Percentage':'சதவீதம்','விகிதம்':'Ratio','Ratio':'விகிதம்','சராசரி':'Average','Average':'சராசரி',
   'பரப்பளவு':'Area','Area':'பரப்பளவு','சுற்றளவு':'Perimeter','Perimeter':'சுற்றளவு',
@@ -201,7 +199,19 @@ function subjectCandidates(raw){
   const aliases=Object.entries(SUBJECT_ALIASES)
     .filter(([label,key]) => key===canonical)
     .map(([label])=>label);
-  return [...new Set([canonical,s,...aliases].filter(Boolean))];
+  const canonicalLabels = {
+    tamil:['Tamil','தமிழ்'],
+    gs:['General Studies','General Knowledge','பொது அறிவு','பொது அறிவு / General Studies'],
+    apt:['Aptitude','திறனறிவு / Aptitude']
+  };
+  return [...new Set([canonical,s,...aliases,...(canonicalLabels[canonical]||[])].filter(Boolean))];
+}
+function examCandidates(raw){
+  const s=String(raw||'').trim();
+  if(!s) return [];
+  const x=s.toLowerCase();
+  if(x==='group4' || x==='group 4') return ['group4','Group 4'];
+  return [...new Set([s])];
 }
 function subtopicCandidates(raw){
   const s=String(raw||'').trim();
@@ -1065,6 +1075,7 @@ api.get('/questions', requirePasswordReady, async (req, res) => {
     const rawSubject = String(req.query.subject || '').trim();
     const subject = canonicalSubject(rawSubject);
     const subjectCandidatesList = subjectCandidates(rawSubject);
+    const examCandidatesList = examCandidates(exam);
     const language = String(req.query.language || 'ta').trim();
     const subtopic = String(req.query.subtopic || '').trim();
     const historyMode = String(req.query.historyMode || '').trim();
@@ -1072,8 +1083,8 @@ api.get('/questions', requirePasswordReady, async (req, res) => {
     const offset = Math.max(parseInt(req.query.offset || '0',10) || 0,0);
     if (!exam || !subject || !['ta','en'].includes(language)) return sendError(res,400,'Invalid question request.');
 
-    const where = ['exam=$1','subject = ANY($2::text[])','language=$3','is_active=true'];
-    const params = [exam, subjectCandidatesList, language];
+    const where = ['exam = ANY($1::text[])','subject = ANY($2::text[])','language=$3','is_active=true'];
+    const params = [examCandidatesList, subjectCandidatesList, language];
     let n = 4;
     const subCandidates = subtopicCandidates(subtopic);
     if (subCandidates.length === 1) {
@@ -1125,6 +1136,7 @@ api.get('/practice/questions', requirePasswordReady, async (req, res) => {
     const rawSubject = String(req.query.subject || '').trim();
     const subject = canonicalSubject(rawSubject);
     const subjectCandidatesList = subjectCandidates(rawSubject);
+    const examCandidatesList = examCandidates(exam);
     const language = String(req.query.language || 'ta').trim();
     const subtopic = String(req.query.subtopic || '').trim();
     const limit = Math.min(
@@ -1136,11 +1148,11 @@ api.get('/practice/questions', requirePasswordReady, async (req, res) => {
       return sendError(res, 400, 'Invalid question request.');
     }
 
-    const params = [req.user.id, exam, subjectCandidatesList, language];
+    const params = [req.user.id, examCandidatesList, subjectCandidatesList, language];
     let n = 5;
 
     let where = `
-      q.exam = $2
+      q.exam = ANY($2::text[])
       AND q.subject = ANY($3::text[])
       AND q.language = $4
       AND q.is_active = true
@@ -1341,55 +1353,6 @@ api.post('/attempts/:id/submit', requirePasswordReady, async (req,res)=>{
     await pool.query(`INSERT INTO activity_events(user_id,event_type,metadata) VALUES($1,'ATTEMPT_SUBMITTED',$2)`,[req.user.id,JSON.stringify({attempt_id:id,mode:attempt.mode,exam:attempt.exam,score,used_questions:total,unanswered})]);
     res.json({score,correct,total,unanswered,usedQuestionIds:usedIds});
   }catch(e){console.error(e);sendError(res,500,'Grading service error.');}
-});
-
-/* ===== Mock/Practice submitted-attempt review =====
-   Correct answers are returned only after the attempt is SUBMITTED and only
-   to the authenticated owner of that attempt. The live exam never receives
-   correct_option through the normal question-loading API.
-*/
-api.get('/attempts/:id/review', requirePasswordReady, async (req,res)=>{
-  try{
-    const id=Number(req.params.id);
-    if(!Number.isInteger(id)) return sendError(res,400,'Invalid attempt id.');
-
-    const a=await pool.query(
-      `SELECT id,status,question_ids
-         FROM attempts
-        WHERE id=$1 AND user_id=$2
-        LIMIT 1`,
-      [id,req.user.id]
-    );
-    if(!a.rowCount) return sendError(res,404,'Attempt not found.');
-    const attempt=a.rows[0];
-    if(attempt.status!=='SUBMITTED') return sendError(res,409,'Review is available only after submission.');
-
-    const ids=Array.isArray(attempt.question_ids) ? attempt.question_ids.map(Number).filter(Number.isInteger) : [];
-    if(!ids.length) return res.json({review:[]});
-
-    const q=await pool.query(
-      `SELECT id,correct_option,explanation
-         FROM questions
-        WHERE id=ANY($1::bigint[])`,
-      [ids]
-    );
-    const byId=new Map(q.rows.map(row=>[Number(row.id),row]));
-
-    res.json({
-      review:ids.map((qid,i)=>{
-        const row=byId.get(Number(qid));
-        return {
-          question_no:i+1,
-          question_id:Number(qid),
-          correct_option:row ? Number(row.correct_option) : null,
-          explanation:row ? String(row.explanation || '') : ''
-        };
-      })
-    });
-  }catch(e){
-    console.error('Attempt review error:',e);
-    sendError(res,500,'Review service error.');
-  }
 });
 
 api.get('/results', requirePasswordReady, async (req,res)=>{
@@ -3336,3 +3299,4 @@ async function start(){
 }
 
 start();
+
