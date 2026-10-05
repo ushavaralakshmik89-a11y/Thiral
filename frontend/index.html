@@ -4561,15 +4561,11 @@ function ensurePracticeNav(){
  $('thiralPracticeNextFinal').disabled=P.index===P.questions.length-1;
  $('thiralPracticePrevFinal').onclick=function(){
   if(P.busy||P.submitted||P.index<=0)return;
-  P.index--;
-  render();
+  P.index--;render();
  };
  $('thiralPracticeNextFinal').onclick=function(){
-  if(P.busy||P.submitted)return;
-  if(P.index<P.questions.length-1){
-   P.index++;
-   render();
-  }
+  if(P.busy||P.submitted||P.index>=P.questions.length-1)return;
+  P.index++;render();
  };
  $('thiralPracticeSubmitFinal').onclick=function(){
   if(P.busy||P.submitted)return;
