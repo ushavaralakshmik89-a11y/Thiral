@@ -203,10 +203,67 @@ const GROUP4_TAMIL_NEW_SUBTOPIC_ALIASES = {
   'எண்-எழுத்து தர்க்கம்':'எழுத்து-எண் தர்க்கம்'
 };
 
+
+const GROUP4_NEW_GS_SUBTOPIC_ALIASES = {
+  'இந்திய பண்பாடு':'Indian Culture','Indian Culture':'இந்திய பண்பாடு',
+  'சிந்து சமவெளி நாகரிகம்':'Indus Valley Civilization','Indus Valley Civilization':'சிந்து சமவெளி நாகரிகம்',
+  'குப்தர்கள்':'Guptas','Guptas':'குப்தர்கள்',
+  'டெல்லி சுல்தான்கள்':'Delhi Sultanate','Delhi Sultanate':'டெல்லி சுல்தான்கள்',
+  'முகலாயர்கள்':'Mughals','Mughals':'முகலாயர்கள்',
+  'மராத்தியர்கள்':'Marathas','Marathas':'மராத்தியர்கள்',
+  'தென்னிந்திய வரலாறு':'South Indian History','South Indian History':'தென்னிந்திய வரலாறு',
+  'தேசிய மறுமலர்ச்சி':'National Renaissance','National Renaissance':'தேசிய மறுமலர்ச்சி',
+  'ஆங்கிலேயருக்கு எதிரான ஆரம்ப எழுச்சிகள்':'Early Uprisings against British Rule','Early Uprisings against British Rule':'ஆங்கிலேயருக்கு எதிரான ஆரம்ப எழுச்சிகள்',
+  'இந்திய தேசிய காங்கிரஸ்':'Indian National Congress','Indian National Congress':'இந்திய தேசிய காங்கிரஸ்',
+  'தேசிய தலைவர்கள்':'National Leaders','National Leaders':'தேசிய தலைவர்கள்',
+  'தமிழ்நாட்டின் சுதந்திரப் போராட்ட இயக்கங்கள்':'Movements in Tamil Nadu Freedom Struggle','Movements in Tamil Nadu Freedom Struggle':'தமிழ்நாட்டின் சுதந்திரப் போராட்ட இயக்கங்கள்',
+  'இந்திய பண்பாட்டின் சிறப்பம்சங்கள்':'Characteristics of Indian Culture','Characteristics of Indian Culture':'இந்திய பண்பாட்டின் சிறப்பம்சங்கள்',
+  'வேற்றுமையில் ஒற்றுமை':'Unity in Diversity','Unity in Diversity':'வேற்றுமையில் ஒற்றுமை',
+  'மதச்சார்பின்மை':'Secularism','Secularism':'மதச்சார்பின்மை',
+
+  'தமிழ் சமூக வரலாறு':'History of Tamil Society','History of Tamil Society':'தமிழ் சமூக வரலாறு',
+  'தொல்லியல் கண்டுபிடிப்புகள்':'Archaeological Discoveries','Archaeological Discoveries':'தொல்லியல் கண்டுபிடிப்புகள்',
+  'சங்க காலம் முதல் நவீன காலம் வரையிலான தமிழ் இலக்கியம்':'Tamil Literature from Sangam to Contemporary Times','Tamil Literature from Sangam to Contemporary Times':'சங்க காலம் முதல் நவீன காலம் வரையிலான தமிழ் இலக்கியம்',
+  'தமிழ் பண்பாடு மற்றும் பாரம்பரியம்':'Tamil Culture and Heritage','Tamil Culture and Heritage':'தமிழ் பண்பாடு மற்றும் பாரம்பரியம்',
+  'திருக்குறள் மற்றும் உலகளாவிய மதிப்புகள்':'Thirukkural and Universal Values','Thirukkural and Universal Values':'திருக்குறள் மற்றும் உலகளாவிய மதிப்புகள்',
+  'தமிழ்நாட்டின் சுதந்திரப் போராட்ட பங்கு':'Role of Tamil Nadu in Freedom Struggle','Role of Tamil Nadu in Freedom Struggle':'தமிழ்நாட்டின் சுதந்திரப் போராட்ட பங்கு',
+  'ஆங்கிலேயருக்கு எதிரான ஆரம்பப் போராட்டங்கள்':'Early Agitations against British Rule','Early Agitations against British Rule':'ஆங்கிலேயருக்கு எதிரான ஆரம்பப் போராட்டங்கள்',
+  'சுதந்திரப் போராட்டத்தில் பெண்களின் பங்கு':'Role of Women in Freedom Struggle','Role of Women in Freedom Struggle':'சுதந்திரப் போராட்டத்தில் பெண்களின் பங்கு',
+  'சமூக சீர்திருத்தவாதிகள்':'Social Reformers','Social Reformers':'சமூக சீர்திருத்தவாதிகள்',
+  'சமூக சீர்திருத்த இயக்கங்கள்':'Social Reform Movements','Social Reform Movements':'சமூக சீர்திருத்த இயக்கங்கள்',
+  'தமிழ்நாட்டின் சமூக மாற்றங்கள்':'Social Transformation of Tamil Nadu','Social Transformation of Tamil Nadu':'தமிழ்நாட்டின் சமூக மாற்றங்கள்',
+  'சமூக நீதி இயக்கங்கள்':'Social Justice Movements','Social Justice Movements':'சமூக நீதி இயக்கங்கள்',
+  'சமூக-அரசியல் இயக்கங்கள்':'Socio-Political Movements','Socio-Political Movements':'சமூக-அரசியல் இயக்கங்கள்',
+
+  'தமிழ்நாடு வளர்ச்சி நிர்வாகம்':'Development Administration in Tamil Nadu','Development Administration in Tamil Nadu':'தமிழ்நாடு வளர்ச்சி நிர்வாகம்',
+  'இந்திய பொருளாதாரத்தின் இயல்பு':'Nature of Indian Economy','Nature of Indian Economy':'இந்திய பொருளாதாரத்தின் இயல்பு',
+  'திட்டமிடல் மற்றும் வளர்ச்சி':'Planning and Development','Planning and Development':'திட்டமிடல் மற்றும் வளர்ச்சி',
+  'திட்டக் குழு மற்றும் நிதி ஆயோக்':'Planning Commission and NITI Aayog','Planning Commission and NITI Aayog':'திட்டக் குழு மற்றும் நிதி ஆயோக்',
+  'வருவாய் ஆதாரங்கள்':'Sources of Revenue','Sources of Revenue':'வருவாய் ஆதாரங்கள்',
+  'இந்திய ரிசர்வ் வங்கி':'Reserve Bank of India','Reserve Bank of India':'இந்திய ரிசர்வ் வங்கி',
+  'நிதிக் குழு':'Finance Commission','Finance Commission':'நிதிக் குழு',
+  'மத்திய-மாநில வளப் பகிர்வு':'Resource Sharing between Union and State Governments','Resource Sharing between Union and State Governments':'மத்திய-மாநில வளப் பகிர்வு',
+  'சரக்கு மற்றும் சேவை வரி (GST)':'Goods and Services Tax (GST)','Goods and Services Tax (GST)':'சரக்கு மற்றும் சேவை வரி (GST)',
+  'வேலைவாய்ப்பு உருவாக்கம்':'Employment Generation','Employment Generation':'வேலைவாய்ப்பு உருவாக்கம்',
+  'நிலச் சீர்திருத்தங்கள் மற்றும் வேளாண்மை':'Land Reforms and Agriculture','Land Reforms and Agriculture':'நிலச் சீர்திருத்தங்கள் மற்றும் வேளாண்மை',
+  'வேளாண்மையில் அறிவியல் மற்றும் தொழில்நுட்பம்':'Science and Technology in Agriculture','Science and Technology in Agriculture':'வேளாண்மையில் அறிவியல் மற்றும் தொழில்நுட்பம்',
+  'தொழில் வளர்ச்சி':'Industrial Growth','Industrial Growth':'தொழில் வளர்ச்சி',
+  'கிராமப்புற நலத்திட்டங்கள்':'Rural Welfare Programmes','Rural Welfare Programmes':'கிராமப்புற நலத்திட்டங்கள்',
+  'மக்கள் தொகை மற்றும் சமூகப் பிரச்சினைகள்':'Population and Social Problems','Population and Social Problems':'மக்கள் தொகை மற்றும் சமூகப் பிரச்சினைகள்',
+  'கல்வி அமைப்பு':'Education System','Education System':'கல்வி அமைப்பு',
+  'சுகாதார அமைப்பு':'Health System','Health System':'சுகாதார அமைப்பு',
+  'வேலைவாய்ப்பு மற்றும் வறுமை':'Employment and Poverty','Employment and Poverty':'வேலைவாய்ப்பு மற்றும் வறுமை',
+  'சமூக நீதி மற்றும் சமூக நல்லிணக்கம்':'Social Justice and Social Harmony','Social Justice and Social Harmony':'சமூக நீதி மற்றும் சமூக நல்லிணக்கம்',
+  'தமிழ்நாடு அரசு நலத்திட்டங்கள்':'Tamil Nadu Government Welfare Schemes','Tamil Nadu Government Welfare Schemes':'தமிழ்நாடு அரசு நலத்திட்டங்கள்',
+  'தமிழ்நாட்டின் புவியியல் மற்றும் பொருளாதார வளர்ச்சி':'Geography of Tamil Nadu and Economic Growth','Geography of Tamil Nadu and Economic Growth':'தமிழ்நாட்டின் புவியியல் மற்றும் பொருளாதார வளர்ச்சி',
+  'சமூக-பொருளாதார பிரச்சினைகள்':'Socio-Economic Problems','Socio-Economic Problems':'சமூக-பொருளாதார பிரச்சினைகள்',
+  'நடப்பு சமூக-பொருளாதார நிகழ்வுகள்':'Current Socio-Economic Issues','Current Socio-Economic Issues':'நடப்பு சமூக-பொருளாதார நிகழ்வுகள்'
+};
+
 function subtopicCandidates(raw){
   const s=String(raw||'').trim();
   if(!s) return [];
-  const a=[s, GROUP4_SUBTOPIC_ALIASES[s] || '', GROUP4_TAMIL_NEW_SUBTOPIC_ALIASES[s] || ''];
+  const a=[s, GROUP4_SUBTOPIC_ALIASES[s] || '', GROUP4_TAMIL_NEW_SUBTOPIC_ALIASES[s] || '', GROUP4_NEW_GS_SUBTOPIC_ALIASES[s] || ''];
   return [...new Set(a.filter(Boolean))];
 }
 
