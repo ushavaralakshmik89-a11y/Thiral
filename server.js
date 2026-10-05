@@ -2674,16 +2674,30 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
       }
     }
 
+    /*
+       Create the normal attempt record BEFORE COMMIT.
+       The frontend expects attemptId and uses it when submitting the Mock.
+       The previous quality/global version selected questions correctly but
+       omitted this attempt creation, so the Mock screen could not open.
+    */
+    const clean=selected.map(q=>Number(q.id));
+
+    const attemptInsert=await client.query(
+      `INSERT INTO attempts(user_id,exam,subject,mode,language,question_ids)
+       VALUES($1,$2,'mixed','mock','mixed',$3)
+       RETURNING id`,
+      [req.user.id,exam,clean]
+    );
+
     /* Keep the existing per-student history mechanism as an additional
        protection. This does not alter the question bank itself. */
-    for(const q of selected){
-      await client.query(
-        `INSERT INTO question_history(user_id,question_id,mode)
-         VALUES($1,$2,'mock')
-         ON CONFLICT DO NOTHING`,
-        [req.user.id,q.id]
-      );
-    }
+    await client.query(
+      `INSERT INTO question_history(user_id,question_id,mode)
+       SELECT $1,x,'mock'
+         FROM unnest($2::bigint[]) AS x
+       ON CONFLICT(user_id,question_id,mode) DO NOTHING`,
+      [req.user.id,clean]
+    );
 
     await client.query('COMMIT');
 
@@ -2705,7 +2719,8 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
       total:200,
       distribution:{tamil:100,gs:75,aptitude:25},
       recycled:0,
-      qualityPolicy:'QUALITY_FIRST_GLOBAL_NO_REPEAT_V3',
+      qualityPolicy:'QUALITY_FIRST_GLOBAL_NO_REPEAT_V4',
+      attemptId:attemptInsert.rows[0].id,
       questions:selected.map(publicQuestion)
     });
 
