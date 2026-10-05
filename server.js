@@ -215,6 +215,11 @@ function clearSessionCookie(res) {
   res.clearCookie('thiral_session', { httpOnly: true, secure: isProd, sameSite: 'strict', path: '/' });
 }
 
+/* ===== LEGACY DEVICE-BINDING DATA =====
+   login_device_hash / thiral_device are retained for backward compatibility,
+   but Student Login no longer rejects a correct password because of device
+   binding. Do not call enforceStudentDeviceBinding() from /auth/login.
+*/
 /* ===== ONE-STUDENT / ONE-DEVICE ACCOUNT BINDING =====
    Student credentials alone are not enough to move an account to another
    browser/device. The first successful student registration/login binds the
@@ -440,22 +445,15 @@ api.post('/auth/login', authLimiter, async (req, res) => {
       return sendError(res, 401, 'Invalid ID/email or password.');
     }
 
-    /* One student account = one registered browser/device. A second device
-       with the same email + password is rejected before a new session is made. */
-    if(u.role === 'STUDENT'){
-      const deviceCheck=await enforceStudentDeviceBinding({req,res,user:u});
-      if(!deviceCheck.ok){
-        await logSecurityEvent({
-          req,
-          eventType:'DEVICE_BINDING_BLOCKED',
-          userId:u.id,
-          email:u.email,
-          details:'Correct password used from an unregistered browser/device',
-          sendAlert:true
-        });
-        return sendError(res,403,'இந்த கணக்கு ஏற்கனவே ஒரு சாதனத்தில் பதிவு செய்யப்பட்டுள்ளது. வேறு சாதனத்தில் இந்த Email ID + Password மூலம் Login செய்ய முடியாது.');
-      }
-    }
+    /*
+     * Student login policy:
+     * Password verification is sufficient for Student Login.
+     * Do NOT block a correct password because of a previous browser/device.
+     *
+     * The old one-student/one-device check has intentionally been removed
+     * from the login path. Existing login_device_hash values may remain in
+     * the database, but they are no longer used to deny Student Login.
+     */
 
     const sid = newSessionId();
     await pool.query(`DELETE FROM sessions WHERE expires_at <= now()`);
@@ -1332,6 +1330,55 @@ api.post('/attempts/:id/submit', requirePasswordReady, async (req,res)=>{
   }catch(e){console.error(e);sendError(res,500,'Grading service error.');}
 });
 
+/* ===== Mock/Practice submitted-attempt review =====
+   Correct answers are returned only after the attempt is SUBMITTED and only
+   to the authenticated owner of that attempt. The live exam never receives
+   correct_option through the normal question-loading API.
+*/
+api.get('/attempts/:id/review', requirePasswordReady, async (req,res)=>{
+  try{
+    const id=Number(req.params.id);
+    if(!Number.isInteger(id)) return sendError(res,400,'Invalid attempt id.');
+
+    const a=await pool.query(
+      `SELECT id,status,question_ids
+         FROM attempts
+        WHERE id=$1 AND user_id=$2
+        LIMIT 1`,
+      [id,req.user.id]
+    );
+    if(!a.rowCount) return sendError(res,404,'Attempt not found.');
+    const attempt=a.rows[0];
+    if(attempt.status!=='SUBMITTED') return sendError(res,409,'Review is available only after submission.');
+
+    const ids=Array.isArray(attempt.question_ids) ? attempt.question_ids.map(Number).filter(Number.isInteger) : [];
+    if(!ids.length) return res.json({review:[]});
+
+    const q=await pool.query(
+      `SELECT id,correct_option,explanation
+         FROM questions
+        WHERE id=ANY($1::bigint[])`,
+      [ids]
+    );
+    const byId=new Map(q.rows.map(row=>[Number(row.id),row]));
+
+    res.json({
+      review:ids.map((qid,i)=>{
+        const row=byId.get(Number(qid));
+        return {
+          question_no:i+1,
+          question_id:Number(qid),
+          correct_option:row ? Number(row.correct_option) : null,
+          explanation:row ? String(row.explanation || '') : ''
+        };
+      })
+    });
+  }catch(e){
+    console.error('Attempt review error:',e);
+    sendError(res,500,'Review service error.');
+  }
+});
+
 api.get('/results', requirePasswordReady, async (req,res)=>{
   try{
     const q=await pool.query(`SELECT id,exam,subject,mode,language,score,correct_count,total_count,started_at,submitted_at FROM attempts WHERE user_id=$1 AND status='SUBMITTED' ORDER BY started_at DESC LIMIT 100`,[req.user.id]);
@@ -1376,8 +1423,269 @@ api.get('/admin/exam-results', requireAdmin, async (req,res)=>{
     const maxPct = req.query.max_pct === undefined || req.query.max_pct === '' ? 100 : Number(req.query.max_pct);
     const page = Math.max(parseInt(req.query.page || '1',10) || 1,1);
     const limit = Math.min(Math.max(parseInt(req.query.limit || '100',10) || 100,1),200);
+
     if(!Number.isFinite(minPct) || !Number.isFinite(maxPct) || minPct<0 || maxPct>100 || minPct>maxPct){
       return sendError(res,400,'Invalid percentage range.');
+    }
+
+    /*
+     * ALL EXAM TYPES:
+     * The legacy attempts table contains Practice / Mock / Question Bank /
+     * 10/20/50/100-question results, while Model Exam results live in
+     * model_exam_results. Previously type="" queried only attempts, so Model
+     * Exam disappeared when "அனைத்தும்" was selected.
+     *
+     * Keep the existing type-specific branches unchanged. When type is empty,
+     * fetch both sources, normalize them to the same row shape, merge, sort,
+     * paginate, and combine their summaries.
+     */
+    if(!type || type==='all'){
+      // ---------- Legacy attempts ----------
+      const legacyWhere=[`a.status='SUBMITTED'`];
+      const legacyParams=[];
+      const addLegacy=(sql,val)=>{legacyParams.push(val);legacyWhere.push(sql.replace('?', '$'+legacyParams.length));};
+
+      if(exam) addLegacy(`a.exam=?`,exam);
+      if(subjectFilter){
+        const subjectList=subjectCandidates(subjectFilter);
+        legacyWhere.push(`a.subject = ANY($${legacyParams.length+1}::text[])`);
+        legacyParams.push(subjectList);
+      }
+      if(from) addLegacy(`a.submitted_at::date >= ?::date`,from);
+      if(to) addLegacy(`a.submitted_at::date <= ?::date`,to);
+
+      if(requestedSubtopic){
+        legacyWhere.push(`EXISTS (
+          SELECT 1 FROM unnest(a.question_ids) AS aqid
+          JOIN questions qq ON qq.id=aqid
+          WHERE qq.subtopic = ANY($${legacyParams.length+1}::text[])
+        )`);
+        legacyParams.push(requestedSubtopicCandidatesSingle);
+      }else if(requestedSubtopics.length){
+        legacyWhere.push(`EXISTS (
+          SELECT 1 FROM unnest(a.question_ids) AS aqid
+          JOIN questions qq ON qq.id=aqid
+          WHERE qq.subtopic = ANY($${legacyParams.length+1}::text[])
+        )`);
+        legacyParams.push(requestedSubtopicCandidates);
+      }
+
+      legacyWhere.push(`COALESCE(a.score,0) >= $${legacyParams.length+1}`); legacyParams.push(minPct);
+      legacyWhere.push(`COALESCE(a.score,0) <= $${legacyParams.length+1}`); legacyParams.push(maxPct);
+
+      const legacySql=legacyWhere.join(' AND ');
+      const legacyRowsQ=await pool.query(`
+        SELECT
+          a.id AS attempt_id,
+          u.name,u.email,
+          a.exam,
+          CASE
+            WHEN lower(a.exam) LIKE '%model%' THEN 'Model Exam'
+            WHEN a.mode='mock' THEN 'Mock Test'
+            WHEN a.mode='bank' THEN 'Question Bank'
+            WHEN a.total_count=10 THEN '10 Questions'
+            WHEN a.total_count=20 THEN '20 Questions'
+            WHEN a.total_count=50 THEN '50 Questions'
+            WHEN a.total_count=100 THEN '100 Questions'
+            ELSE 'Practice'
+          END AS exam_type,
+          to_char(COALESCE(a.submitted_at,a.started_at),'DD-MM-YYYY HH24:MI') AS date,
+          COALESCE(a.total_count,0)::int AS questions,
+          COALESCE(a.correct_count,0)::int AS marks,
+          COALESCE(a.total_count,0)::int AS total_marks,
+          COALESCE(a.score,0)::numeric(10,2) AS percentage,
+          COALESCE((
+            SELECT string_agg(DISTINCT qq.subtopic, ' | ' ORDER BY qq.subtopic)
+            FROM unnest(a.question_ids) AS aqid
+            JOIN questions qq ON qq.id=aqid
+          ),'') AS subtopics,
+          COALESCE(a.submitted_at,a.started_at) AS sort_date
+        FROM attempts a
+        JOIN users u ON u.id=a.user_id
+        WHERE ${legacySql}
+      `,legacyParams);
+
+      // ---------- Model Exam results ----------
+      const modelWhere=[];
+      const modelParams=[];
+      const addModel=(sql,val)=>{modelParams.push(val);modelWhere.push(sql.replace('?', '$'+modelParams.length));};
+
+      if(exam) addModel(`(r.exam_id=? OR me.title=?)`,exam);
+      if(subjectFilter){
+        modelWhere.push(`EXISTS (
+          SELECT 1 FROM model_exam_questions mq
+          WHERE mq.exam_id=r.exam_id AND mq.subject = ANY($${modelParams.length+1}::text[])
+        )`);
+        modelParams.push(subjectCandidates(subjectFilter));
+      }
+      if(from) addModel(`r.submitted_at::date >= ?::date`,from);
+      if(to) addModel(`r.submitted_at::date <= ?::date`,to);
+
+      if(requestedSubtopic){
+        modelWhere.push(`EXISTS (
+          SELECT 1
+          FROM model_exam_questions mq
+          WHERE mq.exam_id=r.exam_id
+            AND mq.topic IS NOT NULL
+            AND (mq.topic = ANY($${modelParams.length+1}::text[]) OR mq.subject = ANY($${modelParams.length+1}::text[]))
+        )`);
+        modelParams.push(requestedSubtopicCandidatesSingle);
+      }else if(requestedSubtopics.length){
+        modelWhere.push(`EXISTS (
+          SELECT 1
+          FROM model_exam_questions mq
+          WHERE mq.exam_id=r.exam_id
+            AND (mq.topic = ANY($${modelParams.length+1}::text[]) OR mq.subject = ANY($${modelParams.length+1}::text[]))
+        )`);
+        modelParams.push(requestedSubtopicCandidates);
+      }
+
+      modelWhere.push(`COALESCE(r.percentage,0) >= $${modelParams.length+1}`); modelParams.push(minPct);
+      modelWhere.push(`COALESCE(r.percentage,0) <= $${modelParams.length+1}`); modelParams.push(maxPct);
+
+      const modelSql=modelWhere.length ? 'WHERE '+modelWhere.join(' AND ') : '';
+      const modelRowsQ=await pool.query(`
+        SELECT
+          r.attempt_id,
+          u.name,u.email,
+          me.title AS exam,
+          'Model Exam' AS exam_type,
+          to_char(r.submitted_at,'DD-MM-YYYY HH24:MI') AS date,
+          r.total_questions::int AS questions,
+          r.marks::numeric AS marks,
+          r.total_questions::numeric AS total_marks,
+          r.percentage::numeric(10,2) AS percentage,
+          '' AS subtopics,
+          r.submitted_at AS sort_date
+        FROM model_exam_results r
+        JOIN model_exams me ON me.exam_id=r.exam_id
+        JOIN users u ON u.id=r.user_id
+        ${modelSql}
+      `,modelParams);
+
+      const allRows=[
+        ...legacyRowsQ.rows.map(r=>({
+          ...r,
+          topic:[...new Set(String(r.subtopics||'').split(' | ').map(group4TopicForSubtopic).filter(Boolean))].join(' | ')
+        })),
+        ...modelRowsQ.rows.map(r=>({...r,topic:''}))
+      ].sort((a,b)=>new Date(b.sort_date||0)-new Date(a.sort_date||0));
+
+      const total=allRows.length;
+      const participants=new Set(allRows.map(r=>String(r.email||'').toLowerCase()).filter(Boolean)).size;
+      const totalQuestions=allRows.reduce((n,r)=>n+Number(r.questions||0),0);
+      const averagePct=total ? allRows.reduce((n,r)=>n+Number(r.percentage||0),0)/total : 0;
+      const highestPct=total ? Math.max(...allRows.map(r=>Number(r.percentage||0))) : 0;
+      const lowestPct=total ? Math.min(...allRows.map(r=>Number(r.percentage||0))) : 0;
+
+      const offset=(page-1)*limit;
+      const rows=allRows.slice(offset,offset+limit).map(({sort_date,...r})=>r);
+
+      // Union the exam dropdown values from both result stores.
+      const legacyExams=await pool.query(`SELECT DISTINCT a.exam FROM attempts a WHERE a.status='SUBMITTED' ORDER BY a.exam`);
+      const modelExams=await pool.query(`
+        SELECT DISTINCT me.exam_id,me.title
+        FROM model_exam_results r
+        JOIN model_exams me ON me.exam_id=r.exam_id
+        ORDER BY me.title
+      `);
+      const exams=[...new Set([
+        ...legacyExams.rows.map(x=>x.exam).filter(Boolean),
+        ...modelExams.rows.map(x=>x.exam_id||x.title).filter(Boolean)
+      ])];
+
+      return res.json({
+        ok:true,
+        rows,
+        total,
+        limit,
+        page,
+        exams,
+        summary:{
+          participants,
+          attempts:total,
+          total_questions:totalQuestions,
+          average_pct:Number(averagePct.toFixed(2)),
+          highest_pct:Number(highestPct.toFixed(2)),
+          lowest_pct:Number(lowestPct.toFixed(2))
+        }
+      });
+    }
+
+    // ---------- Existing type-specific result handling ----------
+    if(type === 'model'){
+      const w=[];
+      const p=[];
+      if(exam){
+        w.push(`(r.exam_id=$${p.length+1} OR me.title=$${p.length+1})`);
+        p.push(exam);
+      }
+      if(subjectFilter){
+        w.push(`EXISTS (SELECT 1 FROM model_exam_questions mq WHERE mq.exam_id=r.exam_id AND mq.subject=$${p.length+1})`);
+        p.push(subjectFilter);
+      }
+      if(from){ w.push(`r.submitted_at::date >= $${p.length+1}::date`); p.push(from); }
+      if(to){ w.push(`r.submitted_at::date <= $${p.length+1}::date`); p.push(to); }
+      w.push(`r.percentage >= $${p.length+1}`); p.push(minPct);
+      w.push(`r.percentage <= $${p.length+1}`); p.push(maxPct);
+
+      const whereModel=w.length ? 'WHERE '+w.join(' AND ') : '';
+      const count=await pool.query(`
+        SELECT count(*)::int AS total,
+               count(DISTINCT r.user_id)::int AS participants,
+               COALESCE(sum(r.total_questions),0)::bigint AS total_questions,
+               COALESCE(avg(r.percentage),0)::numeric(10,2) AS average_pct,
+               COALESCE(max(r.percentage),0)::numeric(10,2) AS highest_pct,
+               COALESCE(min(r.percentage),0)::numeric(10,2) AS lowest_pct
+        FROM model_exam_results r
+        JOIN model_exams me ON me.exam_id=r.exam_id
+        ${whereModel}
+      `,p);
+
+      const pp=p.slice();
+      pp.push(limit,(page-1)*limit);
+      const rows=await pool.query(`
+        SELECT r.attempt_id,
+               u.name,u.email,
+               me.title AS exam,
+               'Model Exam' AS exam_type,
+               to_char(r.submitted_at,'DD-MM-YYYY HH24:MI') AS date,
+               r.total_questions::int AS questions,
+               r.marks::numeric AS marks,
+               r.total_questions::numeric AS total_marks,
+               r.percentage::numeric(10,2) AS percentage,
+               '' AS topic,
+               '' AS subtopics
+        FROM model_exam_results r
+        JOIN model_exams me ON me.exam_id=r.exam_id
+        JOIN users u ON u.id=r.user_id
+        ${whereModel}
+        ORDER BY r.submitted_at DESC,r.id DESC
+        LIMIT $${pp.length-1} OFFSET $${pp.length}
+      `,pp);
+
+      const c=count.rows[0]||{};
+      const examsQ=await pool.query(`
+        SELECT DISTINCT me.exam_id,me.title
+        FROM model_exam_results r
+        JOIN model_exams me ON me.exam_id=r.exam_id
+        ORDER BY me.title
+      `);
+      return res.json({
+        ok:true,
+        rows:rows.rows,
+        total:Number(c.total||0),
+        limit,page,
+        exams:examsQ.rows.map(x=>x.exam_id||x.title).filter(Boolean),
+        summary:{
+          participants:Number(c.participants||0),
+          attempts:Number(c.total||0),
+          total_questions:Number(c.total_questions||0),
+          average_pct:Number(c.average_pct||0),
+          highest_pct:Number(c.highest_pct||0),
+          lowest_pct:Number(c.lowest_pct||0)
+        }
+      });
     }
 
     const where=[`a.status='SUBMITTED'`];
@@ -1408,6 +1716,7 @@ api.get('/admin/exam-results', requireAdmin, async (req,res)=>{
       WHEN a.total_count=10 THEN '10 Questions'
       WHEN a.total_count=20 THEN '20 Questions'
       WHEN a.total_count=50 THEN '50 Questions'
+      WHEN a.total_count=100 THEN '100 Questions'
       ELSE 'Practice'
     END`;
     if(type && ['model','mock','practice','bank','10','20','50','100'].includes(type)){
@@ -1444,6 +1753,186 @@ api.get('/admin/exam-results/export', requireAdmin, async (req,res)=>{
     const minPct=req.query.min_pct===''||req.query.min_pct===undefined?0:Number(req.query.min_pct);
     const maxPct=req.query.max_pct===''||req.query.max_pct===undefined?100:Number(req.query.max_pct);
     if(!Number.isFinite(minPct)||!Number.isFinite(maxPct)||minPct<0||maxPct>100||minPct>maxPct)return sendError(res,400,'Invalid percentage range.');
+
+    if(type === 'model'){
+      const w=[];
+      const p=[];
+      if(exam){
+        w.push(`(r.exam_id=$${p.length+1} OR me.title=$${p.length+1})`);
+        p.push(exam);
+      }
+      if(subjectFilter){
+        w.push(`EXISTS (SELECT 1 FROM model_exam_questions mq WHERE mq.exam_id=r.exam_id AND mq.subject=$${p.length+1})`);
+        p.push(subjectFilter);
+      }
+      if(from){ w.push(`r.submitted_at::date >= $${p.length+1}::date`); p.push(from); }
+      if(to){ w.push(`r.submitted_at::date <= $${p.length+1}::date`); p.push(to); }
+      w.push(`r.percentage >= $${p.length+1}`); p.push(minPct);
+      w.push(`r.percentage <= $${p.length+1}`); p.push(maxPct);
+
+      const whereModel=w.length ? 'WHERE '+w.join(' AND ') : '';
+      const q=await pool.query(`
+        SELECT u.name,u.email,
+               me.title AS exam,
+               'Model Exam' AS exam_type,
+               '' AS topic,
+               '' AS subtopics,
+               to_char(r.submitted_at,'DD-MM-YYYY HH24:MI') AS date,
+               r.total_questions::int AS questions,
+               r.marks::numeric AS marks,
+               r.total_questions::numeric AS total_marks,
+               r.percentage::numeric(10,2) AS percentage
+        FROM model_exam_results r
+        JOIN model_exams me ON me.exam_id=r.exam_id
+        JOIN users u ON u.id=r.user_id
+        ${whereModel}
+        ORDER BY r.submitted_at DESC,r.id DESC
+      `,p);
+
+      /*
+       * When Exam Type = All, append the legacy result sources to the same
+       * export. Model-only export remains unchanged when type='model'.
+       */
+      if(type === '' || type === 'all'){
+        const legacyWhere=[`a.status='SUBMITTED'`];
+        const legacyParams=[];
+        const addLegacy=(sql,val)=>{legacyParams.push(val);legacyWhere.push(sql.replace('?', '$'+legacyParams.length));};
+
+        if(exam) addLegacy(`a.exam=?`,exam);
+        if(subjectFilter){
+          const subjectList=subjectCandidates(subjectFilter);
+          legacyWhere.push(`a.subject = ANY($${legacyParams.length+1}::text[])`);
+          legacyParams.push(subjectList);
+        }
+        if(from) addLegacy(`a.submitted_at::date >= ?::date`,from);
+        if(to) addLegacy(`a.submitted_at::date <= ?::date`,to);
+        if(requestedSubtopic){
+          legacyWhere.push(`EXISTS (
+            SELECT 1 FROM unnest(a.question_ids) AS aqid
+            JOIN questions qq ON qq.id=aqid
+            WHERE qq.subtopic = ANY($${legacyParams.length+1}::text[])
+          )`);
+          legacyParams.push(requestedSubtopicCandidatesSingle);
+        }else if(requestedSubtopics.length){
+          legacyWhere.push(`EXISTS (
+            SELECT 1 FROM unnest(a.question_ids) AS aqid
+            JOIN questions qq ON qq.id=aqid
+            WHERE qq.subtopic = ANY($${legacyParams.length+1}::text[])
+          )`);
+          legacyParams.push(requestedSubtopicCandidates);
+        }
+        legacyWhere.push(`COALESCE(a.score,0) >= $${legacyParams.length+1}`); legacyParams.push(minPct);
+        legacyWhere.push(`COALESCE(a.score,0) <= $${legacyParams.length+1}`); legacyParams.push(maxPct);
+
+        const legacyTypeSql=`CASE
+          WHEN lower(a.exam) LIKE '%model%' THEN 'Model Exam'
+          WHEN a.mode='mock' THEN 'Mock Test'
+          WHEN a.mode='bank' THEN 'Question Bank'
+          WHEN a.total_count=10 THEN '10 Questions'
+          WHEN a.total_count=20 THEN '20 Questions'
+          WHEN a.total_count=50 THEN '50 Questions'
+          WHEN a.total_count=100 THEN '100 Questions'
+          ELSE 'Practice'
+        END`;
+
+        const legacyQ=await pool.query(`
+          SELECT u.name,u.email,a.exam,
+                 ${legacyTypeSql} AS exam_type,
+                 '' AS topic,
+                 COALESCE((
+                   SELECT string_agg(DISTINCT qq.subtopic, ' | ' ORDER BY qq.subtopic)
+                   FROM unnest(a.question_ids) AS aqid
+                   JOIN questions qq ON qq.id=aqid
+                 ),'') AS subtopics,
+                 to_char(COALESCE(a.submitted_at,a.started_at),'DD-MM-YYYY HH24:MI') AS date,
+                 COALESCE(a.total_count,0)::int AS questions,
+                 COALESCE(a.correct_count,0)::int AS marks,
+                 COALESCE(a.total_count,0)::int AS total_marks,
+                 COALESCE(a.score,0)::numeric(10,2) AS percentage
+          FROM attempts a
+          JOIN users u ON u.id=a.user_id
+          WHERE ${legacyWhere.join(' AND ')}
+          ORDER BY COALESCE(a.submitted_at,a.started_at) DESC,a.id DESC
+        `,legacyParams);
+
+        for(const r of legacyQ.rows){
+          r.topic=[...new Set(String(r.subtopics||'').split(' | ').map(group4TopicForSubtopic).filter(Boolean))].join(' | ');
+          q.rows.push(r);
+        }
+      }
+
+      /* Jump directly to the shared XLSX generator below. */
+      const escXml=v=>String(v??'')
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/\"/g,'&quot;').replace(/'/g,'&apos;');
+      const colName=n=>{
+        let z=''; n=Number(n)+1;
+        while(n){const rr=(n-1)%26;z=String.fromCharCode(65+rr)+z;n=Math.floor((n-1)/26);}
+        return z;
+      };
+      const inlineCell=(ref,value,style)=>{
+        const text=escXml(value);
+        return `<c r="${ref}" t="inlineStr"${style?` s="${style}"`:''}><is><t xml:space="preserve">${text}</t></is></c>`;
+      };
+      const numCell=(ref,value,style)=>`<c r="${ref}" t="n"${style?` s="${style}"`:''}><v>${Number(value)||0}</v></c>`;
+      const sheetXml=(rows)=>{
+        const headers=['Name','Email','Exam','Exam Type','Topic','Subtopics','Date','Questions','Marks','Total Marks','Percentage'];
+        const out=[];
+        out.push('<row r="1">'+headers.map((h,i)=>inlineCell(`${colName(i)}1`,h,1)).join('')+'</row>');
+        rows.forEach((r,ri)=>{
+          const rowNo=ri+2;
+          const vals=[r.name,r.email,r.exam,r.exam_type,r.topic,r.subtopics,r.date];
+          const cells=[];
+          vals.forEach((v,i)=>cells.push(inlineCell(`${colName(i)}${rowNo}`,v)));
+          cells.push(numCell(`H${rowNo}`,r.questions));
+          cells.push(numCell(`I${rowNo}`,r.marks));
+          cells.push(numCell(`J${rowNo}`,r.total_marks));
+          cells.push(numCell(`K${rowNo}`,r.percentage));
+          out.push(`<row r="${rowNo}">${cells.join('')}</row>`);
+        });
+        return `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"/></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols><col min="1" max="1" width="24"/><col min="2" max="2" width="32"/><col min="3" max="4" width="18"/><col min="5" max="6" width="28"/><col min="7" max="7" width="20"/><col min="8" max="11" width="14"/></cols><sheetData>${out.join('')}</sheetData><autoFilter ref="A1:K${Math.max(1,rows.length+1)}"/></worksheet>`;
+      };
+      const safeSheetName=(name,used)=>{
+        let n=String(name||'Model Exam').replace(/[\\\/\?\*\[\]:]/g,' ').trim()||'Model Exam';
+        n=n.slice(0,31); const base=n; let i=2;
+        while(used.has(n)){const suffix=` (${i++})`;n=base.slice(0,31-suffix.length)+suffix;}
+        used.add(n); return n;
+      };
+      const groups=new Map();
+      for(const r of q.rows){const key=String(r.exam||'Model Exam');if(!groups.has(key))groups.set(key,[]);groups.get(key).push(r);}
+      if(!groups.size)groups.set('No Results',[]);
+      const sheets=[];const rels=[];const content=[];const usedNames=new Set();let idx=1;
+      for(const [examName,rows] of groups.entries()){
+        const sheetName=safeSheetName(examName,usedNames);
+        sheets.push(`<sheet name="${escXml(sheetName)}" sheetId="${idx}" r:id="rId${idx}"/>`);
+        rels.push(`<Relationship Id="rId${idx}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${idx}.xml"/>`);
+        content.push(`<Override PartName="/xl/worksheets/sheet${idx}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`);
+        idx++;
+      }
+      const files=[
+        {name:'[Content_Types].xml',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${content.join('')}</Types>`},
+        {name:'_rels/.rels',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`},
+        {name:'xl/workbook.xml',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView/></bookViews><sheets>${sheets.join('')}</sheets></workbook>`},
+        {name:'xl/_rels/workbook.xml.rels',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${rels.join('')}<Relationship Id="rId${idx}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`},
+        {name:'xl/styles.xml',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="10"/><name val="Arial"/></font><font><b/><sz val="10"/><name val="Arial"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0"/></cellXfs></styleSheet>`}
+      ];
+      idx=1; for(const [examName,rows] of groups.entries()){files.push({name:`xl/worksheets/sheet${idx}.xml`,data:sheetXml(rows)});idx++;}
+      const crcTable=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1);t[n]=c>>>0;}return t;})();
+      const crc32=buf=>{let c=0xFFFFFFFF;for(const b of buf)c=crcTable[(c^b)&255]^(c>>>8);return(c^0xFFFFFFFF)>>>0;};
+      const zipParts=[];const central=[];let offset=0;const now=new Date();const dosTime=(now.getHours()<<11)|(now.getMinutes()<<5)|Math.floor(now.getSeconds()/2);const dosDate=((now.getFullYear()-1980)<<9)|((now.getMonth()+1)<<5)|now.getDate();
+      for(const f of files){
+        const nameBuf=Buffer.from(f.name,'utf8'),dataBuf=Buffer.from(f.data,'utf8'),crc=crc32(dataBuf);
+        const local=Buffer.alloc(30+nameBuf.length);local.writeUInt32LE(0x04034b50,0);local.writeUInt16LE(20,4);local.writeUInt16LE(0,6);local.writeUInt16LE(0,8);local.writeUInt16LE(dosTime,10);local.writeUInt16LE(dosDate,12);local.writeUInt32LE(crc,14);local.writeUInt32LE(dataBuf.length,18);local.writeUInt32LE(dataBuf.length,22);local.writeUInt16LE(nameBuf.length,26);local.writeUInt16LE(0,28);nameBuf.copy(local,30);zipParts.push(local,dataBuf);
+        const c=Buffer.alloc(46+nameBuf.length);c.writeUInt32LE(0x02014b50,0);c.writeUInt16LE(20,4);c.writeUInt16LE(20,6);c.writeUInt16LE(0,8);c.writeUInt16LE(0,10);c.writeUInt16LE(dosTime,12);c.writeUInt16LE(dosDate,14);c.writeUInt32LE(crc,16);c.writeUInt32LE(dataBuf.length,20);c.writeUInt32LE(dataBuf.length,24);c.writeUInt16LE(nameBuf.length,28);c.writeUInt16LE(0,30);c.writeUInt16LE(0,32);c.writeUInt16LE(0,34);c.writeUInt16LE(0,36);c.writeUInt16LE(0,38);c.writeUInt32LE(offset,42);nameBuf.copy(c,46);central.push(c);offset+=local.length+dataBuf.length;
+      }
+      const centralBuf=Buffer.concat(central);const end=Buffer.alloc(22);end.writeUInt32LE(0x06054b50,0);end.writeUInt16LE(0,4);end.writeUInt16LE(0,6);end.writeUInt16LE(files.length,8);end.writeUInt16LE(files.length,10);end.writeUInt32LE(centralBuf.length,12);end.writeUInt32LE(offset,16);
+      const xlsx=Buffer.concat([...zipParts,centralBuf,end]);
+      const filename=(type===''?'thiral_all_exam_results_':'thiral_model_exam_results_')+new Date().toISOString().slice(0,10)+'.xlsx';
+      res.setHeader('Content-Type','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition',`attachment; filename="${filename}"`);
+      res.setHeader('Content-Length',String(xlsx.length));
+      return res.end(xlsx);
+    }
 
     const where=[`a.status='SUBMITTED'`],params=[];
     const add=(sql,val)=>{params.push(val);where.push(sql.replace('?', '$'+params.length));};
