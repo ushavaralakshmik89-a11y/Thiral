@@ -4627,6 +4627,36 @@ async function api(path,init={}){
 function stop(){if(T.timer){clearInterval(T.timer);T.timer=null;}}
 function timer(n){if($('timer'))$('timer').textContent=String(Math.max(0,n));}
 function lock(v){if($('options'))$('options').querySelectorAll('button').forEach(b=>b.disabled=v);}
+function ensurePracticeNav(){
+  var p=$('options');
+  if(!p)return;
+  var n=$('thiralPracticeNavFinal');
+  if(!n){
+    n=document.createElement('div');
+    n.id='thiralPracticeNavFinal';
+    n.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:16px;';
+    p.parentNode.insertBefore(n,p.nextSibling);
+  }
+  n.innerHTML=
+    '<button type="button" class="secondary" id="thiralPracticePrevFinal">← '+(lang()==='en'?'Previous':'முந்தைய')+'</button>'+
+    '<div style="display:flex;gap:4px;align-items:center;">'+
+      '<button type="button" id="thiralPracticeNextFinal">'+(lang()==='en'?'Next →':'அடுத்து →')+'</button>'+
+      '<button type="button" id="thiralPracticeSubmitFinal">'+(lang()==='en'?'Submit':'சமர்ப்பிக்க')+'</button>'+
+    '</div>';
+  $('thiralPracticePrevFinal').disabled=T.i===0;
+  $('thiralPracticeNextFinal').disabled=!T.checks[String(T.q[T.i]?.id)] || T.i===T.q.length-1;
+  $('thiralPracticePrevFinal').onclick=function(){
+    if(T.busy||T.submitted||T.i<=0)return;
+    T.i--;
+    render();
+  };
+  $('thiralPracticeNextFinal').onclick=function(){
+    window.__THIRAL_FINAL_NEXT();
+  };
+  $('thiralPracticeSubmitFinal').onclick=function(){
+    submit();
+  };
+}
 function render(){
   const q=T.q[T.i]; if(!q)return;
   stop(); T.busy=false;
@@ -4639,6 +4669,7 @@ function render(){
     '<button class="option" type="button" onclick="window.__THIRAL_FINAL_ANSWER('+j+')">'+
     String.fromCharCode(65+j)+'. '+esc(o)+'</button>'
   ).join('');
+  ensurePracticeNav();
   T.seconds=15; timer(15);
   T.timer=setInterval(()=>{
     T.seconds--; timer(T.seconds);
@@ -6655,7 +6686,7 @@ function escapeHtmlAdmin(v){
   function ensureNav(){
     var p=$('options'); if(!p)return;
     var n=$('thiralPostalNavV7'); if(!n){n=document.createElement('div');n.id='thiralPostalNavV7';n.className='top';n.style.marginTop='18px';p.parentNode.insertBefore(n,p.nextSibling);}
-    n.innerHTML='<button type="button" class="secondary" id="thiralPostalPrevV7">← '+(en()?'Previous':'முந்தைய')+'</button><div style="display:flex;gap:4px;align-items:center"><button type="button" id="thiralPostalNextV7">'+(en()?'Next →':'அடுத்து →')+'</button><button type="button" id="thiralPostalSubmitV7">'+(en()?'Submit':'சமர்ப்பிக்க')+'</button></div>';
+    n.innerHTML='<button type="button" class="secondary" id="thiralPostalPrevV7">← '+(en()?'Previous':'முந்தைய')+'</button><div style="display:flex;gap:10px;align-items:center"><button type="button" id="thiralPostalNextV7">'+(en()?'Next →':'அடுத்து →')+'</button><button type="button" id="thiralPostalSubmitV7">'+(en()?'Submit':'சமர்ப்பிக்க')+'</button></div>';
     $('thiralPostalPrevV7').onclick=function(){prev();}; $('thiralPostalNextV7').onclick=function(){next();}; $('thiralPostalSubmitV7').onclick=function(){submit();};
   }
   function render(){
