@@ -2554,31 +2554,59 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
       uniquePool.push({...q,_quality:info});
     }
 
-    /* Approximate near-duplicate protection:
-       compare token sets after removing very common question words.
-       This is deliberately conservative: if two questions are substantially
-       the same idea, only the first survives. */
-    const stop=new Set(['what','which','who','when','where','is','are','was','were','the','a','an','of','in','to','for','and','or','எது','எந்த','யார்','எப்போது','எங்கே','ஒரு','ஒரு','இன்','இல்','மற்றும்']);
-    const signature=(stem)=>{
-      const toks=stem.split(' ').filter(x=>x.length>2 && !stop.has(x));
-      return [...new Set(toks)].sort().slice(0,18).join('|');
+    /* Near-duplicate protection.
+       V4 compared every candidate with every other candidate. With a large
+       question bank that becomes O(n²) and can make the endpoint appear to
+       hang. V5 uses token buckets, so only candidates sharing strong tokens
+       are compared. */
+    const stop=new Set([
+      'what','which','who','when','where','is','are','was','were','the','a','an',
+      'of','in','to','for','and','or','from','on','by','with',
+      'எது','எந்த','யார்','எப்போது','எங்கே','ஒரு','இன்','இல்','மற்றும்','எந்த','ஆகிய'
+    ]);
+
+    const tokensFor=(stem)=>{
+      return [...new Set(
+        stem.split(' ').filter(x=>x.length>2 && !stop.has(x))
+      )].sort();
     };
 
+    const signature=(stem)=>{
+      const toks=tokensFor(stem);
+      return toks.slice(0,18).join('|');
+    };
+
+    const buckets=new Map();
     const accepted=[];
-    const sigMap=new Map();
+    const exactSig=new Set();
 
     for(const q of uniquePool){
-      const sig=signature(q._quality.stem);
-      let near=false;
-      const tokens=new Set(sig.split('|').filter(Boolean));
+      const toks=tokensFor(q._quality.stem);
+      const sig=toks.slice(0,18).join('|');
 
-      for(const [oldSig,oldQ] of sigMap.entries()){
-        const oldTokens=new Set(oldSig.split('|').filter(Boolean));
-        if(!tokens.size || !oldTokens.size) continue;
+      if(exactSig.has(sig)) continue;
+
+      /* Use up to three rare-ish anchors to limit comparisons. */
+      const anchors=toks.slice(0,3);
+      const candidateIndexes=new Set();
+
+      for(const a of anchors){
+        const arr=buckets.get(a);
+        if(arr) for(const idx of arr) candidateIndexes.add(idx);
+      }
+
+      let near=false;
+      const current=new Set(toks);
+
+      for(const idx of candidateIndexes){
+        const oldQ=accepted[idx];
+        const oldTokens=tokensFor(oldQ._quality.stem);
+        const oldSet=new Set(oldTokens);
         let inter=0;
-        for(const t of tokens) if(oldTokens.has(t)) inter++;
-        const union=new Set([...tokens,...oldTokens]).size;
+        for(const t of current) if(oldSet.has(t)) inter++;
+        const union=new Set([...current,...oldSet]).size;
         const jaccard=union ? inter/union : 0;
+
         if(jaccard>=0.82){
           near=true;
           break;
@@ -2586,8 +2614,15 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
       }
 
       if(near) continue;
-      sigMap.set(sig,q);
+
+      const idx=accepted.length;
       accepted.push(q);
+      exactSig.add(sig);
+
+      for(const a of anchors){
+        if(!buckets.has(a)) buckets.set(a,[]);
+        buckets.get(a).push(idx);
+      }
     }
 
     const bySubject={tamil:[],gs:[],apt:[]};
