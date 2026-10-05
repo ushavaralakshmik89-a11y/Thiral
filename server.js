@@ -203,22 +203,143 @@ const GROUP4_TAMIL_NEW_SUBTOPIC_ALIASES = {
   'எண்-எழுத்து தர்க்கம்':'எழுத்து-எண் தர்க்கம்'
 };
 
-/* ===== THIRAL GS51 SERVER-ONLY LOOKUP FIX ===== */
-const THIRAL_GS51_DB_ALIASES = {
-  'இந்திய பண்பாடு':'Indian Culture','Indian Culture':'Indian Culture','சிந்து சமவெளி நாகரிகம்':'Indus Valley Civilization','Indus Valley Civilization':'Indus Valley Civilization','குப்தர்கள்':'Guptas','Guptas':'Guptas','டெல்லி சுல்தான்கள்':'Delhi Sultanate','Delhi Sultanate':'Delhi Sultanate','முகலாயர்கள்':'Mughals','Mughals':'Mughals','மராத்தியர்கள்':'Marathas','Marathas':'Marathas','தென்னிந்திய வரலாறு':'South Indian History','South Indian History':'South Indian History','தேசிய மறுமலர்ச்சி':'National Revival','National Revival':'National Revival','ஆங்கிலேயருக்கு எதிரான ஆரம்ப எழுச்சிகள்':'Early Resistance to British Rule','Early Uprisings against British Rule':'Early Resistance to British Rule','Early Resistance to British Rule':'Early Resistance to British Rule','இந்திய தேசிய காங்கிரஸ்':'Indian National Congress','Indian National Congress':'Indian National Congress','தேசிய தலைவர்கள்':'National Leaders','National Leaders':'National Leaders','தமிழ்நாட்டின் சுதந்திரப் போராட்ட இயக்கங்கள்':'Role of Tamil Nadu in the Freedom Struggle','Role of Tamil Nadu in Freedom Struggle':'Role of Tamil Nadu in the Freedom Struggle','Role of Tamil Nadu in the Freedom Struggle':'Role of Tamil Nadu in the Freedom Struggle','இந்திய பண்பாட்டின் சிறப்பம்சங்கள்':'Features of Indian Culture','Features of Indian Culture':'Features of Indian Culture','வேற்றுமையில் ஒற்றுமை':'Unity in Diversity','Unity in Diversity':'Unity in Diversity','மதச்சார்பின்மை':'Secularism','Secularism':'Secularism',
-  'தமிழ் சமூக வரலாறு':'Tamil Social History','Tamil Social History':'Tamil Social History','தொல்லியல் கண்டுபிடிப்புகள்':'Archaeological Discoveries','Archaeological Discoveries':'Archaeological Discoveries','சங்க காலம் முதல் நவீன காலம் வரையிலான தமிழ் இலக்கியம்':'Tamil Literature from Sangam Age to Modern Age','Tamil Literature from Sangam Age to Modern Age':'Tamil Literature from Sangam Age to Modern Age','தமிழ் பண்பாடு மற்றும் பாரம்பரியம்':'Tamil Culture and Heritage','Tamil Culture and Heritage':'Tamil Culture and Heritage','திருக்குறள் மற்றும் உலகளாவிய மதிப்புகள்':'Thirukkural and Universal Values','Thirukkural and Universal Values':'Thirukkural and Universal Values','தமிழ்நாட்டின் சுதந்திரப் போராட்ட பங்கு':'Role of Tamil Nadu in the Freedom Struggle','ஆங்கிலேயருக்கு எதிரான ஆரம்பப் போராட்டங்கள்':'Early Resistances to British Rule','Early Agitations against British Rule':'Early Resistances to British Rule','Early Resistances to British Rule':'Early Resistances to British Rule','சுதந்திரப் போராட்டத்தில் பெண்களின் பங்கு':'Role of Women in Freedom Struggle','Role of Women in Freedom Struggle':'Role of Women in Freedom Struggle','சமூக சீர்திருத்தவாதிகள்':'Social Reformers','Social Reformers':'Social Reformers','சமூக சீர்திருத்த இயக்கங்கள்':'Social Reform Movements','Social Reform Movements':'Social Reform Movements','தமிழ்நாட்டின் சமூக மாற்றங்கள்':'Social Changes in Tamil Nadu','Social Changes in Tamil Nadu':'Social Changes in Tamil Nadu','சமூக நீதி இயக்கங்கள்':'Social Justice Movements','Social Justice Movements':'Social Justice Movements','சமூக-அரசியல் இயக்கங்கள்':'Socio-Political Movements','Socio-Political Movements':'Socio-Political Movements',
-  'தமிழ்நாடு வளர்ச்சி நிர்வாகம்':'Development Administration in Tamil Nadu','Tamil Nadu Development Administration':'Development Administration in Tamil Nadu','Development Administration in Tamil Nadu':'Development Administration in Tamil Nadu','இந்திய பொருளாதாரத்தின் இயல்பு':'Nature of Indian Economy','Nature of Indian Economy':'Nature of Indian Economy','திட்டமிடல் மற்றும் வளர்ச்சி':'Planning and Development','Planning and Development':'Planning and Development','திட்டக் குழு மற்றும் நிதி ஆயோக்':'Planning Commission and NITI Aayog','Planning Commission and NITI Aayog':'Planning Commission and NITI Aayog','வருவாய் ஆதாரங்கள்':'Sources of Revenue','Sources of Revenue':'Sources of Revenue','இந்திய ரிசர்வ் வங்கி':'Reserve Bank of India','Reserve Bank of India':'Reserve Bank of India','நிதிக் குழு':'Finance Commission','Finance Commission':'Finance Commission','மத்திய-மாநில வளப் பகிர்வு':'Centre-State Resource Sharing','Centre-State Resource Sharing':'Centre-State Resource Sharing','சரக்கு மற்றும் சேவை வரி (GST)':'Goods and Services Tax (GST)','Goods and Services Tax (GST)':'Goods and Services Tax (GST)','வேலைவாய்ப்பு உருவாக்கம்':'Employment Generation','Employment Generation':'Employment Generation','நிலச் சீர்திருத்தங்கள் மற்றும் வேளாண்மை':'Land Reforms and Agriculture','Land Reforms and Agriculture':'Land Reforms and Agriculture','வேளாண்மையில் அறிவியல் மற்றும் தொழில்நுட்பம்':'Science and Technology in Agriculture','Science and Technology in Agriculture':'Science and Technology in Agriculture','தொழில் வளர்ச்சி':'Industrial Development','Industrial Growth':'Industrial Development','Industrial Development':'Industrial Development','கிராமப்புற நலத்திட்டங்கள்':'Rural Welfare Schemes','Rural Welfare Programmes':'Rural Welfare Schemes','Rural Welfare Schemes':'Rural Welfare Schemes','மக்கள் தொகை மற்றும் சமூகப் பிரச்சினைகள்':'Population and Social Issues','Population and Social Problems':'Population and Social Issues','Population and Social Issues':'Population and Social Issues','கல்வி அமைப்பு':'Education System','Education System':'Education System','சுகாதார அமைப்பு':'Health System','Health System':'Health System','வேலைவாய்ப்பு மற்றும் வறுமை':'Employment and Poverty','Employment and Poverty':'Employment and Poverty','சமூக நீதி மற்றும் சமூக நல்லிணக்கம்':'Social Justice and Social Harmony','Social Justice and Social Harmony':'Social Justice and Social Harmony','தமிழ்நாடு அரசு நலத்திட்டங்கள்':'Tamil Nadu Government Welfare Schemes','Government Welfare Schemes in Tamil Nadu':'Tamil Nadu Government Welfare Schemes','Tamil Nadu Government Welfare Schemes':'Tamil Nadu Government Welfare Schemes','தமிழ்நாட்டின் புவியியல் மற்றும் பொருளாதார வளர்ச்சி':'Geography and Economic Development of Tamil Nadu','Geography of Tamil Nadu and Economic Growth':'Geography and Economic Development of Tamil Nadu','Geography and Economic Development of Tamil Nadu':'Geography and Economic Development of Tamil Nadu','சமூக-பொருளாதார பிரச்சினைகள்':'Socio-Economic Issues','Socio-Economic Issues':'Socio-Economic Issues','நடப்பு சமூக-பொருளாதார நிகழ்வுகள்':'Current Socio-Economic Events','Current Socio-Economic Affairs':'Current Socio-Economic Events','Current Socio-Economic Events':'Current Socio-Economic Events'
-};
-const THIRAL_GS51_KEYS = new Set(Object.keys(THIRAL_GS51_DB_ALIASES));
-function isThiralGs51(subject, subtopic){ return subject==='gs' && THIRAL_GS51_KEYS.has(String(subtopic||'').trim()); }
-function thiralGs51Candidates(raw){ const s=String(raw||'').trim(); if(!s)return []; const m=THIRAL_GS51_DB_ALIASES[s]||''; return [...new Set([s,m].filter(Boolean))]; }
-
 function subtopicCandidates(raw){
   const s=String(raw||'').trim();
   if(!s) return [];
   const a=[s, GROUP4_SUBTOPIC_ALIASES[s] || '', GROUP4_TAMIL_NEW_SUBTOPIC_ALIASES[s] || ''];
   return [...new Set(a.filter(Boolean))];
 }
+
+/* ===== THIRAL GS51 SERVER-ONLY MATCHING =====
+   Applies only to the 51 newly added Group 4 GS subtopics.
+   Existing question data is not changed. */
+const THIRAL_GS51_SUBTOPICS = new Set([
+  "இந்திய பண்பாடு",
+  "சிந்து சமவெளி நாகரிகம்",
+  "குப்தர்கள்",
+  "டெல்லி சுல்தான்கள்",
+  "முகலாயர்கள்",
+  "மராத்தியர்கள்",
+  "தென்னிந்திய வரலாறு",
+  "தேசிய மறுமலர்ச்சி",
+  "ஆங்கிலேயருக்கு எதிரான ஆரம்ப எழுச்சிகள்",
+  "இந்திய தேசிய காங்கிரஸ்",
+  "தேசிய தலைவர்கள்",
+  "தமிழ்நாட்டின் சுதந்திரப் போராட்ட இயக்கங்கள்",
+  "இந்திய பண்பாட்டின் சிறப்பம்சங்கள்",
+  "வேற்றுமையில் ஒற்றுமை",
+  "மதச்சார்பின்மை",
+  "தமிழ் சமூக வரலாறு",
+  "தொல்லியல் கண்டுபிடிப்புகள்",
+  "சங்க காலம் முதல் நவீன காலம் வரையிலான தமிழ் இலக்கியம்",
+  "தமிழ் பண்பாடு மற்றும் பாரம்பரியம்",
+  "திருக்குறள் மற்றும் உலகளாவிய மதிப்புகள்",
+  "தமிழ்நாட்டின் சுதந்திரப் போராட்ட பங்கு",
+  "ஆங்கிலேயருக்கு எதிரான ஆரம்பப் போராட்டங்கள்",
+  "சுதந்திரப் போராட்டத்தில் பெண்களின் பங்கு",
+  "சமூக சீர்திருத்தவாதிகள்",
+  "சமூக சீர்திருத்த இயக்கங்கள்",
+  "தமிழ்நாட்டின் சமூக மாற்றங்கள்",
+  "சமூக நீதி இயக்கங்கள்",
+  "சமூக-அரசியல் இயக்கங்கள்",
+  "தமிழ்நாடு வளர்ச்சி நிர்வாகம்",
+  "இந்திய பொருளாதாரத்தின் இயல்பு",
+  "திட்டமிடல் மற்றும் வளர்ச்சி",
+  "திட்டக் குழு மற்றும் நிதி ஆயோக்",
+  "வருவாய் ஆதாரங்கள்",
+  "இந்திய ரிசர்வ் வங்கி",
+  "நிதிக் குழு",
+  "மத்திய-மாநில வளப் பகிர்வு",
+  "சரக்கு மற்றும் சேவை வரி (GST)",
+  "வேலைவாய்ப்பு உருவாக்கம்",
+  "நிலச் சீர்திருத்தங்கள் மற்றும் வேளாண்மை",
+  "வேளாண்மையில் அறிவியல் மற்றும் தொழில்நுட்பம்",
+  "தொழில் வளர்ச்சி",
+  "கிராமப்புற நலத்திட்டங்கள்",
+  "மக்கள் தொகை மற்றும் சமூகப் பிரச்சினைகள்",
+  "கல்வி அமைப்பு",
+  "சுகாதார அமைப்பு",
+  "வேலைவாய்ப்பு மற்றும் வறுமை",
+  "சமூக நீதி மற்றும் சமூக நல்லிணக்கம்",
+  "தமிழ்நாடு அரசு நலத்திட்டங்கள்",
+  "தமிழ்நாட்டின் புவியியல் மற்றும் பொருளாதார வளர்ச்சி",
+  "சமூக-பொருளாதார பிரச்சினைகள்",
+  "நடப்பு சமூக-பொருளாதார நிகழ்வுகள்",
+  "Indian Culture",
+  "Indus Valley Civilization",
+  "Guptas",
+  "Delhi Sultanate",
+  "Mughals",
+  "Marathas",
+  "South Indian History",
+  "National Renaissance",
+  "Early Uprisings against British Rule",
+  "Indian National Congress",
+  "National Leaders",
+  "Role of Tamil Nadu in Freedom Struggle",
+  "Features of Indian Culture",
+  "Unity in Diversity",
+  "Secularism",
+  "Tamil Social History",
+  "Archaeological Discoveries",
+  "Tamil Literature from Sangam to Modern Era",
+  "Tamil Culture and Heritage",
+  "Thirukkural and Universal Values",
+  "Tamil Nadu's Role in Freedom Struggle",
+  "Early Agitations against British Rule",
+  "Role of Women in Freedom Struggle",
+  "Social Reformers",
+  "Social Reform Movements",
+  "Social Changes in Tamil Nadu",
+  "Social Justice Movements",
+  "Socio-Political Movements",
+  "Development Administration in Tamil Nadu",
+  "Nature of Indian Economy",
+  "Planning and Development",
+  "Planning Commission and NITI Aayog",
+  "Sources of Revenue",
+  "Reserve Bank of India",
+  "Finance Commission",
+  "Centre-State Resource Sharing",
+  "Goods and Services Tax (GST)",
+  "Employment Generation",
+  "Land Reforms and Agriculture",
+  "Science and Technology in Agriculture",
+  "Industrial Growth",
+  "Rural Welfare Programmes",
+  "Population and Social Problems",
+  "Education System",
+  "Health System",
+  "Employment and Poverty",
+  "Social Justice and Social Harmony",
+  "Government Welfare Schemes in Tamil Nadu",
+  "Geography of Tamil Nadu and Economic Growth",
+  "Socio-Economic Problems",
+  "Current Socio-Economic Affairs",
+ ]);
+const THIRAL_GS51_DB_ALIASES = {
+  "Early Uprisings against British Rule": "Early Resistance to British Rule",
+  "Early Agitations against British Rule": "Early Resistances to British Rule",
+  "Role of Tamil Nadu in Freedom Struggle": "Role of Tamil Nadu in the Freedom Struggle",
+  "Industrial Growth": "Industrial Development",
+  "Rural Welfare Programmes": "Rural Welfare Schemes",
+  "Population and Social Problems": "Population and Social Issues",
+  "Government Welfare Schemes in Tamil Nadu": "Tamil Nadu Government Welfare Schemes",
+  "Geography of Tamil Nadu and Economic Growth": "Geography and Economic Development of Tamil Nadu",
+  "Current Socio-Economic Affairs": "Current Socio-Economic Events",
+};
+function isThiralGs51(subject, subtopic){
+  return subject === 'gs' && THIRAL_GS51_SUBTOPICS.has(String(subtopic||'').trim());
+}
+function thiralGs51ExamCandidates(exam, subject, subtopic){
+  return isThiralGs51(subject, subtopic) ? ['group4','Group 4','Group4'] : [exam];
+}
+function thiralGs51SubtopicCandidates(subtopic){
+  const s=String(subtopic||'').trim();
+  if(!s) return [];
+  return [...new Set([s, THIRAL_GS51_DB_ALIASES[s] || '', GROUP4_SUBTOPIC_ALIASES[s] || '', GROUP4_TAMIL_NEW_SUBTOPIC_ALIASES[s] || ''].filter(Boolean))];
+}
+
 
 function newSessionId() {
   return crypto.randomBytes(32).toString('hex');
@@ -1082,36 +1203,13 @@ api.get('/questions', requirePasswordReady, async (req, res) => {
     const offset = Math.max(parseInt(req.query.offset || '0',10) || 0,0);
     if (!exam || !subject || !['ta','en'].includes(language)) return sendError(res,400,'Invalid question request.');
 
-    /*
-       ISOLATED FIX: NEW TAMIL GROUP 4 APTITUDE TOPICS ONLY.
-       Every existing Tamil path, every English path, and every other subject
-       keeps the original query logic. This special branch activates only for
-       the ten newly imported Tamil Aptitude topics.
-    */
-    const NEW_TAMIL_G4_APT_MAP = {
-      'எளிமைப்படுத்துதல்':'எளிமைப்படுத்தல்',
-      'மீ.பொ.வ (HCF)':'மீ.பெ.வ',
-      'மீ.சி.ம (LCM)':'மீ.சி.பொ.ம',
-      'எளிய வட்டி':'தனிவட்டி',
-      'கூட்டு வட்டி':'கூட்டு வட்டி',
-      'தர்க்க சிந்தனை':'தர்க்கரீதியான சிந்தனை',
-      'புதிர்கள்':'புதிர்கள்',
-      'பகடை':'பகடை',
-      'காட்சித் தர்க்கம்':'காட்சித் தர்க்கம்',
-      'எண்-எழுத்து தர்க்கம்':'எழுத்து-எண் தர்க்கம்'
-    };
-
-    const isNewTamilG4Apt = exam === 'group4' && subject === 'apt' && language === 'ta' && Object.prototype.hasOwnProperty.call(NEW_TAMIL_G4_APT_MAP, subtopic);
-    const isThiralGs51Request = isThiralGs51(subject, subtopic);
-    const where = (isNewTamilG4Apt || isThiralGs51Request)
-      ? ['exam = ANY($1::text[])','subject = ANY($2::text[])','language=$3','is_active=true']
-      : ['exam=$1','subject = ANY($2::text[])','language=$3','is_active=true'];
-    const params = (isNewTamilG4Apt || isThiralGs51Request)
-      ? [['group4','Group 4','Group4'], isThiralGs51Request ? ['gs','பொது அறிவு','General Studies','General Knowledge','பொது அறிவு / General Studies','general studies'] : ['apt','Aptitude'], language]
-      : [exam, subjectCandidatesList, language];
+    const examCandidates = thiralGs51ExamCandidates(exam, subject, subtopic);
+    const where = ['exam = ANY($1::text[])','subject = ANY($2::text[])','language=$3','is_active=true'];
+    const params = [examCandidates, subjectCandidatesList, language];
     let n = 4;
-    const subCandidates = isNewTamilG4Apt ? [NEW_TAMIL_G4_APT_MAP[subtopic]] : isThiralGs51Request ? thiralGs51Candidates(subtopic) : subtopicCandidates(subtopic);
-
+    const subCandidates = isThiralGs51(subject, subtopic)
+      ? thiralGs51SubtopicCandidates(subtopic)
+      : subtopicCandidates(subtopic);
     if (subCandidates.length === 1) {
       where.push(`subtopic=$${n++}`); params.push(subCandidates[0]);
     } else if (subCandidates.length > 1) {
@@ -1172,32 +1270,20 @@ api.get('/practice/questions', requirePasswordReady, async (req, res) => {
       return sendError(res, 400, 'Invalid question request.');
     }
 
-    const NEW_TAMIL_G4_APT_MAP = {
-      'எளிமைப்படுத்துதல்':'எளிமைப்படுத்தல்',
-      'மீ.பொ.வ (HCF)':'மீ.பெ.வ',
-      'மீ.சி.ம (LCM)':'மீ.சி.பொ.ம',
-      'எளிய வட்டி':'தனிவட்டி',
-      'கூட்டு வட்டி':'கூட்டு வட்டி',
-      'தர்க்க சிந்தனை':'தர்க்கரீதியான சிந்தனை',
-      'புதிர்கள்':'புதிர்கள்',
-      'பகடை':'பகடை',
-      'காட்சித் தர்க்கம்':'காட்சித் தர்க்கம்',
-      'எண்-எழுத்து தர்க்கம்':'எழுத்து-எண் தர்க்கம்'
-    };
-
-    const isNewTamilG4Apt = exam === 'group4' && subject === 'apt' && language === 'ta' && Object.prototype.hasOwnProperty.call(NEW_TAMIL_G4_APT_MAP, subtopic);
-    const isThiralGs51Request = isThiralGs51(subject, subtopic);
-    const params = (isNewTamilG4Apt || isThiralGs51Request)
-      ? [req.user.id, ['group4','Group 4','Group4'], isThiralGs51Request ? ['gs','பொது அறிவு','General Studies','General Knowledge','பொது அறிவு / General Studies','general studies'] : ['apt','Aptitude'], language]
-      : [req.user.id, exam, subjectCandidatesList, language];
+    const examCandidates = thiralGs51ExamCandidates(exam, subject, subtopic);
+    const params = [req.user.id, examCandidates, subjectCandidatesList, language];
     let n = 5;
+
     let where = `
-      q.exam ${(isNewTamilG4Apt || isThiralGs51Request) ? '= ANY($2::text[])' : '= $2'}
+      q.exam = ANY($2::text[])
       AND q.subject = ANY($3::text[])
       AND q.language = $4
       AND q.is_active = true
     `;
-    const subCandidates = isNewTamilG4Apt ? [NEW_TAMIL_G4_APT_MAP[subtopic]] : isThiralGs51Request ? thiralGs51Candidates(subtopic) : subtopicCandidates(subtopic);
+
+    const subCandidates = isThiralGs51(subject, subtopic)
+      ? thiralGs51SubtopicCandidates(subtopic)
+      : subtopicCandidates(subtopic);
     if (subCandidates.length === 1) {
       where += ` AND q.subtopic = $${n}`;
       params.push(subCandidates[0]);
