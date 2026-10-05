@@ -4852,6 +4852,23 @@ async function loadPracticeQuestions(requested){
   }
   /* Group 4 database uses Tamil subtopic keys for GK in Tamil,
      while Aptitude English uses English subtopic keys. */
+  if(currentSubject==='apt' && contentLanguage!=='en'){
+    /* NEW Tamil Group 4 Aptitude topics only.
+       Existing Tamil topics and the entire English path are untouched. */
+    const group4NewTamilAptitudeSubtopics={
+      'எளிமைப்படுத்துதல்':'எளிமைப்படுத்தல்',
+      'மீ.பொ.வ (HCF)':'மீ.பெ.வ',
+      'மீ.சி.ம (LCM)':'மீ.சி.பொ.ம',
+      'எளிய வட்டி':'தனிவட்டி',
+      'கூட்டு வட்டி':'கூட்டு வட்டி',
+      'தர்க்க சிந்தனை':'தர்க்கரீதியான சிந்தனை',
+      'புதிர்கள்':'புதிர்கள்',
+      'பகடை':'பகடை',
+      'காட்சித் தர்க்கம்':'காட்சித் தர்க்கம்',
+      'எண்-எழுத்து தர்க்கம்':'எழுத்து-எண் தர்க்கம்'
+    };
+    dbSubtopic=group4NewTamilAptitudeSubtopics[selectedSubtopic]||selectedSubtopic;
+  }
   if(currentSubject==='apt' && contentLanguage==='en'){
     for(const topicKey of Object.keys(EN_LABELS.apt?.topics||{})){
       const subs=EN_LABELS.apt.topics[topicKey]?.subs||{};
