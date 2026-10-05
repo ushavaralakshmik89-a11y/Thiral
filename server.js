@@ -190,156 +190,12 @@ function subjectCandidates(raw){
     .map(([label])=>label);
   return [...new Set([canonical,s,...aliases].filter(Boolean))];
 }
-const GROUP4_TAMIL_NEW_SUBTOPIC_ALIASES = {
-  'எளிமைப்படுத்துதல்':'எளிமைப்படுத்தல்',
-  'மீ.பொ.வ (HCF)':'மீ.பெ.வ',
-  'மீ.சி.ம (LCM)':'மீ.சி.பொ.ம',
-  'எளிய வட்டி':'தனிவட்டி',
-  'கூட்டு வட்டி':'கூட்டு வட்டி',
-  'தர்க்க சிந்தனை':'தர்க்கரீதியான சிந்தனை',
-  'புதிர்கள்':'புதிர்கள்',
-  'பகடை':'பகடை',
-  'காட்சித் தர்க்கம்':'காட்சித் தர்க்கம்',
-  'எண்-எழுத்து தர்க்கம்':'எழுத்து-எண் தர்க்கம்'
-};
-
 function subtopicCandidates(raw){
   const s=String(raw||'').trim();
   if(!s) return [];
-  const a=[s, GROUP4_SUBTOPIC_ALIASES[s] || '', GROUP4_TAMIL_NEW_SUBTOPIC_ALIASES[s] || ''];
+  const a=[s, GROUP4_SUBTOPIC_ALIASES[s] || ''];
   return [...new Set(a.filter(Boolean))];
 }
-
-/* ===== THIRAL GS51 SERVER-ONLY MATCHING =====
-   Applies only to the 51 newly added Group 4 GS subtopics.
-   Existing question data is not changed. */
-const THIRAL_GS51_SUBTOPICS = new Set([
-  "இந்திய பண்பாடு",
-  "சிந்து சமவெளி நாகரிகம்",
-  "குப்தர்கள்",
-  "டெல்லி சுல்தான்கள்",
-  "முகலாயர்கள்",
-  "மராத்தியர்கள்",
-  "தென்னிந்திய வரலாறு",
-  "தேசிய மறுமலர்ச்சி",
-  "ஆங்கிலேயருக்கு எதிரான ஆரம்ப எழுச்சிகள்",
-  "இந்திய தேசிய காங்கிரஸ்",
-  "தேசிய தலைவர்கள்",
-  "தமிழ்நாட்டின் சுதந்திரப் போராட்ட இயக்கங்கள்",
-  "இந்திய பண்பாட்டின் சிறப்பம்சங்கள்",
-  "வேற்றுமையில் ஒற்றுமை",
-  "மதச்சார்பின்மை",
-  "தமிழ் சமூக வரலாறு",
-  "தொல்லியல் கண்டுபிடிப்புகள்",
-  "சங்க காலம் முதல் நவீன காலம் வரையிலான தமிழ் இலக்கியம்",
-  "தமிழ் பண்பாடு மற்றும் பாரம்பரியம்",
-  "திருக்குறள் மற்றும் உலகளாவிய மதிப்புகள்",
-  "தமிழ்நாட்டின் சுதந்திரப் போராட்ட பங்கு",
-  "ஆங்கிலேயருக்கு எதிரான ஆரம்பப் போராட்டங்கள்",
-  "சுதந்திரப் போராட்டத்தில் பெண்களின் பங்கு",
-  "சமூக சீர்திருத்தவாதிகள்",
-  "சமூக சீர்திருத்த இயக்கங்கள்",
-  "தமிழ்நாட்டின் சமூக மாற்றங்கள்",
-  "சமூக நீதி இயக்கங்கள்",
-  "சமூக-அரசியல் இயக்கங்கள்",
-  "தமிழ்நாடு வளர்ச்சி நிர்வாகம்",
-  "இந்திய பொருளாதாரத்தின் இயல்பு",
-  "திட்டமிடல் மற்றும் வளர்ச்சி",
-  "திட்டக் குழு மற்றும் நிதி ஆயோக்",
-  "வருவாய் ஆதாரங்கள்",
-  "இந்திய ரிசர்வ் வங்கி",
-  "நிதிக் குழு",
-  "மத்திய-மாநில வளப் பகிர்வு",
-  "சரக்கு மற்றும் சேவை வரி (GST)",
-  "வேலைவாய்ப்பு உருவாக்கம்",
-  "நிலச் சீர்திருத்தங்கள் மற்றும் வேளாண்மை",
-  "வேளாண்மையில் அறிவியல் மற்றும் தொழில்நுட்பம்",
-  "தொழில் வளர்ச்சி",
-  "கிராமப்புற நலத்திட்டங்கள்",
-  "மக்கள் தொகை மற்றும் சமூகப் பிரச்சினைகள்",
-  "கல்வி அமைப்பு",
-  "சுகாதார அமைப்பு",
-  "வேலைவாய்ப்பு மற்றும் வறுமை",
-  "சமூக நீதி மற்றும் சமூக நல்லிணக்கம்",
-  "தமிழ்நாடு அரசு நலத்திட்டங்கள்",
-  "தமிழ்நாட்டின் புவியியல் மற்றும் பொருளாதார வளர்ச்சி",
-  "சமூக-பொருளாதார பிரச்சினைகள்",
-  "நடப்பு சமூக-பொருளாதார நிகழ்வுகள்",
-  "Indian Culture",
-  "Indus Valley Civilization",
-  "Guptas",
-  "Delhi Sultanate",
-  "Mughals",
-  "Marathas",
-  "South Indian History",
-  "National Renaissance",
-  "Early Uprisings against British Rule",
-  "Indian National Congress",
-  "National Leaders",
-  "Role of Tamil Nadu in Freedom Struggle",
-  "Features of Indian Culture",
-  "Unity in Diversity",
-  "Secularism",
-  "Tamil Social History",
-  "Archaeological Discoveries",
-  "Tamil Literature from Sangam to Modern Era",
-  "Tamil Culture and Heritage",
-  "Thirukkural and Universal Values",
-  "Tamil Nadu's Role in Freedom Struggle",
-  "Early Agitations against British Rule",
-  "Role of Women in Freedom Struggle",
-  "Social Reformers",
-  "Social Reform Movements",
-  "Social Changes in Tamil Nadu",
-  "Social Justice Movements",
-  "Socio-Political Movements",
-  "Development Administration in Tamil Nadu",
-  "Nature of Indian Economy",
-  "Planning and Development",
-  "Planning Commission and NITI Aayog",
-  "Sources of Revenue",
-  "Reserve Bank of India",
-  "Finance Commission",
-  "Centre-State Resource Sharing",
-  "Goods and Services Tax (GST)",
-  "Employment Generation",
-  "Land Reforms and Agriculture",
-  "Science and Technology in Agriculture",
-  "Industrial Growth",
-  "Rural Welfare Programmes",
-  "Population and Social Problems",
-  "Education System",
-  "Health System",
-  "Employment and Poverty",
-  "Social Justice and Social Harmony",
-  "Government Welfare Schemes in Tamil Nadu",
-  "Geography of Tamil Nadu and Economic Growth",
-  "Socio-Economic Problems",
-  "Current Socio-Economic Affairs",
- ]);
-const THIRAL_GS51_DB_ALIASES = {
-  "Early Uprisings against British Rule": "Early Resistance to British Rule",
-  "Early Agitations against British Rule": "Early Resistances to British Rule",
-  "Role of Tamil Nadu in Freedom Struggle": "Role of Tamil Nadu in the Freedom Struggle",
-  "Industrial Growth": "Industrial Development",
-  "Rural Welfare Programmes": "Rural Welfare Schemes",
-  "Population and Social Problems": "Population and Social Issues",
-  "Government Welfare Schemes in Tamil Nadu": "Tamil Nadu Government Welfare Schemes",
-  "Geography of Tamil Nadu and Economic Growth": "Geography and Economic Development of Tamil Nadu",
-  "Current Socio-Economic Affairs": "Current Socio-Economic Events",
-};
-function isThiralGs51(subject, subtopic){
-  return subject === 'gs' && THIRAL_GS51_SUBTOPICS.has(String(subtopic||'').trim());
-}
-function thiralGs51ExamCandidates(exam, subject, subtopic){
-  return isThiralGs51(subject, subtopic) ? ['group4','Group 4','Group4'] : [exam];
-}
-function thiralGs51SubtopicCandidates(subtopic){
-  const s=String(subtopic||'').trim();
-  if(!s) return [];
-  return [...new Set([s, THIRAL_GS51_DB_ALIASES[s] || '', GROUP4_SUBTOPIC_ALIASES[s] || '', GROUP4_TAMIL_NEW_SUBTOPIC_ALIASES[s] || ''].filter(Boolean))];
-}
-
 
 function newSessionId() {
   return crypto.randomBytes(32).toString('hex');
@@ -1190,6 +1046,46 @@ api.post('/auth/logout', async (req, res) => {
   res.json({ ok: true });
 });
 
+
+/* ===== THIRAL GS51 SERVER-ONLY MATCHING =====
+   Only the 51 newly added Group-4 General Studies subtopics use this
+   tolerant lookup. Existing Tamil/Aptitude/old GS paths are unchanged.
+*/
+const THIRAL_GS51_TA = new Set([
+"இந்திய பண்பாடு","சிந்து சமவெளி நாகரிகம்","குப்தர்கள்","டெல்லி சுல்தான்கள்","முகலாயர்கள்","மராத்தியர்கள்","தென்னிந்திய வரலாறு","தேசிய மறுமலர்ச்சி","ஆங்கிலேயருக்கு எதிரான ஆரம்ப எழுச்சிகள்","இந்திய தேசிய காங்கிரஸ்","தேசிய தலைவர்கள்","தமிழ்நாட்டின் சுதந்திரப் போராட்ட இயக்கங்கள்","இந்திய பண்பாட்டின் சிறப்பம்சங்கள்","வேற்றுமையில் ஒற்றுமை","மதச்சார்பின்மை",
+"தமிழ் சமூக வரலாறு","தொல்லியல் கண்டுபிடிப்புகள்","சங்க காலம் முதல் நவீன காலம் வரையிலான தமிழ் இலக்கியம்","தமிழ் பண்பாடு மற்றும் பாரம்பரியம்","திருக்குறள் மற்றும் உலகளாவிய மதிப்புகள்","தமிழ்நாட்டின் சுதந்திரப் போராட்ட பங்கு","ஆங்கிலேயருக்கு எதிரான ஆரம்பப் போராட்டங்கள்","சுதந்திரப் போராட்டத்தில் பெண்களின் பங்கு","சமூக சீர்திருத்தவாதிகள்","சமூக சீர்திருத்த இயக்கங்கள்","தமிழ்நாட்டின் சமூக மாற்றங்கள்","சமூக நீதி இயக்கங்கள்","சமூக-அரசியல் இயக்கங்கள்",
+"தமிழ்நாடு வளர்ச்சி நிர்வாகம்","இந்திய பொருளாதாரத்தின் இயல்பு","திட்டமிடல் மற்றும் வளர்ச்சி","திட்டக் குழு மற்றும் நிதி ஆயோக்","வருவாய் ஆதாரங்கள்","இந்திய ரிசர்வ் வங்கி","நிதிக் குழு","மத்திய-மாநில வளப் பகிர்வு","சரக்கு மற்றும் சேவை வரி (GST)","வேலைவாய்ப்பு உருவாக்கம்","நிலச் சீர்திருத்தங்கள் மற்றும் வேளாண்மை","வேளாண்மையில் அறிவியல் மற்றும் தொழில்நுட்பம்","தொழில் வளர்ச்சி","கிராமப்புற நலத்திட்டங்கள்","மக்கள் தொகை மற்றும் சமூகப் பிரச்சினைகள்","கல்வி அமைப்பு","சுகாதார அமைப்பு","வேலைவாய்ப்பு மற்றும் வறுமை","சமூக நீதி மற்றும் சமூக நல்லிணக்கம்","தமிழ்நாடு அரசு நலத்திட்டங்கள்","தமிழ்நாட்டின் புவியியல் மற்றும் பொருளாதார வளர்ச்சி","சமூக-பொருளாதார பிரச்சினைகள்","நடப்பு சமூக-பொருளாதார நிகழ்வுகள்"
+]);
+const THIRAL_GS51_EN = new Set([
+"Indian Culture","Indus Valley Civilization","Guptas","Delhi Sultanate","Mughals","Marathas","South Indian History","National Renaissance","Early Uprisings against British Rule","Indian National Congress","National Leaders","Role of Tamil Nadu in Freedom Struggle","Features of Indian Culture","Unity in Diversity","Secularism",
+"Tamil Social History","Archaeological Discoveries","Tamil Literature from Sangam to Modern Era","Tamil Culture and Heritage","Thirukkural and Universal Values","Tamil Nadu's Role in Freedom Struggle","Early Agitations against British Rule","Role of Women in Freedom Struggle","Social Reformers","Social Reform Movements","Social Changes in Tamil Nadu","Social Justice Movements","Socio-Political Movements",
+"Development Administration in Tamil Nadu","Nature of Indian Economy","Planning and Development","Planning Commission and NITI Aayog","Sources of Revenue","Reserve Bank of India","Finance Commission","Centre-State Resource Sharing","Goods and Services Tax (GST)","Employment Generation","Land Reforms and Agriculture","Science and Technology in Agriculture","Industrial Growth","Rural Welfare Programmes","Population and Social Problems","Education System","Health System","Employment and Poverty","Social Justice and Social Harmony","Government Welfare Schemes in Tamil Nadu","Geography of Tamil Nadu and Economic Growth","Socio-Economic Problems","Current Socio-Economic Affairs"
+]);
+const THIRAL_GS51_EN_ALIASES = {
+"Early Uprisings against British Rule":"Early Resistance to British Rule",
+"Early Agitations against British Rule":"Early Resistances to British Rule",
+"Role of Tamil Nadu in Freedom Struggle":"Role of Tamil Nadu in the Freedom Struggle",
+"Industrial Growth":"Industrial Development",
+"Rural Welfare Programmes":"Rural Welfare Schemes",
+"Population and Social Problems":"Population and Social Issues",
+"Government Welfare Schemes in Tamil Nadu":"Tamil Nadu Government Welfare Schemes",
+"Geography of Tamil Nadu and Economic Growth":"Geography and Economic Development of Tamil Nadu",
+"Current Socio-Economic Affairs":"Current Socio-Economic Events"
+};
+function thiralIsGS51(subject, subtopic){
+  return subject === "gs" && (THIRAL_GS51_TA.has(String(subtopic||"").trim()) || THIRAL_GS51_EN.has(String(subtopic||"").trim()));
+}
+function thiralGS51ExamCandidates(exam, subject, subtopic){
+  return thiralIsGS51(subject, subtopic) ? ["group4","Group 4","Group4"] : [exam];
+}
+function thiralGS51SubtopicCandidates(subtopic){
+  const s=String(subtopic||"").trim();
+  const a=[s,THIRAL_GS51_EN_ALIASES[s]||""];
+  if(typeof GROUP4_SUBTOPIC_ALIASES!=="undefined") a.push(GROUP4_SUBTOPIC_ALIASES[s]||"");
+  if(typeof GROUP4_TAMIL_NEW_SUBTOPIC_ALIASES!=="undefined") a.push(GROUP4_TAMIL_NEW_SUBTOPIC_ALIASES[s]||"");
+  return [...new Set(a.filter(Boolean))];
+}
+
 api.get('/questions', requirePasswordReady, async (req, res) => {
   try {
     const exam = String(req.query.exam || '').trim();
@@ -1203,12 +1099,16 @@ api.get('/questions', requirePasswordReady, async (req, res) => {
     const offset = Math.max(parseInt(req.query.offset || '0',10) || 0,0);
     if (!exam || !subject || !['ta','en'].includes(language)) return sendError(res,400,'Invalid question request.');
 
-    const examCandidates = thiralGs51ExamCandidates(exam, subject, subtopic);
-    const where = ['exam = ANY($1::text[])','subject = ANY($2::text[])','language=$3','is_active=true'];
-    const params = [examCandidates, subjectCandidatesList, language];
+    const examCandidates = thiralGS51ExamCandidates(exam, subject, subtopic);
+    const where = thiralIsGS51(subject, subtopic)
+      ? ['exam = ANY($1::text[])','subject = ANY($2::text[])','language=$3','is_active=true']
+      : ['exam=$1','subject = ANY($2::text[])','language=$3','is_active=true'];
+    const params = thiralIsGS51(subject, subtopic)
+      ? [examCandidates, subjectCandidatesList, language]
+      : [exam, subjectCandidatesList, language];
     let n = 4;
-    const subCandidates = isThiralGs51(subject, subtopic)
-      ? thiralGs51SubtopicCandidates(subtopic)
+    const subCandidates = thiralIsGS51(subject, subtopic)
+      ? thiralGS51SubtopicCandidates(subtopic)
       : subtopicCandidates(subtopic);
     if (subCandidates.length === 1) {
       where.push(`subtopic=$${n++}`); params.push(subCandidates[0]);
@@ -1270,19 +1170,21 @@ api.get('/practice/questions', requirePasswordReady, async (req, res) => {
       return sendError(res, 400, 'Invalid question request.');
     }
 
-    const examCandidates = thiralGs51ExamCandidates(exam, subject, subtopic);
-    const params = [req.user.id, examCandidates, subjectCandidatesList, language];
+    const examCandidates = thiralGS51ExamCandidates(exam, subject, subtopic);
+    const params = thiralIsGS51(subject, subtopic)
+      ? [req.user.id, examCandidates, subjectCandidatesList, language]
+      : [req.user.id, exam, subjectCandidatesList, language];
     let n = 5;
 
     let where = `
-      q.exam = ANY($2::text[])
+      q.exam ${thiralIsGS51(subject, subtopic) ? '= ANY($2::text[])' : '= $2'}
       AND q.subject = ANY($3::text[])
       AND q.language = $4
       AND q.is_active = true
     `;
 
-    const subCandidates = isThiralGs51(subject, subtopic)
-      ? thiralGs51SubtopicCandidates(subtopic)
+    const subCandidates = thiralIsGS51(subject, subtopic)
+      ? thiralGS51SubtopicCandidates(subtopic)
       : subtopicCandidates(subtopic);
     if (subCandidates.length === 1) {
       where += ` AND q.subtopic = $${n}`;
@@ -1478,6 +1380,55 @@ api.post('/attempts/:id/submit', requirePasswordReady, async (req,res)=>{
     await pool.query(`INSERT INTO activity_events(user_id,event_type,metadata) VALUES($1,'ATTEMPT_SUBMITTED',$2)`,[req.user.id,JSON.stringify({attempt_id:id,mode:attempt.mode,exam:attempt.exam,score,used_questions:total,unanswered})]);
     res.json({score,correct,total,unanswered,usedQuestionIds:usedIds});
   }catch(e){console.error(e);sendError(res,500,'Grading service error.');}
+});
+
+/* ===== Mock/Practice submitted-attempt review =====
+   Correct answers are returned only after the attempt is SUBMITTED and only
+   to the authenticated owner of that attempt. The live exam never receives
+   correct_option through the normal question-loading API.
+*/
+api.get('/attempts/:id/review', requirePasswordReady, async (req,res)=>{
+  try{
+    const id=Number(req.params.id);
+    if(!Number.isInteger(id)) return sendError(res,400,'Invalid attempt id.');
+
+    const a=await pool.query(
+      `SELECT id,status,question_ids
+         FROM attempts
+        WHERE id=$1 AND user_id=$2
+        LIMIT 1`,
+      [id,req.user.id]
+    );
+    if(!a.rowCount) return sendError(res,404,'Attempt not found.');
+    const attempt=a.rows[0];
+    if(attempt.status!=='SUBMITTED') return sendError(res,409,'Review is available only after submission.');
+
+    const ids=Array.isArray(attempt.question_ids) ? attempt.question_ids.map(Number).filter(Number.isInteger) : [];
+    if(!ids.length) return res.json({review:[]});
+
+    const q=await pool.query(
+      `SELECT id,correct_option,explanation
+         FROM questions
+        WHERE id=ANY($1::bigint[])`,
+      [ids]
+    );
+    const byId=new Map(q.rows.map(row=>[Number(row.id),row]));
+
+    res.json({
+      review:ids.map((qid,i)=>{
+        const row=byId.get(Number(qid));
+        return {
+          question_no:i+1,
+          question_id:Number(qid),
+          correct_option:row ? Number(row.correct_option) : null,
+          explanation:row ? String(row.explanation || '') : ''
+        };
+      })
+    });
+  }catch(e){
+    console.error('Attempt review error:',e);
+    sendError(res,500,'Review service error.');
+  }
 });
 
 api.get('/results', requirePasswordReady, async (req,res)=>{
