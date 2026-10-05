@@ -1171,47 +1171,28 @@ api.get('/practice/questions', requirePasswordReady, async (req, res) => {
       return sendError(res, 400, 'Invalid question request.');
     }
 
-    /*
-     * Isolated fix for the 10 newly-added Tamil Group 4 Aptitude topics.
-     * The website sends the UI topic names, while the imported questions
-     * use different DB topic names. Imported rows also use
-     * "Group 4" / "Aptitude" instead of the older "group4" / "apt".
-     */
     const NEW_TAMIL_G4_APT_MAP = {
-      'எளிமைப்படுத்துதல்': 'எளிமைப்படுத்தல்',
-      'மீ.பொ.வ (HCF)': 'மீ.பெ.வ',
-      'மீ.சி.ம (LCM)': 'மீ.சி.பொ.ம',
-      'எளிய வட்டி': 'தனிவட்டி',
-      'கூட்டு வட்டி': 'கூட்டு வட்டி',
-      'தர்க்க சிந்தனை': 'தர்க்கரீதியான சிந்தனை',
-      'புதிர்கள்': 'புதிர்கள்',
-      'பகடை': 'பகடை',
-      'காட்சித் தர்க்கம்': 'காட்சித் தர்க்கம்',
-      'எண்-எழுத்து தர்க்கம்': 'எழுத்து-எண் தர்க்கம்'
+      'எளிமைப்படுத்துதல்':'எளிமைப்படுத்தல்',
+      'மீ.பொ.வ (HCF)':'மீ.பெ.வ',
+      'மீ.சி.ம (LCM)':'மீ.சி.பொ.ம',
+      'எளிய வட்டி':'தனிவட்டி',
+      'கூட்டு வட்டி':'கூட்டு வட்டி',
+      'தர்க்க சிந்தனை':'தர்க்கரீதியான சிந்தனை',
+      'புதிர்கள்':'புதிர்கள்',
+      'பகடை':'பகடை',
+      'காட்சித் தர்க்கம்':'காட்சித் தர்க்கம்',
+      'எண்-எழுத்து தர்க்கம்':'எழுத்து-எண் தர்க்கம்'
     };
 
     const isNewTamilG4Apt =
       exam === 'group4' &&
       subject === 'apt' &&
       language === 'ta' &&
-      Object.prototype.hasOwnProperty.call(
-        NEW_TAMIL_G4_APT_MAP,
-        subtopic
-      );
+      Object.prototype.hasOwnProperty.call(NEW_TAMIL_G4_APT_MAP, subtopic);
 
     const params = isNewTamilG4Apt
-      ? [
-          req.user.id,
-          ['group4', 'Group 4', 'Group4'],
-          ['apt', 'Aptitude'],
-          language
-        ]
-      : [
-          req.user.id,
-          exam,
-          subjectCandidatesList,
-          language
-        ];
+      ? [req.user.id, ['group4','Group 4','Group4'], ['apt','Aptitude'], language]
+      : [req.user.id, exam, subjectCandidatesList, language];
 
     let n = 5;
 
@@ -1225,7 +1206,6 @@ api.get('/practice/questions', requirePasswordReady, async (req, res) => {
     const subCandidates = isNewTamilG4Apt
       ? [NEW_TAMIL_G4_APT_MAP[subtopic]]
       : subtopicCandidates(subtopic);
-
     if (subCandidates.length === 1) {
       where += ` AND q.subtopic = $${n}`;
       params.push(subCandidates[0]);
@@ -1280,7 +1260,6 @@ api.get('/practice/questions', requirePasswordReady, async (req, res) => {
     sendError(res, 500, 'Practice question service error.');
   }
 });
-
 
 api.post('/attempts', requirePasswordReady, async (req,res)=>{
   try {
