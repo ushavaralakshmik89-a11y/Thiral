@@ -160,6 +160,19 @@ const GROUP4_SUBTOPIC_ALIASES = {
   'அடிப்படை பொருளாதாரம்':'Basic Economics','Basic Economics':'அடிப்படை பொருளாதாரம்',
   'இந்திய பொருளாதாரம்':'Indian Economy','Indian Economy':'இந்திய பொருளாதாரம்',
   'தமிழ்நாடு பொருளாதாரம்':'Tamil Nadu Economy','Tamil Nadu Economy':'தமிழ்நாடு பொருளாதாரம்',
+  /* ===== Group 4 new Aptitude / Reasoning topics =====
+     UI labels and database labels are matched in both directions.
+     Existing question rows are NOT changed. */
+  'எளிமைப்படுத்துதல்':'Simplification','Simplification':'எளிமைப்படுத்துதல்',
+  'மீ.பொ.வ (HCF)':'HCF','HCF':'மீ.பொ.வ (HCF)',
+  'மீ.சி.ம (LCM)':'LCM','LCM':'மீ.சி.ம (LCM)',
+  'எளிய வட்டி':'Simple Interest','Simple Interest':'எளிய வட்டி',
+  'கூட்டு வட்டி':'Compound Interest','Compound Interest':'கூட்டு வட்டி',
+  'தர்க்க சிந்தனை':'Logical Reasoning','Logical Reasoning':'தர்க்க சிந்தனை',
+  'புதிர்கள்':'Puzzles','Puzzles':'புதிர்கள்',
+  'பகடை':'Dice','Dice':'பகடை',
+  'காட்சித் தர்க்கம்':'Visual Reasoning','Visual Reasoning':'காட்சித் தர்க்கம்',
+  'எண்-எழுத்து தர்க்கம்':'Alpha-Numeric Reasoning','Alpha-Numeric Reasoning':'எண்-எழுத்து தர்க்கம்',
   'எண்கள்':'Numbers','Numbers':'எண்கள்','பின்னங்கள்':'Fractions','Fractions':'பின்னங்கள்',
   'சதவீதம்':'Percentage','Percentage':'சதவீதம்','விகிதம்':'Ratio','Ratio':'விகிதம்','சராசரி':'Average','Average':'சராசரி',
   'பரப்பளவு':'Area','Area':'பரப்பளவு','சுற்றளவு':'Perimeter','Perimeter':'சுற்றளவு',
