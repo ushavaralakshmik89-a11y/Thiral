@@ -1072,8 +1072,9 @@ api.get('/questions', requirePasswordReady, async (req, res) => {
     const offset = Math.max(parseInt(req.query.offset || '0',10) || 0,0);
     if (!exam || !subject || !['ta','en'].includes(language)) return sendError(res,400,'Invalid question request.');
 
-    const where = ['exam=$1','subject = ANY($2::text[])','language=$3','is_active=true'];
-    const params = [exam, subjectCandidatesList, language];
+    const examCandidatesList = exam === 'group4' ? ['group4','Group 4','Group4'] : [exam];
+    const where = ['exam = ANY($1::text[])','subject = ANY($2::text[])','language=$3','is_active=true'];
+    const params = [examCandidatesList, subjectCandidatesList, language];
     let n = 4;
     const subCandidates = subtopicCandidates(subtopic);
     if (subCandidates.length === 1) {
