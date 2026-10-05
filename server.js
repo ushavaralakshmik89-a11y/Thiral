@@ -190,23 +190,41 @@ function subjectCandidates(raw){
     .map(([label])=>label);
   return [...new Set([canonical,s,...aliases].filter(Boolean))];
 }
-const GROUP4_TAMIL_NEW_SUBTOPIC_ALIASES = {
-  'எளிமைப்படுத்துதல்':'எளிமைப்படுத்தல்',
-  'மீ.பொ.வ (HCF)':'மீ.பெ.வ',
-  'மீ.சி.ம (LCM)':'மீ.சி.பொ.ம',
-  'எளிய வட்டி':'தனிவட்டி',
-  'கூட்டு வட்டி':'கூட்டு வட்டி',
-  'தர்க்க சிந்தனை':'தர்க்கரீதியான சிந்தனை',
-  'புதிர்கள்':'புதிர்கள்',
-  'பகடை':'பகடை',
-  'காட்சித் தர்க்கம்':'காட்சித் தர்க்கம்',
-  'எண்-எழுத்து தர்க்கம்':'எழுத்து-எண் தர்க்கம்'
+const NEW_GS_EN_SUBTOPIC_ALIASES = {
+  'Early Uprisings against British Rule':'Early Resistance to British Rule',
+  'Early Agitations against British Rule':'Early Resistances to British Rule',
+  'Role of Tamil Nadu in Freedom Struggle':'Role of Tamil Nadu in the Freedom Struggle',
+  'Industrial Growth':'Industrial Development',
+  'Rural Welfare Programmes':'Rural Welfare Schemes',
+  'Population and Social Problems':'Population and Social Issues',
+  'Government Welfare Schemes in Tamil Nadu':'Tamil Nadu Government Welfare Schemes',
+  'Geography of Tamil Nadu and Economic Growth':'Geography and Economic Development of Tamil Nadu',
+  'Current Socio-Economic Affairs':'Current Socio-Economic Events'
 };
+
+const NEW_GS_TAMIL_SUBTOPICS = new Set([
+  'இந்திய பண்பாடு','சிந்து சமவெளி நாகரிகம்','குப்தர்கள்','டெல்லி சுல்தான்கள்','முகலாயர்கள்','மராத்தியர்கள்','தென்னிந்திய வரலாறு','தேசிய மறுமலர்ச்சி','ஆங்கிலேயருக்கு எதிரான ஆரம்ப எழுச்சிகள்','இந்திய தேசிய காங்கிரஸ்','தேசிய தலைவர்கள்','தமிழ்நாட்டின் சுதந்திரப் போராட்ட இயக்கங்கள்','இந்திய பண்பாட்டின் சிறப்பம்சங்கள்','வேற்றுமையில் ஒற்றுமை','மதச்சார்பின்மை',
+  'தமிழ் சமூக வரலாறு','தொல்லியல் கண்டுபிடிப்புகள்','சங்க காலம் முதல் நவீன காலம் வரையிலான தமிழ் இலக்கியம்','தமிழ் பண்பாடு மற்றும் பாரம்பரியம்','திருக்குறள் மற்றும் உலகளாவிய மதிப்புகள்','தமிழ்நாட்டின் சுதந்திரப் போராட்ட பங்கு','ஆங்கிலேயருக்கு எதிரான ஆரம்பப் போராட்டங்கள்','சுதந்திரப் போராட்டத்தில் பெண்களின் பங்கு','சமூக சீர்திருத்தவாதிகள்','சமூக சீர்திருத்த இயக்கங்கள்','தமிழ்நாட்டின் சமூக மாற்றங்கள்','சமூக நீதி இயக்கங்கள்','சமூக-அரசியல் இயக்கங்கள்',
+  'தமிழ்நாடு வளர்ச்சி நிர்வாகம்','இந்திய பொருளாதாரத்தின் இயல்பு','திட்டமிடல் மற்றும் வளர்ச்சி','திட்டக் குழு மற்றும் நிதி ஆயோக்','வருவாய் ஆதாரங்கள்','இந்திய ரிசர்வ் வங்கி','நிதிக் குழு','மத்திய-மாநில வளப் பகிர்வு','சரக்கு மற்றும் சேவை வரி (GST)','வேலைவாய்ப்பு உருவாக்கம்','நிலச் சீர்திருத்தங்கள் மற்றும் வேளாண்மை','வேளாண்மையில் அறிவியல் மற்றும் தொழில்நுட்பம்','தொழில் வளர்ச்சி','கிராமப்புற நலத்திட்டங்கள்','மக்கள் தொகை மற்றும் சமூகப் பிரச்சினைகள்','கல்வி அமைப்பு','சுகாதார அமைப்பு','வேலைவாய்ப்பு மற்றும் வறுமை','சமூக நீதி மற்றும் சமூக நல்லிணக்கம்','தமிழ்நாடு அரசு நலத்திட்டங்கள்','தமிழ்நாட்டின் புவியியல் மற்றும் பொருளாதார வளர்ச்சி','சமூக-பொருளாதார பிரச்சினைகள்','நடப்பு சமூக-பொருளாதார நிகழ்வுகள்'
+]);
+
+function isNewGS51Request(subject, language, subtopic){
+  if(subject !== 'gs') return false;
+  const s=String(subtopic||'').trim();
+  if(!s) return false;
+  if(language === 'ta') return NEW_GS_TAMIL_SUBTOPICS.has(s);
+  if(language === 'en') return Object.prototype.hasOwnProperty.call(NEW_GS_EN_SUBTOPIC_ALIASES,s) || Object.values(NEW_GS_EN_SUBTOPIC_ALIASES).includes(s) || [
+    'Indian Culture','Indus Valley Civilization','Guptas','Delhi Sultanate','Mughals','Marathas','South Indian History','National Renaissance','Indian National Congress','National Leaders','Cultural Features of India','Unity in Diversity','Secularism',
+    'Tamil Social History','Archaeological Discoveries','Tamil Literature from Sangam to Modern Period','Tamil Culture and Heritage','Thirukkural and Universal Values','Role of Tamil Nadu in the Freedom Struggle',"Women\'s Role in the Freedom Struggle",'Social Reformers','Social Reform Movements','Social Changes in Tamil Nadu','Social Justice Movements','Socio-Political Movements',
+    'Development Administration in Tamil Nadu','Nature of Indian Economy','Planning and Development','Planning Commission and NITI Aayog','Revenue Sources','Reserve Bank of India','Finance Commission','Centre-State Resource Sharing','Goods and Services Tax (GST)','Employment Generation','Land Reforms and Agriculture','Science and Technology in Agriculture','Industrial Development','Rural Welfare Schemes','Population and Social Issues','Education System','Health System','Employment and Poverty','Social Justice and Social Harmony','Tamil Nadu Government Welfare Schemes','Geography and Economic Development of Tamil Nadu','Socio-Economic Issues','Current Socio-Economic Events'
+  ].includes(s);
+  return false;
+}
 
 function subtopicCandidates(raw){
   const s=String(raw||'').trim();
   if(!s) return [];
-  const a=[s, GROUP4_SUBTOPIC_ALIASES[s] || '', GROUP4_TAMIL_NEW_SUBTOPIC_ALIASES[s] || ''];
+  const a=[s, GROUP4_SUBTOPIC_ALIASES[s] || '', NEW_GS_EN_SUBTOPIC_ALIASES[s] || ''];
   return [...new Set(a.filter(Boolean))];
 }
 
@@ -228,11 +246,6 @@ function clearSessionCookie(res) {
   res.clearCookie('thiral_session', { httpOnly: true, secure: isProd, sameSite: 'strict', path: '/' });
 }
 
-/* ===== LEGACY DEVICE-BINDING DATA =====
-   login_device_hash / thiral_device are retained for backward compatibility,
-   but Student Login no longer rejects a correct password because of device
-   binding. Do not call enforceStudentDeviceBinding() from /auth/login.
-*/
 /* ===== ONE-STUDENT / ONE-DEVICE ACCOUNT BINDING =====
    Student credentials alone are not enough to move an account to another
    browser/device. The first successful student registration/login binds the
@@ -458,15 +471,22 @@ api.post('/auth/login', authLimiter, async (req, res) => {
       return sendError(res, 401, 'Invalid ID/email or password.');
     }
 
-    /*
-     * Student login policy:
-     * Password verification is sufficient for Student Login.
-     * Do NOT block a correct password because of a previous browser/device.
-     *
-     * The old one-student/one-device check has intentionally been removed
-     * from the login path. Existing login_device_hash values may remain in
-     * the database, but they are no longer used to deny Student Login.
-     */
+    /* One student account = one registered browser/device. A second device
+       with the same email + password is rejected before a new session is made. */
+    if(u.role === 'STUDENT'){
+      const deviceCheck=await enforceStudentDeviceBinding({req,res,user:u});
+      if(!deviceCheck.ok){
+        await logSecurityEvent({
+          req,
+          eventType:'DEVICE_BINDING_BLOCKED',
+          userId:u.id,
+          email:u.email,
+          details:'Correct password used from an unregistered browser/device',
+          sendAlert:true
+        });
+        return sendError(res,403,'இந்த கணக்கு ஏற்கனவே ஒரு சாதனத்தில் பதிவு செய்யப்பட்டுள்ளது. வேறு சாதனத்தில் இந்த Email ID + Password மூலம் Login செய்ய முடியாது.');
+      }
+    }
 
     const sid = newSessionId();
     await pool.query(`DELETE FROM sessions WHERE expires_at <= now()`);
@@ -1072,45 +1092,11 @@ api.get('/questions', requirePasswordReady, async (req, res) => {
     const offset = Math.max(parseInt(req.query.offset || '0',10) || 0,0);
     if (!exam || !subject || !['ta','en'].includes(language)) return sendError(res,400,'Invalid question request.');
 
-    /*
-       ISOLATED FIX: NEW TAMIL GROUP 4 APTITUDE TOPICS ONLY.
-       Every existing Tamil path, every English path, and every other subject
-       keeps the original query logic. This special branch activates only for
-       the ten newly imported Tamil Aptitude topics.
-    */
-    const NEW_TAMIL_G4_APT_MAP = {
-      'எளிமைப்படுத்துதல்':'எளிமைப்படுத்தல்',
-      'மீ.பொ.வ (HCF)':'மீ.பெ.வ',
-      'மீ.சி.ம (LCM)':'மீ.சி.பொ.ம',
-      'எளிய வட்டி':'தனிவட்டி',
-      'கூட்டு வட்டி':'கூட்டு வட்டி',
-      'தர்க்க சிந்தனை':'தர்க்கரீதியான சிந்தனை',
-      'புதிர்கள்':'புதிர்கள்',
-      'பகடை':'பகடை',
-      'காட்சித் தர்க்கம்':'காட்சித் தர்க்கம்',
-      'எண்-எழுத்து தர்க்கம்':'எழுத்து-எண் தர்க்கம்'
-    };
-
-    const isNewTamilG4Apt =
-      exam === 'group4' &&
-      subject === 'apt' &&
-      language === 'ta' &&
-      Object.prototype.hasOwnProperty.call(NEW_TAMIL_G4_APT_MAP, subtopic);
-
-    /* Existing requests retain the original exact exam/subject behavior. */
-    const where = isNewTamilG4Apt
-      ? ['exam = ANY($1::text[])','subject = ANY($2::text[])','language=$3','is_active=true']
-      : ['exam=$1','subject = ANY($2::text[])','language=$3','is_active=true'];
-
-    const params = isNewTamilG4Apt
-      ? [['group4','Group 4','Group4'], ['apt','Aptitude'], language]
-      : [exam, subjectCandidatesList, language];
-
+    const newGS51 = isNewGS51Request(subject, language, subtopic);
+    const where = [newGS51 ? 'exam = ANY($1::text[])' : 'exam=$1','subject = ANY($2::text[])','language=$3','is_active=true'];
+    const params = [newGS51 ? ['group4','Group 4','Group4'] : exam, subjectCandidatesList, language];
     let n = 4;
-    const subCandidates = isNewTamilG4Apt
-      ? [NEW_TAMIL_G4_APT_MAP[subtopic]]
-      : subtopicCandidates(subtopic);
-
+    const subCandidates = subtopicCandidates(subtopic);
     if (subCandidates.length === 1) {
       where.push(`subtopic=$${n++}`); params.push(subCandidates[0]);
     } else if (subCandidates.length > 1) {
@@ -1171,41 +1157,18 @@ api.get('/practice/questions', requirePasswordReady, async (req, res) => {
       return sendError(res, 400, 'Invalid question request.');
     }
 
-    const NEW_TAMIL_G4_APT_MAP = {
-      'எளிமைப்படுத்துதல்':'எளிமைப்படுத்தல்',
-      'மீ.பொ.வ (HCF)':'மீ.பெ.வ',
-      'மீ.சி.ம (LCM)':'மீ.சி.பொ.ம',
-      'எளிய வட்டி':'தனிவட்டி',
-      'கூட்டு வட்டி':'கூட்டு வட்டி',
-      'தர்க்க சிந்தனை':'தர்க்கரீதியான சிந்தனை',
-      'புதிர்கள்':'புதிர்கள்',
-      'பகடை':'பகடை',
-      'காட்சித் தர்க்கம்':'காட்சித் தர்க்கம்',
-      'எண்-எழுத்து தர்க்கம்':'எழுத்து-எண் தர்க்கம்'
-    };
-
-    const isNewTamilG4Apt =
-      exam === 'group4' &&
-      subject === 'apt' &&
-      language === 'ta' &&
-      Object.prototype.hasOwnProperty.call(NEW_TAMIL_G4_APT_MAP, subtopic);
-
-    const params = isNewTamilG4Apt
-      ? [req.user.id, ['group4','Group 4','Group4'], ['apt','Aptitude'], language]
-      : [req.user.id, exam, subjectCandidatesList, language];
-
+    const newGS51 = isNewGS51Request(subject, language, subtopic);
+    const params = [req.user.id, newGS51 ? ['group4','Group 4','Group4'] : exam, subjectCandidatesList, language];
     let n = 5;
 
     let where = `
-      q.exam ${isNewTamilG4Apt ? '= ANY($2::text[])' : '= $2'}
+      q.exam ${newGS51 ? '= ANY($2::text[])' : '= $2'}
       AND q.subject = ANY($3::text[])
       AND q.language = $4
       AND q.is_active = true
     `;
 
-    const subCandidates = isNewTamilG4Apt
-      ? [NEW_TAMIL_G4_APT_MAP[subtopic]]
-      : subtopicCandidates(subtopic);
+    const subCandidates = subtopicCandidates(subtopic);
     if (subCandidates.length === 1) {
       where += ` AND q.subtopic = $${n}`;
       params.push(subCandidates[0]);
@@ -1446,269 +1409,8 @@ api.get('/admin/exam-results', requireAdmin, async (req,res)=>{
     const maxPct = req.query.max_pct === undefined || req.query.max_pct === '' ? 100 : Number(req.query.max_pct);
     const page = Math.max(parseInt(req.query.page || '1',10) || 1,1);
     const limit = Math.min(Math.max(parseInt(req.query.limit || '100',10) || 100,1),200);
-
     if(!Number.isFinite(minPct) || !Number.isFinite(maxPct) || minPct<0 || maxPct>100 || minPct>maxPct){
       return sendError(res,400,'Invalid percentage range.');
-    }
-
-    /*
-     * ALL EXAM TYPES:
-     * The legacy attempts table contains Practice / Mock / Question Bank /
-     * 10/20/50/100-question results, while Model Exam results live in
-     * model_exam_results. Previously type="" queried only attempts, so Model
-     * Exam disappeared when "அனைத்தும்" was selected.
-     *
-     * Keep the existing type-specific branches unchanged. When type is empty,
-     * fetch both sources, normalize them to the same row shape, merge, sort,
-     * paginate, and combine their summaries.
-     */
-    if(!type || type==='all'){
-      // ---------- Legacy attempts ----------
-      const legacyWhere=[`a.status='SUBMITTED'`];
-      const legacyParams=[];
-      const addLegacy=(sql,val)=>{legacyParams.push(val);legacyWhere.push(sql.replace('?', '$'+legacyParams.length));};
-
-      if(exam) addLegacy(`a.exam=?`,exam);
-      if(subjectFilter){
-        const subjectList=subjectCandidates(subjectFilter);
-        legacyWhere.push(`a.subject = ANY($${legacyParams.length+1}::text[])`);
-        legacyParams.push(subjectList);
-      }
-      if(from) addLegacy(`a.submitted_at::date >= ?::date`,from);
-      if(to) addLegacy(`a.submitted_at::date <= ?::date`,to);
-
-      if(requestedSubtopic){
-        legacyWhere.push(`EXISTS (
-          SELECT 1 FROM unnest(a.question_ids) AS aqid
-          JOIN questions qq ON qq.id=aqid
-          WHERE qq.subtopic = ANY($${legacyParams.length+1}::text[])
-        )`);
-        legacyParams.push(requestedSubtopicCandidatesSingle);
-      }else if(requestedSubtopics.length){
-        legacyWhere.push(`EXISTS (
-          SELECT 1 FROM unnest(a.question_ids) AS aqid
-          JOIN questions qq ON qq.id=aqid
-          WHERE qq.subtopic = ANY($${legacyParams.length+1}::text[])
-        )`);
-        legacyParams.push(requestedSubtopicCandidates);
-      }
-
-      legacyWhere.push(`COALESCE(a.score,0) >= $${legacyParams.length+1}`); legacyParams.push(minPct);
-      legacyWhere.push(`COALESCE(a.score,0) <= $${legacyParams.length+1}`); legacyParams.push(maxPct);
-
-      const legacySql=legacyWhere.join(' AND ');
-      const legacyRowsQ=await pool.query(`
-        SELECT
-          a.id AS attempt_id,
-          u.name,u.email,
-          a.exam,
-          CASE
-            WHEN lower(a.exam) LIKE '%model%' THEN 'Model Exam'
-            WHEN a.mode='mock' THEN 'Mock Test'
-            WHEN a.mode='bank' THEN 'Question Bank'
-            WHEN a.total_count=10 THEN '10 Questions'
-            WHEN a.total_count=20 THEN '20 Questions'
-            WHEN a.total_count=50 THEN '50 Questions'
-            WHEN a.total_count=100 THEN '100 Questions'
-            ELSE 'Practice'
-          END AS exam_type,
-          to_char(COALESCE(a.submitted_at,a.started_at),'DD-MM-YYYY HH24:MI') AS date,
-          COALESCE(a.total_count,0)::int AS questions,
-          COALESCE(a.correct_count,0)::int AS marks,
-          COALESCE(a.total_count,0)::int AS total_marks,
-          COALESCE(a.score,0)::numeric(10,2) AS percentage,
-          COALESCE((
-            SELECT string_agg(DISTINCT qq.subtopic, ' | ' ORDER BY qq.subtopic)
-            FROM unnest(a.question_ids) AS aqid
-            JOIN questions qq ON qq.id=aqid
-          ),'') AS subtopics,
-          COALESCE(a.submitted_at,a.started_at) AS sort_date
-        FROM attempts a
-        JOIN users u ON u.id=a.user_id
-        WHERE ${legacySql}
-      `,legacyParams);
-
-      // ---------- Model Exam results ----------
-      const modelWhere=[];
-      const modelParams=[];
-      const addModel=(sql,val)=>{modelParams.push(val);modelWhere.push(sql.replace('?', '$'+modelParams.length));};
-
-      if(exam) addModel(`(r.exam_id=? OR me.title=?)`,exam);
-      if(subjectFilter){
-        modelWhere.push(`EXISTS (
-          SELECT 1 FROM model_exam_questions mq
-          WHERE mq.exam_id=r.exam_id AND mq.subject = ANY($${modelParams.length+1}::text[])
-        )`);
-        modelParams.push(subjectCandidates(subjectFilter));
-      }
-      if(from) addModel(`r.submitted_at::date >= ?::date`,from);
-      if(to) addModel(`r.submitted_at::date <= ?::date`,to);
-
-      if(requestedSubtopic){
-        modelWhere.push(`EXISTS (
-          SELECT 1
-          FROM model_exam_questions mq
-          WHERE mq.exam_id=r.exam_id
-            AND mq.topic IS NOT NULL
-            AND (mq.topic = ANY($${modelParams.length+1}::text[]) OR mq.subject = ANY($${modelParams.length+1}::text[]))
-        )`);
-        modelParams.push(requestedSubtopicCandidatesSingle);
-      }else if(requestedSubtopics.length){
-        modelWhere.push(`EXISTS (
-          SELECT 1
-          FROM model_exam_questions mq
-          WHERE mq.exam_id=r.exam_id
-            AND (mq.topic = ANY($${modelParams.length+1}::text[]) OR mq.subject = ANY($${modelParams.length+1}::text[]))
-        )`);
-        modelParams.push(requestedSubtopicCandidates);
-      }
-
-      modelWhere.push(`COALESCE(r.percentage,0) >= $${modelParams.length+1}`); modelParams.push(minPct);
-      modelWhere.push(`COALESCE(r.percentage,0) <= $${modelParams.length+1}`); modelParams.push(maxPct);
-
-      const modelSql=modelWhere.length ? 'WHERE '+modelWhere.join(' AND ') : '';
-      const modelRowsQ=await pool.query(`
-        SELECT
-          r.attempt_id,
-          u.name,u.email,
-          me.title AS exam,
-          'Model Exam' AS exam_type,
-          to_char(r.submitted_at,'DD-MM-YYYY HH24:MI') AS date,
-          r.total_questions::int AS questions,
-          r.marks::numeric AS marks,
-          r.total_questions::numeric AS total_marks,
-          r.percentage::numeric(10,2) AS percentage,
-          '' AS subtopics,
-          r.submitted_at AS sort_date
-        FROM model_exam_results r
-        JOIN model_exams me ON me.exam_id=r.exam_id
-        JOIN users u ON u.id=r.user_id
-        ${modelSql}
-      `,modelParams);
-
-      const allRows=[
-        ...legacyRowsQ.rows.map(r=>({
-          ...r,
-          topic:[...new Set(String(r.subtopics||'').split(' | ').map(group4TopicForSubtopic).filter(Boolean))].join(' | ')
-        })),
-        ...modelRowsQ.rows.map(r=>({...r,topic:''}))
-      ].sort((a,b)=>new Date(b.sort_date||0)-new Date(a.sort_date||0));
-
-      const total=allRows.length;
-      const participants=new Set(allRows.map(r=>String(r.email||'').toLowerCase()).filter(Boolean)).size;
-      const totalQuestions=allRows.reduce((n,r)=>n+Number(r.questions||0),0);
-      const averagePct=total ? allRows.reduce((n,r)=>n+Number(r.percentage||0),0)/total : 0;
-      const highestPct=total ? Math.max(...allRows.map(r=>Number(r.percentage||0))) : 0;
-      const lowestPct=total ? Math.min(...allRows.map(r=>Number(r.percentage||0))) : 0;
-
-      const offset=(page-1)*limit;
-      const rows=allRows.slice(offset,offset+limit).map(({sort_date,...r})=>r);
-
-      // Union the exam dropdown values from both result stores.
-      const legacyExams=await pool.query(`SELECT DISTINCT a.exam FROM attempts a WHERE a.status='SUBMITTED' ORDER BY a.exam`);
-      const modelExams=await pool.query(`
-        SELECT DISTINCT me.exam_id,me.title
-        FROM model_exam_results r
-        JOIN model_exams me ON me.exam_id=r.exam_id
-        ORDER BY me.title
-      `);
-      const exams=[...new Set([
-        ...legacyExams.rows.map(x=>x.exam).filter(Boolean),
-        ...modelExams.rows.map(x=>x.exam_id||x.title).filter(Boolean)
-      ])];
-
-      return res.json({
-        ok:true,
-        rows,
-        total,
-        limit,
-        page,
-        exams,
-        summary:{
-          participants,
-          attempts:total,
-          total_questions:totalQuestions,
-          average_pct:Number(averagePct.toFixed(2)),
-          highest_pct:Number(highestPct.toFixed(2)),
-          lowest_pct:Number(lowestPct.toFixed(2))
-        }
-      });
-    }
-
-    // ---------- Existing type-specific result handling ----------
-    if(type === 'model'){
-      const w=[];
-      const p=[];
-      if(exam){
-        w.push(`(r.exam_id=$${p.length+1} OR me.title=$${p.length+1})`);
-        p.push(exam);
-      }
-      if(subjectFilter){
-        w.push(`EXISTS (SELECT 1 FROM model_exam_questions mq WHERE mq.exam_id=r.exam_id AND mq.subject=$${p.length+1})`);
-        p.push(subjectFilter);
-      }
-      if(from){ w.push(`r.submitted_at::date >= $${p.length+1}::date`); p.push(from); }
-      if(to){ w.push(`r.submitted_at::date <= $${p.length+1}::date`); p.push(to); }
-      w.push(`r.percentage >= $${p.length+1}`); p.push(minPct);
-      w.push(`r.percentage <= $${p.length+1}`); p.push(maxPct);
-
-      const whereModel=w.length ? 'WHERE '+w.join(' AND ') : '';
-      const count=await pool.query(`
-        SELECT count(*)::int AS total,
-               count(DISTINCT r.user_id)::int AS participants,
-               COALESCE(sum(r.total_questions),0)::bigint AS total_questions,
-               COALESCE(avg(r.percentage),0)::numeric(10,2) AS average_pct,
-               COALESCE(max(r.percentage),0)::numeric(10,2) AS highest_pct,
-               COALESCE(min(r.percentage),0)::numeric(10,2) AS lowest_pct
-        FROM model_exam_results r
-        JOIN model_exams me ON me.exam_id=r.exam_id
-        ${whereModel}
-      `,p);
-
-      const pp=p.slice();
-      pp.push(limit,(page-1)*limit);
-      const rows=await pool.query(`
-        SELECT r.attempt_id,
-               u.name,u.email,
-               me.title AS exam,
-               'Model Exam' AS exam_type,
-               to_char(r.submitted_at,'DD-MM-YYYY HH24:MI') AS date,
-               r.total_questions::int AS questions,
-               r.marks::numeric AS marks,
-               r.total_questions::numeric AS total_marks,
-               r.percentage::numeric(10,2) AS percentage,
-               '' AS topic,
-               '' AS subtopics
-        FROM model_exam_results r
-        JOIN model_exams me ON me.exam_id=r.exam_id
-        JOIN users u ON u.id=r.user_id
-        ${whereModel}
-        ORDER BY r.submitted_at DESC,r.id DESC
-        LIMIT $${pp.length-1} OFFSET $${pp.length}
-      `,pp);
-
-      const c=count.rows[0]||{};
-      const examsQ=await pool.query(`
-        SELECT DISTINCT me.exam_id,me.title
-        FROM model_exam_results r
-        JOIN model_exams me ON me.exam_id=r.exam_id
-        ORDER BY me.title
-      `);
-      return res.json({
-        ok:true,
-        rows:rows.rows,
-        total:Number(c.total||0),
-        limit,page,
-        exams:examsQ.rows.map(x=>x.exam_id||x.title).filter(Boolean),
-        summary:{
-          participants:Number(c.participants||0),
-          attempts:Number(c.total||0),
-          total_questions:Number(c.total_questions||0),
-          average_pct:Number(c.average_pct||0),
-          highest_pct:Number(c.highest_pct||0),
-          lowest_pct:Number(c.lowest_pct||0)
-        }
-      });
     }
 
     const where=[`a.status='SUBMITTED'`];
@@ -1739,7 +1441,6 @@ api.get('/admin/exam-results', requireAdmin, async (req,res)=>{
       WHEN a.total_count=10 THEN '10 Questions'
       WHEN a.total_count=20 THEN '20 Questions'
       WHEN a.total_count=50 THEN '50 Questions'
-      WHEN a.total_count=100 THEN '100 Questions'
       ELSE 'Practice'
     END`;
     if(type && ['model','mock','practice','bank','10','20','50','100'].includes(type)){
@@ -1776,186 +1477,6 @@ api.get('/admin/exam-results/export', requireAdmin, async (req,res)=>{
     const minPct=req.query.min_pct===''||req.query.min_pct===undefined?0:Number(req.query.min_pct);
     const maxPct=req.query.max_pct===''||req.query.max_pct===undefined?100:Number(req.query.max_pct);
     if(!Number.isFinite(minPct)||!Number.isFinite(maxPct)||minPct<0||maxPct>100||minPct>maxPct)return sendError(res,400,'Invalid percentage range.');
-
-    if(type === 'model'){
-      const w=[];
-      const p=[];
-      if(exam){
-        w.push(`(r.exam_id=$${p.length+1} OR me.title=$${p.length+1})`);
-        p.push(exam);
-      }
-      if(subjectFilter){
-        w.push(`EXISTS (SELECT 1 FROM model_exam_questions mq WHERE mq.exam_id=r.exam_id AND mq.subject=$${p.length+1})`);
-        p.push(subjectFilter);
-      }
-      if(from){ w.push(`r.submitted_at::date >= $${p.length+1}::date`); p.push(from); }
-      if(to){ w.push(`r.submitted_at::date <= $${p.length+1}::date`); p.push(to); }
-      w.push(`r.percentage >= $${p.length+1}`); p.push(minPct);
-      w.push(`r.percentage <= $${p.length+1}`); p.push(maxPct);
-
-      const whereModel=w.length ? 'WHERE '+w.join(' AND ') : '';
-      const q=await pool.query(`
-        SELECT u.name,u.email,
-               me.title AS exam,
-               'Model Exam' AS exam_type,
-               '' AS topic,
-               '' AS subtopics,
-               to_char(r.submitted_at,'DD-MM-YYYY HH24:MI') AS date,
-               r.total_questions::int AS questions,
-               r.marks::numeric AS marks,
-               r.total_questions::numeric AS total_marks,
-               r.percentage::numeric(10,2) AS percentage
-        FROM model_exam_results r
-        JOIN model_exams me ON me.exam_id=r.exam_id
-        JOIN users u ON u.id=r.user_id
-        ${whereModel}
-        ORDER BY r.submitted_at DESC,r.id DESC
-      `,p);
-
-      /*
-       * When Exam Type = All, append the legacy result sources to the same
-       * export. Model-only export remains unchanged when type='model'.
-       */
-      if(type === '' || type === 'all'){
-        const legacyWhere=[`a.status='SUBMITTED'`];
-        const legacyParams=[];
-        const addLegacy=(sql,val)=>{legacyParams.push(val);legacyWhere.push(sql.replace('?', '$'+legacyParams.length));};
-
-        if(exam) addLegacy(`a.exam=?`,exam);
-        if(subjectFilter){
-          const subjectList=subjectCandidates(subjectFilter);
-          legacyWhere.push(`a.subject = ANY($${legacyParams.length+1}::text[])`);
-          legacyParams.push(subjectList);
-        }
-        if(from) addLegacy(`a.submitted_at::date >= ?::date`,from);
-        if(to) addLegacy(`a.submitted_at::date <= ?::date`,to);
-        if(requestedSubtopic){
-          legacyWhere.push(`EXISTS (
-            SELECT 1 FROM unnest(a.question_ids) AS aqid
-            JOIN questions qq ON qq.id=aqid
-            WHERE qq.subtopic = ANY($${legacyParams.length+1}::text[])
-          )`);
-          legacyParams.push(requestedSubtopicCandidatesSingle);
-        }else if(requestedSubtopics.length){
-          legacyWhere.push(`EXISTS (
-            SELECT 1 FROM unnest(a.question_ids) AS aqid
-            JOIN questions qq ON qq.id=aqid
-            WHERE qq.subtopic = ANY($${legacyParams.length+1}::text[])
-          )`);
-          legacyParams.push(requestedSubtopicCandidates);
-        }
-        legacyWhere.push(`COALESCE(a.score,0) >= $${legacyParams.length+1}`); legacyParams.push(minPct);
-        legacyWhere.push(`COALESCE(a.score,0) <= $${legacyParams.length+1}`); legacyParams.push(maxPct);
-
-        const legacyTypeSql=`CASE
-          WHEN lower(a.exam) LIKE '%model%' THEN 'Model Exam'
-          WHEN a.mode='mock' THEN 'Mock Test'
-          WHEN a.mode='bank' THEN 'Question Bank'
-          WHEN a.total_count=10 THEN '10 Questions'
-          WHEN a.total_count=20 THEN '20 Questions'
-          WHEN a.total_count=50 THEN '50 Questions'
-          WHEN a.total_count=100 THEN '100 Questions'
-          ELSE 'Practice'
-        END`;
-
-        const legacyQ=await pool.query(`
-          SELECT u.name,u.email,a.exam,
-                 ${legacyTypeSql} AS exam_type,
-                 '' AS topic,
-                 COALESCE((
-                   SELECT string_agg(DISTINCT qq.subtopic, ' | ' ORDER BY qq.subtopic)
-                   FROM unnest(a.question_ids) AS aqid
-                   JOIN questions qq ON qq.id=aqid
-                 ),'') AS subtopics,
-                 to_char(COALESCE(a.submitted_at,a.started_at),'DD-MM-YYYY HH24:MI') AS date,
-                 COALESCE(a.total_count,0)::int AS questions,
-                 COALESCE(a.correct_count,0)::int AS marks,
-                 COALESCE(a.total_count,0)::int AS total_marks,
-                 COALESCE(a.score,0)::numeric(10,2) AS percentage
-          FROM attempts a
-          JOIN users u ON u.id=a.user_id
-          WHERE ${legacyWhere.join(' AND ')}
-          ORDER BY COALESCE(a.submitted_at,a.started_at) DESC,a.id DESC
-        `,legacyParams);
-
-        for(const r of legacyQ.rows){
-          r.topic=[...new Set(String(r.subtopics||'').split(' | ').map(group4TopicForSubtopic).filter(Boolean))].join(' | ');
-          q.rows.push(r);
-        }
-      }
-
-      /* Jump directly to the shared XLSX generator below. */
-      const escXml=v=>String(v??'')
-        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-        .replace(/\"/g,'&quot;').replace(/'/g,'&apos;');
-      const colName=n=>{
-        let z=''; n=Number(n)+1;
-        while(n){const rr=(n-1)%26;z=String.fromCharCode(65+rr)+z;n=Math.floor((n-1)/26);}
-        return z;
-      };
-      const inlineCell=(ref,value,style)=>{
-        const text=escXml(value);
-        return `<c r="${ref}" t="inlineStr"${style?` s="${style}"`:''}><is><t xml:space="preserve">${text}</t></is></c>`;
-      };
-      const numCell=(ref,value,style)=>`<c r="${ref}" t="n"${style?` s="${style}"`:''}><v>${Number(value)||0}</v></c>`;
-      const sheetXml=(rows)=>{
-        const headers=['Name','Email','Exam','Exam Type','Topic','Subtopics','Date','Questions','Marks','Total Marks','Percentage'];
-        const out=[];
-        out.push('<row r="1">'+headers.map((h,i)=>inlineCell(`${colName(i)}1`,h,1)).join('')+'</row>');
-        rows.forEach((r,ri)=>{
-          const rowNo=ri+2;
-          const vals=[r.name,r.email,r.exam,r.exam_type,r.topic,r.subtopics,r.date];
-          const cells=[];
-          vals.forEach((v,i)=>cells.push(inlineCell(`${colName(i)}${rowNo}`,v)));
-          cells.push(numCell(`H${rowNo}`,r.questions));
-          cells.push(numCell(`I${rowNo}`,r.marks));
-          cells.push(numCell(`J${rowNo}`,r.total_marks));
-          cells.push(numCell(`K${rowNo}`,r.percentage));
-          out.push(`<row r="${rowNo}">${cells.join('')}</row>`);
-        });
-        return `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"/></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols><col min="1" max="1" width="24"/><col min="2" max="2" width="32"/><col min="3" max="4" width="18"/><col min="5" max="6" width="28"/><col min="7" max="7" width="20"/><col min="8" max="11" width="14"/></cols><sheetData>${out.join('')}</sheetData><autoFilter ref="A1:K${Math.max(1,rows.length+1)}"/></worksheet>`;
-      };
-      const safeSheetName=(name,used)=>{
-        let n=String(name||'Model Exam').replace(/[\\\/\?\*\[\]:]/g,' ').trim()||'Model Exam';
-        n=n.slice(0,31); const base=n; let i=2;
-        while(used.has(n)){const suffix=` (${i++})`;n=base.slice(0,31-suffix.length)+suffix;}
-        used.add(n); return n;
-      };
-      const groups=new Map();
-      for(const r of q.rows){const key=String(r.exam||'Model Exam');if(!groups.has(key))groups.set(key,[]);groups.get(key).push(r);}
-      if(!groups.size)groups.set('No Results',[]);
-      const sheets=[];const rels=[];const content=[];const usedNames=new Set();let idx=1;
-      for(const [examName,rows] of groups.entries()){
-        const sheetName=safeSheetName(examName,usedNames);
-        sheets.push(`<sheet name="${escXml(sheetName)}" sheetId="${idx}" r:id="rId${idx}"/>`);
-        rels.push(`<Relationship Id="rId${idx}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${idx}.xml"/>`);
-        content.push(`<Override PartName="/xl/worksheets/sheet${idx}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`);
-        idx++;
-      }
-      const files=[
-        {name:'[Content_Types].xml',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${content.join('')}</Types>`},
-        {name:'_rels/.rels',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`},
-        {name:'xl/workbook.xml',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView/></bookViews><sheets>${sheets.join('')}</sheets></workbook>`},
-        {name:'xl/_rels/workbook.xml.rels',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${rels.join('')}<Relationship Id="rId${idx}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`},
-        {name:'xl/styles.xml',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="10"/><name val="Arial"/></font><font><b/><sz val="10"/><name val="Arial"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0"/></cellXfs></styleSheet>`}
-      ];
-      idx=1; for(const [examName,rows] of groups.entries()){files.push({name:`xl/worksheets/sheet${idx}.xml`,data:sheetXml(rows)});idx++;}
-      const crcTable=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1);t[n]=c>>>0;}return t;})();
-      const crc32=buf=>{let c=0xFFFFFFFF;for(const b of buf)c=crcTable[(c^b)&255]^(c>>>8);return(c^0xFFFFFFFF)>>>0;};
-      const zipParts=[];const central=[];let offset=0;const now=new Date();const dosTime=(now.getHours()<<11)|(now.getMinutes()<<5)|Math.floor(now.getSeconds()/2);const dosDate=((now.getFullYear()-1980)<<9)|((now.getMonth()+1)<<5)|now.getDate();
-      for(const f of files){
-        const nameBuf=Buffer.from(f.name,'utf8'),dataBuf=Buffer.from(f.data,'utf8'),crc=crc32(dataBuf);
-        const local=Buffer.alloc(30+nameBuf.length);local.writeUInt32LE(0x04034b50,0);local.writeUInt16LE(20,4);local.writeUInt16LE(0,6);local.writeUInt16LE(0,8);local.writeUInt16LE(dosTime,10);local.writeUInt16LE(dosDate,12);local.writeUInt32LE(crc,14);local.writeUInt32LE(dataBuf.length,18);local.writeUInt32LE(dataBuf.length,22);local.writeUInt16LE(nameBuf.length,26);local.writeUInt16LE(0,28);nameBuf.copy(local,30);zipParts.push(local,dataBuf);
-        const c=Buffer.alloc(46+nameBuf.length);c.writeUInt32LE(0x02014b50,0);c.writeUInt16LE(20,4);c.writeUInt16LE(20,6);c.writeUInt16LE(0,8);c.writeUInt16LE(0,10);c.writeUInt16LE(dosTime,12);c.writeUInt16LE(dosDate,14);c.writeUInt32LE(crc,16);c.writeUInt32LE(dataBuf.length,20);c.writeUInt32LE(dataBuf.length,24);c.writeUInt16LE(nameBuf.length,28);c.writeUInt16LE(0,30);c.writeUInt16LE(0,32);c.writeUInt16LE(0,34);c.writeUInt16LE(0,36);c.writeUInt16LE(0,38);c.writeUInt32LE(offset,42);nameBuf.copy(c,46);central.push(c);offset+=local.length+dataBuf.length;
-      }
-      const centralBuf=Buffer.concat(central);const end=Buffer.alloc(22);end.writeUInt32LE(0x06054b50,0);end.writeUInt16LE(0,4);end.writeUInt16LE(0,6);end.writeUInt16LE(files.length,8);end.writeUInt16LE(files.length,10);end.writeUInt32LE(centralBuf.length,12);end.writeUInt32LE(offset,16);
-      const xlsx=Buffer.concat([...zipParts,centralBuf,end]);
-      const filename=(type===''?'thiral_all_exam_results_':'thiral_model_exam_results_')+new Date().toISOString().slice(0,10)+'.xlsx';
-      res.setHeader('Content-Type','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.setHeader('Content-Disposition',`attachment; filename="${filename}"`);
-      res.setHeader('Content-Length',String(xlsx.length));
-      return res.end(xlsx);
-    }
 
     const where=[`a.status='SUBMITTED'`],params=[];
     const add=(sql,val)=>{params.push(val);where.push(sql.replace('?', '$'+params.length));};
