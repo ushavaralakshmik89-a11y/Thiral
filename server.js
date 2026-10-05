@@ -140,6 +140,18 @@ const SUBJECT_ALIASES = {
   'பொது அறிவு / General Studies':'gs','General Studies':'gs','general studies':'gs',
   'திறனறிவு / Aptitude':'apt','Aptitude':'apt','aptitude':'apt'
 };
+const NEW_GS_EN_SUBTOPIC_ALIASES = {
+  'Early Uprisings against British Rule':'Early Resistance to British Rule',
+  'Early Agitations against British Rule':'Early Resistances to British Rule',
+  'Role of Tamil Nadu in Freedom Struggle':'Role of Tamil Nadu in the Freedom Struggle',
+  'Industrial Growth':'Industrial Development',
+  'Rural Welfare Programmes':'Rural Welfare Schemes',
+  'Population and Social Problems':'Population and Social Issues',
+  'Government Welfare Schemes in Tamil Nadu':'Tamil Nadu Government Welfare Schemes',
+  'Geography of Tamil Nadu and Economic Growth':'Geography and Economic Development of Tamil Nadu',
+  'Current Socio-Economic Affairs':'Current Socio-Economic Events'
+};
+
 const GROUP4_SUBTOPIC_ALIASES = {
   'பண்டைய இந்தியா':'Ancient India','Ancient India':'பண்டைய இந்தியா',
   'இடைக்கால இந்தியா':'Medieval India','Medieval India':'இடைக்கால இந்தியா',
@@ -191,9 +203,13 @@ function subjectCandidates(raw){
   return [...new Set([canonical,s,...aliases].filter(Boolean))];
 }
 function subtopicCandidates(raw){
-  const s=String(raw||'').trim();
+  const s=String(raw||'').normalize('NFKC').trim().replace(/\s+/g,' ');
   if(!s) return [];
-  const a=[s, GROUP4_SUBTOPIC_ALIASES[s] || ''];
+  const a=[
+    s,
+    GROUP4_SUBTOPIC_ALIASES[s] || '',
+    NEW_GS_EN_SUBTOPIC_ALIASES[s] || ''
+  ];
   return [...new Set(a.filter(Boolean))];
 }
 
@@ -1059,8 +1075,18 @@ api.get('/questions', requirePasswordReady, async (req, res) => {
     const offset = Math.max(parseInt(req.query.offset || '0',10) || 0,0);
     if (!exam || !subject || !['ta','en'].includes(language)) return sendError(res,400,'Invalid question request.');
 
-    const where = ['exam=$1','subject = ANY($2::text[])','language=$3','is_active=true'];
-    const params = [exam, subjectCandidatesList, language];
+    const examSqlCandidates = [...new Set(
+      [exam, exam === 'group4' ? 'Group 4' : exam]
+        .map(v => String(v || '').normalize('NFKC').trim().replace(/\s+/g,' ').toLowerCase())
+        .filter(Boolean)
+    )];
+    const where = [
+      'LOWER(BTRIM(exam)) = ANY($1::text[])',
+      'subject = ANY($2::text[])',
+      'LOWER(BTRIM(language)) = $3',
+      'is_active=true'
+    ];
+    const params = [examSqlCandidates, subjectCandidatesList, language.toLowerCase()];
     let n = 4;
     const subCandidates = subtopicCandidates(subtopic);
     if (subCandidates.length === 1) {
@@ -1123,13 +1149,18 @@ api.get('/practice/questions', requirePasswordReady, async (req, res) => {
       return sendError(res, 400, 'Invalid question request.');
     }
 
-    const params = [req.user.id, exam, subjectCandidatesList, language];
+    const examSqlCandidates = [...new Set(
+      [exam, exam === 'group4' ? 'Group 4' : exam]
+        .map(v => String(v || '').normalize('NFKC').trim().replace(/\s+/g,' ').toLowerCase())
+        .filter(Boolean)
+    )];
+    const params = [req.user.id, examSqlCandidates, subjectCandidatesList, language.toLowerCase()];
     let n = 5;
 
     let where = `
-      q.exam = $2
+      LOWER(BTRIM(q.exam)) = ANY($2::text[])
       AND q.subject = ANY($3::text[])
-      AND q.language = $4
+      AND LOWER(BTRIM(q.language)) = $4
       AND q.is_active = true
     `;
 
