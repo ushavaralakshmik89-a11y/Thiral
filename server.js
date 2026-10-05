@@ -1330,55 +1330,6 @@ api.post('/attempts/:id/submit', requirePasswordReady, async (req,res)=>{
   }catch(e){console.error(e);sendError(res,500,'Grading service error.');}
 });
 
-/* ===== Mock/Practice submitted-attempt review =====
-   Correct answers are returned only after the attempt is SUBMITTED and only
-   to the authenticated owner of that attempt. The live exam never receives
-   correct_option through the normal question-loading API.
-*/
-api.get('/attempts/:id/review', requirePasswordReady, async (req,res)=>{
-  try{
-    const id=Number(req.params.id);
-    if(!Number.isInteger(id)) return sendError(res,400,'Invalid attempt id.');
-
-    const a=await pool.query(
-      `SELECT id,status,question_ids
-         FROM attempts
-        WHERE id=$1 AND user_id=$2
-        LIMIT 1`,
-      [id,req.user.id]
-    );
-    if(!a.rowCount) return sendError(res,404,'Attempt not found.');
-    const attempt=a.rows[0];
-    if(attempt.status!=='SUBMITTED') return sendError(res,409,'Review is available only after submission.');
-
-    const ids=Array.isArray(attempt.question_ids) ? attempt.question_ids.map(Number).filter(Number.isInteger) : [];
-    if(!ids.length) return res.json({review:[]});
-
-    const q=await pool.query(
-      `SELECT id,correct_option,explanation
-         FROM questions
-        WHERE id=ANY($1::bigint[])`,
-      [ids]
-    );
-    const byId=new Map(q.rows.map(row=>[Number(row.id),row]));
-
-    res.json({
-      review:ids.map((qid,i)=>{
-        const row=byId.get(Number(qid));
-        return {
-          question_no:i+1,
-          question_id:Number(qid),
-          correct_option:row ? Number(row.correct_option) : null,
-          explanation:row ? String(row.explanation || '') : ''
-        };
-      })
-    });
-  }catch(e){
-    console.error('Attempt review error:',e);
-    sendError(res,500,'Review service error.');
-  }
-});
-
 api.get('/results', requirePasswordReady, async (req,res)=>{
   try{
     const q=await pool.query(`SELECT id,exam,subject,mode,language,score,correct_count,total_count,started_at,submitted_at FROM attempts WHERE user_id=$1 AND status='SUBMITTED' ORDER BY started_at DESC LIMIT 100`,[req.user.id]);
@@ -2607,73 +2558,34 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
     let gsRows=unique.filter(q=>q._mockSubject==='gs');
     let aptRows=unique.filter(q=>q._mockSubject==='apt');
 
-    /* If this student has already consumed the fresh pool, do not leave the
-       Mock screen empty. Reuse old Mock questions only after the fresh pool
-       for that subject is exhausted. The current Mock still avoids duplicate
-       content until its unique pool is exhausted. */
-    const need={tamil:100,gs:75,apt:25};
-    const freshCount={tamil:tamilRows.length,gs:gsRows.length,apt:aptRows.length};
-    if(freshCount.tamil<100 || freshCount.gs<75 || freshCount.apt<25){
-      const recycleAll=[];
-      for(const spec of specs){
-        const r=await client.query(
-          `SELECT id,exam,subject,subtopic,language,question,options,explanation,
-                  COALESCE(to_jsonb(questions)->>'difficulty',to_jsonb(questions)->>'level','') AS difficulty
-             FROM questions
-            WHERE exam=$1
-              AND subject=ANY($2::text[])
-              AND language=$3
-              AND is_active=true
-            ORDER BY id
-            LIMIT 5000`,
-          [exam,spec.candidates,spec.language]
-        );
-        recycleAll.push(...r.rows.map(q=>({...q,_mockSubject:spec.name})));
-      }
+    /*
+       QUALITY-ONLY GROUP 4 RULE:
+       Never recycle questions from an earlier Mock. A new Mock is created only
+       when enough genuinely unused, unique questions exist in every required
+       pool: 100 Tamil + 75 GS + 25 Aptitude.
+    */
+    const required={tamil:100,gs:75,apt:25};
+    const available={tamil:tamilRows.length,gs:gsRows.length,apt:aptRows.length};
 
-      const addRecycled=(name,current,required)=>{
-        if(current.length>=required) return current;
-        const localSeen=new Set(current.map(contentKey));
-        for(const q of recycleAll){
-          if(q._mockSubject!==name) continue;
-          const ck=contentKey(q);
-          if(!ck || localSeen.has(ck)) continue;
-          localSeen.add(ck);
-          current.push(q);
-          if(current.length>=required) break;
-        }
-        return current;
-      };
-
-      tamilRows=addRecycled('tamil',tamilRows,100);
-      gsRows=addRecycled('gs',gsRows,75);
-      aptRows=addRecycled('apt',aptRows,25);
-    }
-
-    /* A Mock must contain 200 slots. If a subject has fewer than its required
-       number of unique questions even after recycling, cycle only after that
-       subject's unique pool is exhausted. This prevents an empty Mock while
-       preserving uniqueness for as long as the database permits. */
-    const cycleTo=(rows,count)=>{
-      if(!rows.length) return [];
-      const out=[];
-      for(let i=0;i<count;i++) out.push(rows[i%rows.length]);
-      return out;
-    };
-
-    const tamilSelected=selectBest(tamilRows,Math.min(100,tamilRows.length),{1:20,2:60,3:20});
-    const gsSelected=selectBest(gsRows,Math.min(75,gsRows.length),{1:15,2:45,3:15});
-    const aptSelected=selectBest(aptRows,Math.min(25,aptRows.length),{1:5,2:15,3:5});
-
-    const tamilFinal=tamilSelected.length>=100?tamilSelected:cycleTo(tamilRows,100);
-    const gsFinal=gsSelected.length>=75?gsSelected:cycleTo(gsRows,75);
-    const aptFinal=aptSelected.length>=25?aptSelected:cycleTo(aptRows,25);
-
-    if(!tamilFinal.length || !gsFinal.length || !aptFinal.length){
+    if(available.tamil<required.tamil ||
+       available.gs<required.gs ||
+       available.apt<required.apt){
       await client.query('ROLLBACK');
       return sendError(res,409,
-        `Mock-க்கு தேவையான கேள்விகள் இல்லை. தமிழ்: ${tamilRows.length}, GS: ${gsRows.length}, Aptitude: ${aptRows.length}.` 
+        `புதிய தனித்துவமான கேள்விகள் போதவில்லை. Mock உருவாக்கப்படவில்லை. தமிழ்: ${available.tamil}/${required.tamil}, GS: ${available.gs}/${required.gs}, Aptitude: ${available.apt}/${required.apt}.`
       );
+    }
+
+    /* Quality-first distribution: Moderate 20%, Hard 60%, Very Hard 20%.
+       If one difficulty bucket is short, the selector uses the strongest
+       remaining unused questions. It never recycles old Mock questions. */
+    const tamilFinal=selectBest(tamilRows,100,{1:20,2:60,3:20});
+    const gsFinal=selectBest(gsRows,75,{1:15,2:45,3:15});
+    const aptSelected=selectBest(aptRows,25,{1:5,2:15,3:5});
+
+    if(tamilFinal.length!==100 || gsFinal.length!==75 || aptSelected.length!==25){
+      await client.query('ROLLBACK');
+      return sendError(res,409,'தரமான தனித்துவமான 200 கேள்விகளை உருவாக்க முடியவில்லை. Mock உருவாக்கப்படவில்லை.');
     }
 
     /* Aptitude gets a second diversity pass across subtopics, without allowing
