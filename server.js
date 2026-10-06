@@ -210,15 +210,13 @@ function subtopicCandidates(raw){
   return [...new Set(a.filter(Boolean))];
 }
 
-
-/* =========================================================
-   NEW GROUP 4 GENERAL STUDIES COMPATIBILITY (51 SUBTOPICS)
-   Added on top of the known-good backup server only.
-   Existing question data and existing routes remain unchanged.
-   The import data uses `Group 4` for exam and `gs` for subject;
-   the frontend may use `group4` plus either Tamil or English subtopic labels.
-   ========================================================= */
-const NEW_GROUP4_GS_TAMIL_TO_EN = {
+/* ===== GROUP 4 NEW GS 51 BILINGUAL SUBTOPIC MATCH =====
+   The 51 newly added GS subtopics may exist in questions.subtopic as
+   either the Tamil UI label, the English label, or one of the known
+   imported English aliases. Match all known labels without rewriting data.
+   This branch is limited to Group 4 + GS + these 51 subtopics.
+*/
+const GROUP4_NEW_GS_51_MAP = {
   'இந்திய பண்பாடு':'Indian Culture',
   'சிந்து சமவெளி நாகரிகம்':'Indus Valley Civilization',
   'குப்தர்கள்':'Guptas',
@@ -272,80 +270,40 @@ const NEW_GROUP4_GS_TAMIL_TO_EN = {
   'நடப்பு சமூக-பொருளாதார நிகழ்வுகள்':'Current Socio-Economic Issues',
 };
 
-const NEW_GROUP4_GS_EN_TO_TAMIL = {
-  'Indian Culture':'இந்திய பண்பாடு',
-  'Indus Valley Civilization':'சிந்து சமவெளி நாகரிகம்',
-  'Guptas':'குப்தர்கள்',
-  'Delhi Sultanate':'டெல்லி சுல்தான்கள்',
-  'Mughals':'முகலாயர்கள்',
-  'Marathas':'மராத்தியர்கள்',
-  'South Indian History':'தென்னிந்திய வரலாறு',
-  'National Renaissance':'தேசிய மறுமலர்ச்சி',
-  'Early Uprisings against British Rule':'ஆங்கிலேயருக்கு எதிரான ஆரம்ப எழுச்சிகள்',
-  'Indian National Congress':'இந்திய தேசிய காங்கிரஸ்',
-  'National Leaders':'தேசிய தலைவர்கள்',
-  'Movements in Tamil Nadu Freedom Struggle':'தமிழ்நாட்டின் சுதந்திரப் போராட்ட இயக்கங்கள்',
-  'Characteristics of Indian Culture':'இந்திய பண்பாட்டின் சிறப்பம்சங்கள்',
-  'Unity in Diversity':'வேற்றுமையில் ஒற்றுமை',
-  'Secularism':'மதச்சார்பின்மை',
-  'History of Tamil Society':'தமிழ் சமூக வரலாறு',
-  'Archaeological Discoveries':'தொல்லியல் கண்டுபிடிப்புகள்',
-  'Tamil Literature from Sangam to Contemporary Times':'சங்க காலம் முதல் நவீன காலம் வரையிலான தமிழ் இலக்கியம்',
-  'Tamil Culture and Heritage':'தமிழ் பண்பாடு மற்றும் பாரம்பரியம்',
-  'Thirukkural and Universal Values':'திருக்குறள் மற்றும் உலகளாவிய மதிப்புகள்',
-  'Role of Tamil Nadu in Freedom Struggle':'தமிழ்நாட்டின் சுதந்திரப் போராட்ட பங்கு',
-  'Early Agitations against British Rule':'ஆங்கிலேயருக்கு எதிரான ஆரம்பப் போராட்டங்கள்',
-  'Role of Women in Freedom Struggle':'சுதந்திரப் போராட்டத்தில் பெண்களின் பங்கு',
-  'Social Reformers':'சமூக சீர்திருத்தவாதிகள்',
-  'Social Reform Movements':'சமூக சீர்திருத்த இயக்கங்கள்',
-  'Social Transformation of Tamil Nadu':'தமிழ்நாட்டின் சமூக மாற்றங்கள்',
-  'Social Justice Movements':'சமூக நீதி இயக்கங்கள்',
-  'Socio-Political Movements':'சமூக-அரசியல் இயக்கங்கள்',
-  'Development Administration in Tamil Nadu':'தமிழ்நாடு வளர்ச்சி நிர்வாகம்',
-  'Nature of Indian Economy':'இந்திய பொருளாதாரத்தின் இயல்பு',
-  'Planning and Development':'திட்டமிடல் மற்றும் வளர்ச்சி',
-  'Planning Commission and NITI Aayog':'திட்டக் குழு மற்றும் நிதி ஆயோக்',
-  'Sources of Revenue':'வருவாய் ஆதாரங்கள்',
-  'Reserve Bank of India':'இந்திய ரிசர்வ் வங்கி',
-  'Finance Commission':'நிதிக் குழு',
-  'Resource Sharing between Union and State Governments':'மத்திய-மாநில வளப் பகிர்வு',
-  'Goods and Services Tax (GST)':'சரக்கு மற்றும் சேவை வரி (GST)',
-  'Employment Generation':'வேலைவாய்ப்பு உருவாக்கம்',
-  'Land Reforms and Agriculture':'நிலச் சீர்திருத்தங்கள் மற்றும் வேளாண்மை',
-  'Science and Technology in Agriculture':'வேளாண்மையில் அறிவியல் மற்றும் தொழில்நுட்பம்',
-  'Industrial Growth':'தொழில் வளர்ச்சி',
-  'Rural Welfare Programmes':'கிராமப்புற நலத்திட்டங்கள்',
-  'Population and Social Problems':'மக்கள் தொகை மற்றும் சமூகப் பிரச்சினைகள்',
-  'Education System':'கல்வி அமைப்பு',
-  'Health System':'சுகாதார அமைப்பு',
-  'Employment and Poverty':'வேலைவாய்ப்பு மற்றும் வறுமை',
-  'Social Justice and Social Harmony':'சமூக நீதி மற்றும் சமூக நல்லிணக்கம்',
-  'Tamil Nadu Government Welfare Schemes':'தமிழ்நாடு அரசு நலத்திட்டங்கள்',
-  'Geography of Tamil Nadu and Economic Growth':'தமிழ்நாட்டின் புவியியல் மற்றும் பொருளாதார வளர்ச்சி',
-  'Socio-Economic Problems':'சமூக-பொருளாதார பிரச்சினைகள்',
-  'Current Socio-Economic Issues':'நடப்பு சமூக-பொருளாதார நிகழ்வுகள்',
+const GROUP4_NEW_GS_51_EXTRA_ALIASES = {
+  'Early Uprisings against British Rule':'Early Resistance to British Rule',
+  'Early Agitations against British Rule':'Early Resistances against British Rule',
+  'Early Resistances against British Rule':'Early Agitations against British Rule',
+  'Early Resistances to British Rule':'Early Agitations against British Rule',
+  'Role of Tamil Nadu in Freedom Struggle':'Role of Tamil Nadu in the Freedom Struggle',
+  'Industrial Growth':'Industrial Development',
+  'Rural Welfare Programmes':'Rural Welfare Schemes',
+  'Population and Social Problems':'Population and Social Issues',
+  'Government Welfare Schemes in Tamil Nadu':'Tamil Nadu Government Welfare Schemes',
+  'Geography of Tamil Nadu and Economic Growth':'Geography and Economic Development of Tamil Nadu',
+  'Current Socio-Economic Affairs':'Current Socio-Economic Events'
 };
 
-const NEW_GROUP4_GS_EXAM_CANDIDATES = ['group4','Group 4','Group4'];
-const NEW_GROUP4_GS_SUBJECT_CANDIDATES = [
-  'gs','General Studies','General Knowledge','general studies','general knowledge',
-  'பொது அறிவு','பொது அறிவு / General Studies'
-];
-
-function newGroup4GSSubtopicCandidates(rawSubtopic) {
-  const s=String(rawSubtopic||'').trim();
+function group4NewGs51Candidates(raw) {
+  const s=String(raw||'').trim();
   if(!s) return [];
-  const paired = NEW_GROUP4_GS_TAMIL_TO_EN[s] || NEW_GROUP4_GS_EN_TO_TAMIL[s] || '';
-  return [...new Set([s, paired].filter(Boolean))];
+  const out=[s];
+  const en=GROUP4_NEW_GS_51_MAP[s];
+  const ta=Object.entries(GROUP4_NEW_GS_51_MAP).find(([taLabel,enLabel])=>enLabel===s)?.[0];
+  if(en) out.push(en);
+  if(ta) out.push(ta);
+  const extra1=GROUP4_NEW_GS_51_EXTRA_ALIASES[s];
+  if(extra1) out.push(extra1);
+  const extra2=Object.entries(GROUP4_NEW_GS_51_EXTRA_ALIASES).find(([a,b])=>b===s)?.[0];
+  if(extra2) out.push(extra2);
+  return [...new Set(out.filter(Boolean))];
 }
 
-function isNewGroup4GSRequest(exam, subject, language, subtopic) {
-  const examOk = NEW_GROUP4_GS_EXAM_CANDIDATES.includes(String(exam||'').trim());
-  const subjectOk = NEW_GROUP4_GS_SUBJECT_CANDIDATES.includes(String(subject||'').trim()) || canonicalSubject(subject)==='gs';
-  const langOk = language==='ta' || language==='en';
-  const s=String(subtopic||'').trim();
-  const topicOk = Object.prototype.hasOwnProperty.call(NEW_GROUP4_GS_TAMIL_TO_EN,s) || Object.prototype.hasOwnProperty.call(NEW_GROUP4_GS_EN_TO_TAMIL,s);
-  return examOk && subjectOk && langOk && topicOk;
+function isGroup4NewGs51(exam, subject, subtopic) {
+  return exam === 'group4' &&
+         subject === 'gs' &&
+         (Object.prototype.hasOwnProperty.call(GROUP4_NEW_GS_51_MAP, subtopic) ||
+          Object.values(GROUP4_NEW_GS_51_MAP).includes(subtopic));
 }
 
 function newSessionId() {
@@ -1235,25 +1193,22 @@ api.get('/questions', requirePasswordReady, async (req, res) => {
       language === 'ta' &&
       Object.prototype.hasOwnProperty.call(NEW_TAMIL_G4_APT_MAP, subtopic);
 
-    const isNewGroup4GS = isNewGroup4GSRequest(exam, rawSubject, language, subtopic);
+    const isNewGroup4Gs51 = isGroup4NewGs51(exam, subject, subtopic);
 
     /* Existing requests retain the original exact exam/subject behavior. */
-    const isSpecialNewGroup4 = isNewTamilG4Apt || isNewGroup4GS;
-    const where = isSpecialNewGroup4
+    const where = isNewTamilG4Apt
       ? ['exam = ANY($1::text[])','subject = ANY($2::text[])','language=$3','is_active=true']
       : ['exam=$1','subject = ANY($2::text[])','language=$3','is_active=true'];
 
     const params = isNewTamilG4Apt
       ? [['group4','Group 4','Group4'], ['apt','Aptitude'], language]
-      : isNewGroup4GS
-        ? [NEW_GROUP4_GS_EXAM_CANDIDATES, NEW_GROUP4_GS_SUBJECT_CANDIDATES, language]
-        : [exam, subjectCandidatesList, language];
+      : [exam, subjectCandidatesList, language];
 
     let n = 4;
     const subCandidates = isNewTamilG4Apt
       ? [NEW_TAMIL_G4_APT_MAP[subtopic]]
-      : isNewGroup4GS
-        ? newGroup4GSSubtopicCandidates(subtopic)
+      : isNewGroup4Gs51
+        ? group4NewGs51Candidates(subtopic)
         : subtopicCandidates(subtopic);
 
     if (subCandidates.length === 1) {
@@ -1335,19 +1290,16 @@ api.get('/practice/questions', requirePasswordReady, async (req, res) => {
       language === 'ta' &&
       Object.prototype.hasOwnProperty.call(NEW_TAMIL_G4_APT_MAP, subtopic);
 
-    const isNewGroup4GS = isNewGroup4GSRequest(exam, rawSubject, language, subtopic);
-    const isSpecialNewGroup4 = isNewTamilG4Apt || isNewGroup4GS;
+    const isNewGroup4Gs51 = isGroup4NewGs51(exam, subject, subtopic);
 
     const params = isNewTamilG4Apt
       ? [req.user.id, ['group4','Group 4','Group4'], ['apt','Aptitude'], language]
-      : isNewGroup4GS
-        ? [req.user.id, NEW_GROUP4_GS_EXAM_CANDIDATES, NEW_GROUP4_GS_SUBJECT_CANDIDATES, language]
-        : [req.user.id, exam, subjectCandidatesList, language];
+      : [req.user.id, exam, subjectCandidatesList, language];
 
     let n = 5;
 
     let where = `
-      q.exam ${isSpecialNewGroup4 ? '= ANY($2::text[])' : '= $2'}
+      q.exam ${isNewTamilG4Apt ? '= ANY($2::text[])' : '= $2'}
       AND q.subject = ANY($3::text[])
       AND q.language = $4
       AND q.is_active = true
@@ -1355,8 +1307,8 @@ api.get('/practice/questions', requirePasswordReady, async (req, res) => {
 
     const subCandidates = isNewTamilG4Apt
       ? [NEW_TAMIL_G4_APT_MAP[subtopic]]
-      : isNewGroup4GS
-        ? newGroup4GSSubtopicCandidates(subtopic)
+      : isNewGroup4Gs51
+        ? group4NewGs51Candidates(subtopic)
         : subtopicCandidates(subtopic);
     if (subCandidates.length === 1) {
       where += ` AND q.subtopic = $${n}`;
@@ -2601,7 +2553,7 @@ app.use('/api/admin', async (req, res, next) => {
 api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
   const exam=String(req.query.exam||'').trim();
   const requestedLanguage=String(req.query.language||'ta').trim();
-  if(!NEW_GROUP4_GS_EXAM_CANDIDATES.includes(exam) || !['ta','en'].includes(requestedLanguage)){
+  if(exam!=='group4' || !['ta','en'].includes(requestedLanguage)){
     return sendError(res,400,'Invalid Group 4 Mock request.');
   }
 
@@ -2628,7 +2580,7 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
         `SELECT id,exam,subject,subtopic,language,question,options,explanation,
                 COALESCE(to_jsonb(questions)->>'difficulty',to_jsonb(questions)->>'level','') AS difficulty
            FROM questions
-          WHERE exam=ANY($1::text[])
+          WHERE exam=$1
             AND subject=ANY($2::text[])
             AND language=$3
             AND is_active=true
@@ -2640,7 +2592,7 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
             )
           ORDER BY id
           LIMIT 3000`,
-        [NEW_GROUP4_GS_EXAM_CANDIDATES,spec.candidates,spec.language,req.user.id]
+        [exam,spec.candidates,spec.language,req.user.id]
       );
       all.push(...r.rows.map(q=>({...q,_mockSubject:spec.name})));
     }
