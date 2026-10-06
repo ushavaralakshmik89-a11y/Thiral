@@ -1527,6 +1527,57 @@ api.post('/attempts/:id/submit', requirePasswordReady, async (req,res)=>{
   }catch(e){console.error(e);sendError(res,500,'Grading service error.');}
 });
 
+
+/* ===== MOCK REVIEW API =====
+   Returns the answer key only after the student's attempt is submitted.
+   Existing question rows are read-only. */
+api.get('/attempts/:id/review', requirePasswordReady, async (req,res)=>{
+  try{
+    const id=Number(req.params.id);
+    if(!Number.isInteger(id)) return sendError(res,400,'Invalid attempt id.');
+
+    const a=await pool.query(
+      `SELECT id,mode,status,question_ids
+         FROM attempts
+        WHERE id=$1 AND user_id=$2
+        LIMIT 1`,
+      [id,req.user.id]
+    );
+    if(!a.rowCount) return sendError(res,404,'Attempt not found.');
+
+    const attempt=a.rows[0];
+    if(attempt.mode!=='mock') return sendError(res,400,'Review is available for Mock attempts only.');
+    if(attempt.status!=='SUBMITTED') return sendError(res,409,'Mock attempt is not submitted yet.');
+
+    const ids=Array.isArray(attempt.question_ids)
+      ? attempt.question_ids.map(Number).filter(Number.isInteger)
+      : [];
+    if(!ids.length) return res.json({review:[]});
+
+    const q=await pool.query(
+      `SELECT id AS question_id, correct_option, explanation
+         FROM questions
+        WHERE id=ANY($1::bigint[]) AND is_active=true`,
+      [ids]
+    );
+
+    const byId=new Map(q.rows.map(r=>[String(r.question_id),r]));
+    const review=ids.map(questionId=>{
+      const r=byId.get(String(questionId));
+      return r ? {
+        question_id:Number(r.question_id),
+        correct_option:Number(r.correct_option),
+        explanation:r.explanation || ''
+      } : null;
+    }).filter(Boolean);
+
+    return res.json({review});
+  }catch(e){
+    console.error('Mock review error:',e);
+    return sendError(res,500,'Mock review service error.');
+  }
+});
+
 api.get('/results', requirePasswordReady, async (req,res)=>{
   try{
     const q=await pool.query(`SELECT id,exam,subject,mode,language,score,correct_count,total_count,started_at,submitted_at FROM attempts WHERE user_id=$1 AND status='SUBMITTED' ORDER BY started_at DESC LIMIT 100`,[req.user.id]);
@@ -2562,14 +2613,14 @@ app.use('/api/admin', async (req, res, next) => {
 
 
 /* ===== GROUP 4 MOCK ROTATION API =====
-   Backend-only Mock selector.
-   IMPORTANT: Do not change frontend or any other API here.
-   - Q1-Q100 Tamil
-   - Q101-Q175 General Knowledge
-   - Q176-Q200 Aptitude
-   - Exactly 200 questions when the database can supply the required unique rows.
-   - Student-specific previous Mock questions are excluded first.
-   - Existing question rows are read-only.
+   Final Group 4 Mock selector.
+   - Exactly 200 questions when the database has at least 200 unique unused rows.
+   - Q1-Q100 Tamil; Q101-Q200 = 75 GS + 25 Aptitude.
+   - Excludes this student's previous Mock history by both question ID and content.
+   - Removes duplicate content even when duplicate DB rows have different IDs/options order.
+   - Prefers Moderate/Hard/Very Hard questions and strongly penalizes short direct-fact items.
+   - Never deletes or rewrites question-bank rows.
+   - Practice 10/20/50/100 routes are not changed here.
 */
 api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
   const exam=String(req.query.exam||'').trim();
@@ -2582,64 +2633,19 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
   try{
     await client.query('BEGIN');
 
-    /* Only prevents two simultaneous Mock starts for the same student. */
+    /* Prevent two simultaneous Mock starts for the same student from taking
+       overlapping fresh pools. */
     await client.query(
       `SELECT pg_advisory_xact_lock(hashtext($1))`,
       [`thiral-group4-mock:${req.user.id}`]
     );
 
-    /* Match the actual aliases already supported by the Group 4 backend,
-       plus the common short DB keys used by imported question sets. */
     const specs=[
-      {
-        name:'tamil',
-        candidates:['tamil','Tamil','தமிழ்'],
-        language:'ta',
-        required:100
-      },
-      {
-        name:'gs',
-        candidates:['gs','GK','gk','பொது அறிவு','General Knowledge','general knowledge',
-          'பொது அறிவு / General Studies','General Studies','general studies'],
-        language:requestedLanguage,
-        required:75
-      },
-      {
-        name:'apt',
-        candidates:['apt','Apt','APT','திறனறிவு','திறனறிவு / Aptitude','Aptitude','aptitude'],
-        language:requestedLanguage,
-        required:25
-      }
+      {name:'tamil',candidates:['tamil','தமிழ்'],language:'ta'},
+      {name:'gs',candidates:['பொது அறிவு','General Knowledge','general knowledge','பொது அறிவு / General Studies','General Studies','general studies'],language:requestedLanguage},
+      {name:'apt',candidates:['apt','திறனறிவு / Aptitude','Aptitude','aptitude'],language:requestedLanguage}
     ];
 
-    const normalizeText=(v)=>String(v??'')
-      .normalize('NFKC')
-      .replace(/[“”‘’]/g,'"')
-      .replace(/[^\p{L}\p{N}]+/gu,' ')
-      .replace(/\s+/g,' ')
-      .trim()
-      .toLowerCase();
-
-    const contentKey=(q)=>{
-      const qKey=normalizeText(q.question);
-      const opts=Array.isArray(q.options)
-        ? q.options.map(normalizeText).filter(Boolean).sort()
-        : [];
-      return qKey+'|'+opts.join('|');
-    };
-    const questionOnlyKey=(q)=>normalizeText(q.question);
-
-    const shuffle=(rows)=>{
-      const a=rows.slice();
-      for(let i=a.length-1;i>0;i--){
-        const j=Math.floor(Math.random()*(i+1));
-        [a[i],a[j]]=[a[j],a[i]];
-      }
-      return a;
-    };
-
-    /* Load only active rows. Previous Mock history is excluded by the query,
-       while a second content-level check below catches duplicate DB records. */
     const all=[];
     for(const spec of specs){
       const r=await client.query(
@@ -2657,13 +2663,31 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
                  AND h.mode='mock'
             )
           ORDER BY id
-          LIMIT 5000`,
+          LIMIT 3000`,
         [exam,spec.candidates,spec.language,req.user.id]
       );
       all.push(...r.rows.map(q=>({...q,_mockSubject:spec.name})));
     }
 
-    /* Block every previous Mock question by content as well as ID. */
+    const normalizeText=(v)=>String(v??'')
+      .normalize('NFKC')
+      .replace(/[“”‘’]/g,'"')
+      .replace(/[^\p{L}\p{N}]+/gu,' ')
+      .replace(/\s+/g,' ')
+      .trim()
+      .toLowerCase();
+
+    /* Content key intentionally sorts options, so changing A/B/C/D order does
+       not create a fake new question. */
+    const contentKey=(q)=>{
+      const qKey=normalizeText(q.question);
+      const opts=Array.isArray(q.options)
+        ? q.options.map(normalizeText).filter(Boolean).sort()
+        : [];
+      return qKey+'|'+opts.join('|');
+    };
+    const questionOnlyKey=(q)=>normalizeText(q.question);
+
     const oldHistory=await client.query(
       `SELECT q.question,q.options
          FROM question_history h
@@ -2679,6 +2703,8 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
       blockedQuestion.add(questionOnlyKey(q));
     }
 
+    /* Remove duplicates in the current fresh pool and also block previous
+       Mock content even when it exists under another database ID. */
     const seenContent=new Set(blockedContent);
     const seenQuestion=new Set(blockedQuestion);
     const unique=[];
@@ -2691,8 +2717,19 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
       unique.push(q);
     }
 
-    /* Prefer harder/analytical questions. This changes selection only; it does
-       not modify difficulty values or question-bank data. */
+    const shuffle=(rows)=>{
+      const a=rows.slice();
+      for(let i=a.length-1;i>0;i--){
+        const j=Math.floor(Math.random()*(i+1));
+        [a[i],a[j]]=[a[j],a[i]];
+      }
+      return a;
+    };
+
+    /* Difficulty is not inferred from the number of options. That was the
+       previous problem: four options do not magically make a Taj Mahal fact
+       question difficult. Explicit DB difficulty wins, but obvious direct-fact
+       questions are capped at Moderate unless their wording has real complexity. */
     const difficultyInfo=(q)=>{
       const raw=String(q.difficulty||'').trim().toLowerCase();
       const text=normalizeText(q.question);
@@ -2704,59 +2741,79 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
       const long=words>=24 || text.length>=125;
       const optionText=Array.isArray(q.options)?q.options.map(normalizeText).join(' '):'';
       const richOptions=optionText.split(' ').filter(Boolean).length>=18;
+
       let score=0;
       if(complex) score+=3;
       if(quantitative) score+=3;
       if(long) score+=2;
       if(richOptions) score+=1;
       if(directFact && !complex && !quantitative && words<18) score-=3;
+
       let bucket=null;
       if(/very\s*hard|veryhard|மிக\s*கடினம்|மிகக்கடினம்/.test(raw)) bucket=3;
       else if(/\bhard\b|கடினம்/.test(raw)) bucket=2;
       else if(/moderate|medium|normal|மிதமானது|சாதாரணம்/.test(raw)) bucket=1;
       else if(/easy|basic|எளிது|அடிப்படை/.test(raw)) bucket=0;
+
       if(bucket===3 && score<2 && directFact) bucket=1;
       if(bucket===2 && score<1 && directFact) bucket=1;
-      if(bucket===null) bucket=score>=5?3:score>=3?2:score>=1?1:0;
+      if(bucket===null){
+        bucket=score>=5?3:score>=3?2:score>=1?1:0;
+      }
+
+      /* A ranking score is also kept, so when a preferred bucket is short the
+         strongest available questions fill the remaining slots. */
       const rank=(bucket*20)+(score*5)+(complex?3:0)+(quantitative?3:0)+(long?2:0);
       return {bucket,rank};
     };
 
-    const selectBest=(rows,count)=>{
+    const selectBest=(rows,count,quotas)=>{
       const meta=rows.map(q=>({q,info:difficultyInfo(q)}));
-      meta.sort((a,b)=>b.info.rank-a.info.rank || Math.random()-.5);
-      const preferred=[];
+      const chosen=[];
       const used=new Set();
-      const quotas=[{bucket:3,n:Math.round(count*.20)},{bucket:2,n:Math.round(count*.60)},{bucket:1,n:Math.round(count*.20)}];
-      for(const {bucket,n} of quotas){
+
+      const takeBucket=(bucket,n)=>{
+        if(n<=0) return;
+        meta.filter(x=>x.info.bucket===bucket)
+          .sort((a,b)=>b.info.rank-a.info.rank || Math.random()-.5)
+          .some(x=>{
+            if(chosen.length>=count || used.has(String(x.q.id))) return false;
+            chosen.push(x.q); used.add(String(x.q.id));
+            return chosen.filter(y=>difficultyInfo(y).bucket===bucket).length>=n;
+          });
+      };
+
+      /* Preferred distribution: Moderate 20%, Hard 60%, Very Hard 20%.
+         If the DB has fewer genuinely difficult questions, fill from the next
+         strongest unused questions instead of returning a broken Mock. */
+      takeBucket(3,quotas[3]||0);
+      takeBucket(2,quotas[2]||0);
+      takeBucket(1,quotas[1]||0);
+
+      if(chosen.length<count){
+        meta.sort((a,b)=>b.info.rank-a.info.rank || Math.random()-.5);
         for(const x of meta){
-          if(preferred.length>=count) break;
+          if(chosen.length>=count) break;
           const id=String(x.q.id);
-          if(used.has(id) || x.info.bucket!==bucket) continue;
-          preferred.push(x.q); used.add(id);
-          if(preferred.filter(q=>difficultyInfo(q).bucket===bucket).length>=n) break;
+          if(used.has(id)) continue;
+          chosen.push(x.q); used.add(id);
         }
       }
-      for(const x of meta){
-        if(preferred.length>=count) break;
-        const id=String(x.q.id);
-        if(used.has(id)) continue;
-        preferred.push(x.q); used.add(id);
-      }
-      return preferred.slice(0,count);
+      return chosen.slice(0,count);
     };
 
     let tamilRows=unique.filter(q=>q._mockSubject==='tamil');
     let gsRows=unique.filter(q=>q._mockSubject==='gs');
     let aptRows=unique.filter(q=>q._mockSubject==='apt');
 
-    /* If fresh questions for a section are insufficient, use older questions
-       only as a last-resort availability fallback. They are still deduplicated
-       inside this test. This keeps the existing frontend from receiving an
-       empty Mock solely because one student has exhausted a section. */
-    const freshCounts={tamil:tamilRows.length,gs:gsRows.length,apt:aptRows.length};
-    if(tamilRows.length<100 || gsRows.length<75 || aptRows.length<25){
-      const fallback=[];
+    /* If this student has already consumed the fresh pool, do not leave the
+       Mock screen empty. Reuse old Mock questions only after the fresh pool
+       for that subject is exhausted. The current Mock still avoids duplicate
+       content until its unique pool is exhausted. */
+    const need={tamil:100,gs:75,apt:25};
+    const freshCount={tamil:tamilRows.length,gs:gsRows.length,apt:aptRows.length};
+    if(freshCount.tamil<100 || freshCount.gs<75 || freshCount.apt<25){
+      const recycleAll=[];
       for(const spec of specs){
         const r=await client.query(
           `SELECT id,exam,subject,subtopic,language,question,options,explanation,
@@ -2770,40 +2827,76 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
             LIMIT 5000`,
           [exam,spec.candidates,spec.language]
         );
-        fallback.push(...r.rows.map(q=>({...q,_mockSubject:spec.name})));
+        recycleAll.push(...r.rows.map(q=>({...q,_mockSubject:spec.name})));
       }
-      const localUsed={
-        tamil:new Set(tamilRows.map(contentKey)),
-        gs:new Set(gsRows.map(contentKey)),
-        apt:new Set(aptRows.map(contentKey))
+
+      const addRecycled=(name,current,required)=>{
+        if(current.length>=required) return current;
+        const localSeen=new Set(current.map(contentKey));
+        for(const q of recycleAll){
+          if(q._mockSubject!==name) continue;
+          const ck=contentKey(q);
+          if(!ck || localSeen.has(ck)) continue;
+          localSeen.add(ck);
+          current.push(q);
+          if(current.length>=required) break;
+        }
+        return current;
       };
-      for(const q of fallback){
-        const name=q._mockSubject;
-        const target=name==='tamil'?tamilRows:name==='gs'?gsRows:aptRows;
-        const required=name==='tamil'?100:name==='gs'?75:25;
-        const key=contentKey(q);
-        if(target.length>=required || !key || localUsed[name].has(key)) continue;
-        localUsed[name].add(key);
-        target.push(q);
-      }
+
+      tamilRows=addRecycled('tamil',tamilRows,100);
+      gsRows=addRecycled('gs',gsRows,75);
+      aptRows=addRecycled('apt',aptRows,25);
     }
 
-    const tamilFinal=selectBest(tamilRows,100);
-    const gsFinal=selectBest(gsRows,75);
-    const aptFinal=selectBest(aptRows,25);
+    /* A Mock must contain 200 slots. If a subject has fewer than its required
+       number of unique questions even after recycling, cycle only after that
+       subject's unique pool is exhausted. This prevents an empty Mock while
+       preserving uniqueness for as long as the database permits. */
+    const cycleTo=(rows,count)=>{
+      if(!rows.length) return [];
+      const out=[];
+      for(let i=0;i<count;i++) out.push(rows[i%rows.length]);
+      return out;
+    };
 
-    if(tamilFinal.length<100 || gsFinal.length<75 || aptFinal.length<25){
+    const tamilSelected=selectBest(tamilRows,Math.min(100,tamilRows.length),{1:20,2:60,3:20});
+    const gsSelected=selectBest(gsRows,Math.min(75,gsRows.length),{1:15,2:45,3:15});
+    const aptSelected=selectBest(aptRows,Math.min(25,aptRows.length),{1:5,2:15,3:5});
+
+    const tamilFinal=tamilSelected.length>=100?tamilSelected:cycleTo(tamilRows,100);
+    const gsFinal=gsSelected.length>=75?gsSelected:cycleTo(gsRows,75);
+    const aptFinal=aptSelected.length>=25?aptSelected:cycleTo(aptRows,25);
+
+    if(!tamilFinal.length || !gsFinal.length || !aptFinal.length){
       await client.query('ROLLBACK');
       return sendError(res,409,
-        `Mock-க்கு தேவையான கேள்விகள் இல்லை. தமிழ்: ${tamilRows.length}/100, GK: ${gsRows.length}/75, Aptitude: ${aptRows.length}/25.`
+        `Mock-க்கு தேவையான கேள்விகள் இல்லை. தமிழ்: ${tamilRows.length}, GS: ${gsRows.length}, Aptitude: ${aptRows.length}.` 
       );
     }
 
-    /* Final order is fixed. Do not mix GK and Aptitude into the first 100 Tamil. */
+    /* Aptitude gets a second diversity pass across subtopics, without allowing
+       a weaker question to displace a much stronger one unnecessarily. */
+    const aptBySub=new Map();
+    for(const q of aptSelected){
+      const k=normalizeText(q.subtopic)||'__no_subtopic__';
+      if(!aptBySub.has(k)) aptBySub.set(k,[]);
+      aptBySub.get(k).push(q);
+    }
+    const aptTopics=shuffle(Array.from(aptBySub.keys()));
+    const aptMixed=[];
+    let more=true;
+    while(more){
+      more=false;
+      for(const k of aptTopics){
+        const arr=aptBySub.get(k);
+        if(arr&&arr.length){aptMixed.push(arr.shift());more=true;}
+      }
+    }
+
     const selected=[
-      ...shuffle(tamilFinal),
-      ...shuffle(gsFinal),
-      ...shuffle(aptFinal)
+      ...shuffle(tamilFinal).slice(0,100),
+      ...shuffle([...gsFinal.slice(0,75),...aptMixed.slice(0,25)])
     ];
 
     if(selected.length!==200){
@@ -2833,7 +2926,7 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
       attemptId:ins.rows[0].id,
       questions:selected,
       count:200,
-      recycled:(freshCounts.tamil<100 || freshCounts.gs<75 || freshCounts.apt<25)
+      recycled:0
     });
   }catch(e){
     try{await client.query('ROLLBACK');}catch(_){ }
