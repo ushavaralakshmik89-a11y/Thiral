@@ -287,23 +287,44 @@ const GROUP4_NEW_GS_51_EXTRA_ALIASES = {
 function group4NewGs51Candidates(raw) {
   const s=String(raw||'').trim();
   if(!s) return [];
-  const out=[s];
-  const en=GROUP4_NEW_GS_51_MAP[s];
-  const ta=Object.entries(GROUP4_NEW_GS_51_MAP).find(([taLabel,enLabel])=>enLabel===s)?.[0];
-  if(en) out.push(en);
-  if(ta) out.push(ta);
-  const extra1=GROUP4_NEW_GS_51_EXTRA_ALIASES[s];
-  if(extra1) out.push(extra1);
-  const extra2=Object.entries(GROUP4_NEW_GS_51_EXTRA_ALIASES).find(([a,b])=>b===s)?.[0];
-  if(extra2) out.push(extra2);
-  return [...new Set(out.filter(Boolean))];
+
+  /*
+     Build the complete alias family for the selected 51-GS subtopic.
+     A row may have been imported with the Tamil label, the primary English
+     label, or one of the older English aliases.  Follow aliases in both
+     directions until no new label is found.  This is lookup-only: no DB row
+     is changed and the language filter still decides Tamil vs English.
+  */
+  const out=new Set([s]);
+  let changed=true;
+  while(changed){
+    changed=false;
+    for(const ta of Object.keys(GROUP4_NEW_GS_51_MAP)){
+      const en=GROUP4_NEW_GS_51_MAP[ta];
+      if(out.has(ta) || out.has(en)){
+        if(!out.has(ta)){ out.add(ta); changed=true; }
+        if(!out.has(en)){ out.add(en); changed=true; }
+      }
+    }
+    for(const [a,b] of Object.entries(GROUP4_NEW_GS_51_EXTRA_ALIASES)){
+      if(out.has(a) || out.has(b)){
+        if(!out.has(a)){ out.add(a); changed=true; }
+        if(!out.has(b)){ out.add(b); changed=true; }
+      }
+    }
+  }
+  return [...out].filter(Boolean);
 }
 
 function isGroup4NewGs51(exam, subject, subtopic) {
-  return exam === 'group4' &&
-         subject === 'gs' &&
-         (Object.prototype.hasOwnProperty.call(GROUP4_NEW_GS_51_MAP, subtopic) ||
-          Object.values(GROUP4_NEW_GS_51_MAP).includes(subtopic));
+  if(exam !== 'group4' || subject !== 'gs') return false;
+  const s=String(subtopic||'').trim();
+  if(!s) return false;
+  return group4NewGs51Candidates(s).length > 0 &&
+    (Object.prototype.hasOwnProperty.call(GROUP4_NEW_GS_51_MAP,s) ||
+     Object.values(GROUP4_NEW_GS_51_MAP).includes(s) ||
+     Object.prototype.hasOwnProperty.call(GROUP4_NEW_GS_51_EXTRA_ALIASES,s) ||
+     Object.values(GROUP4_NEW_GS_51_EXTRA_ALIASES).includes(s));
 }
 
 function newSessionId() {
