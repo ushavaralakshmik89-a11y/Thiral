@@ -726,14 +726,9 @@ a{
 <hr>
 <button class="secondary" onclick="show('dash')">← Dashboard</button>
 <hr>
-<h3>🎯 Group 4 Mock Tests</h3>
-<p class="small">புதிய Topic / Subtopic கேள்விகளும் தானாக இணைக்கப்படும். ஒரு மாணவருக்கு வழங்கப்பட்ட Mock கேள்வி அடுத்த மாணவருக்கு மீண்டும் வழங்கப்படாது.</p>
-<div class="grid">
-<button type="button" onclick="startGroup4Mock('tamil')">📚 தமிழ் Mock<br><small>100 கேள்விகள் • 3 மணி</small></button>
-<button type="button" onclick="startGroup4Mock('gs')">📗 பொது அறிவு Mock<br><small>100 கேள்விகள் • 3 மணி</small></button>
-<button type="button" onclick="startGroup4Mock('aptitude')">📐 Aptitude Mock<br><small>100 கேள்விகள் • 3 மணி</small></button>
-<button type="button" onclick="startGroup4Mock('full')">🎯 Full Group 4 Mock<br><small>200 கேள்விகள் • 3 மணி</small></button>
-</div>
+<h3>🎯 Group 4 முழு Mock Test</h3>
+<p class="small">அனைத்து பாடங்களையும் உள்ளடக்கிய முழு Mock Test: <b>200 கேள்விகள் • 3 மணி நேரம் • அறிவுபூர்வமான கலப்பு வினாக்கள்</b>.</p>
+<button onclick="startMock()">🎯 Group 4 Full Mock Test தொடங்கு</button>
 </section>
 
 <section id="topics" class="card hidden">
@@ -5835,13 +5830,10 @@ window.startPractice=async function(n){
     });
   }
 
-  window.startGroup4Mock=async function(mockType){
+  window.startMock=async function(){
     try{
-      mockType=String(mockType||'full').toLowerCase();
-      if(!['full','tamil','gs','aptitude'].includes(mockType)) mockType='full';
-      var selectedMockLanguage=(mockType==='tamil') ? 'ta' : await chooseMockLanguage();
+      var selectedMockLanguage=await chooseMockLanguage();
       if(!selectedMockLanguage) return;
-      try{ contentLanguage=selectedMockLanguage; }catch(_){ }
       try{ selectedExam='group4'; }catch(_){ }
       try{ localStorage.setItem('tnpsc_selected_exam','group4'); }catch(_){ }
 
@@ -5853,15 +5845,15 @@ window.startPractice=async function(n){
       mockFinished=false;
       mockAttemptId=null;
 
-      var total=(mockType==='full')?200:100;
-      var label=(mockType==='tamil')?'தமிழ்':(mockType==='gs')?'பொது அறிவு':(mockType==='aptitude')?'திறனறிவு / Aptitude':'Group 4 Full';
       var qe=document.getElementById('mockQuestion');
-      if(qe) qe.textContent=label+' Mock – '+total+' கேள்விகள் ஏற்றப்படுகிறது...';
+      if(qe) qe.textContent='200 Mock கேள்விகள் ஏற்றப்படுகிறது...';
 
-      var d=await mockApi('/mock/questions?exam=group4&language='+encodeURIComponent(selectedMockLanguage)+'&set='+encodeURIComponent(mockType));
+      var L=selectedMockLanguage;
+      var d=await mockApi('/mock/questions?exam=group4&language='+encodeURIComponent(L));
       var rows=Array.isArray(d.questions)?d.questions:[];
-      if(rows.length!==total){
-        throw new Error(label+' Mock-க்கு '+total+' கேள்விகள் கிடைக்கவில்லை. கிடைத்தது: '+rows.length);
+
+      if(rows.length!==200){
+        throw new Error('Mock Test-க்கு 200 கேள்விகள் கிடைக்கவில்லை. கிடைத்தது: '+rows.length);
       }
 
       mockQuestions=normalizeMockRows(rows);
@@ -5877,8 +5869,10 @@ window.startPractice=async function(n){
       if(result) result.classList.add('hidden');
       if(review) review.classList.add('screen-review');
 
+      var ex=(typeof EXAMS!=='undefined' && (EXAMS[selectedExam]||EXAMS.group4))||null;
+      var title=ex&&ex.title?ex.title:'Group 4';
       var h=document.querySelector('#mockTest h2');
-      if(h) h.textContent=label+' – Mock Test • '+total+' கேள்விகள் • 3 மணி நேரம்';
+      if(h) h.textContent=title+' – Mock Test • 200 கேள்விகள் • 3 மணி நேரம்';
 
       if(typeof show==='function') show('mockTest');
       if(typeof renderMockTimer==='function') renderMockTimer();
@@ -5893,13 +5887,9 @@ window.startPractice=async function(n){
         }
       },1000);
     }catch(e){
-      var qe=document.getElementById('mockQuestion');
       if(qe) qe.textContent='Mock Test தொடங்க முடியவில்லை: '+String(e&&e.message||e);
     }
   };
-
-  /* Backward-compatible entry point. Existing dashboard/full-Mock calls still work. */
-  window.startMock=function(){ return window.startGroup4Mock('full'); };
 
   window.submitMock=async function(auto){
     if(mockFinished || !mockQuestions.length || !mockAttemptId) return;
