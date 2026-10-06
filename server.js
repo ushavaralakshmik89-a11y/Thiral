@@ -197,10 +197,17 @@ const NEW_GROUP4_GS_SUBTOPICS = new Set([
 ]);
 
 function isNewGroup4GSRequest(exam, subject, language, subtopic){
+  /*
+     FINAL GROUP 4 GS FIX:
+     The secure frontend question loader requests /questions by exam + subject
+     + language and does not always send a subtopic. Therefore this branch must
+     cover the whole Group 4 GS request, not only the 51 visible subtopic labels.
+     This changes only query matching (Group 4/group4/Group4 and GS subject
+     aliases). No question data is rewritten or deleted.
+  */
   return exam === 'group4' &&
     subject === 'gs' &&
-    ['ta','en'].includes(language) &&
-    NEW_GROUP4_GS_SUBTOPICS.has(String(subtopic || '').trim());
+    ['ta','en'].includes(language);
 }
 
 function subjectCandidates(raw){
