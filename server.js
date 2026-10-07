@@ -1523,38 +1523,23 @@ api.post('/attempts/:id/submit', requirePasswordReady, async (req,res)=>{
 
     await pool.query(`UPDATE attempts SET status='SUBMITTED',score=$1,correct_count=$2,total_count=$3,submitted_at=now() WHERE id=$4`,[score,correct,total,id]);
     await pool.query(`INSERT INTO activity_events(user_id,event_type,metadata) VALUES($1,'ATTEMPT_SUBMITTED',$2)`,[req.user.id,JSON.stringify({attempt_id:id,mode:attempt.mode,exam:attempt.exam,score,used_questions:total,unanswered})]);
-    /* Mock Test Review: return question-level grading data for Mock only. */
-    if(attempt.mode==='mock' && usedIds.length){
-      const reviewResult=await pool.query(
-        `SELECT id,question,options,correct_option,explanation
-         FROM questions
-         WHERE id=ANY($1::bigint[])
-         ORDER BY array_position($1::bigint[],id)`,
-        [usedIds]
-      );
-
+    if(attempt.mode==='mock'){
+      const reviewResult=usedIds.length
+        ? await pool.query(`SELECT id,question,options,correct_option,explanation FROM questions WHERE id=ANY($1::bigint[]) ORDER BY array_position($1::bigint[],id)`,[usedIds])
+        : {rows:[]};
       const review=reviewResult.rows.map(q=>{
-        let options=q.options;
-        if(typeof options==='string'){
-          try{ options=JSON.parse(options); }catch(_){ }
-        }
-        const selectedRaw=answers[String(q.id)] ?? answers[q.id];
-        const selected=Number(selectedRaw);
-        const correctOption=Number(q.correct_option);
-        const isCorrect=Number.isInteger(selected) && selected>=0 && selected===correctOption;
-        const correctAnswer=Array.isArray(options) ? (options[correctOption] ?? '') : '';
+        const raw=answers[String(q.id)] ?? answers[q.id];
+        const selected=Number(raw);
         return {
           id:Number(q.id),
           question:q.question,
-          options,
+          options:q.options,
           selected_answer:Number.isInteger(selected) ? selected : -1,
-          correct:isCorrect,
-          correct_option:correctOption,
-          correct_answer:correctAnswer,
+          correct:Number.isInteger(selected) && selected===Number(q.correct_option),
+          correct_option:Number(q.correct_option),
           explanation:q.explanation || ''
         };
       });
-
       return res.json({score,correct,total,unanswered,usedQuestionIds:usedIds,review});
     }
 
