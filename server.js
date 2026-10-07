@@ -1523,7 +1523,10 @@ api.post('/attempts/:id/submit', requirePasswordReady, async (req,res)=>{
 
     await pool.query(`UPDATE attempts SET status='SUBMITTED',score=$1,correct_count=$2,total_count=$3,submitted_at=now() WHERE id=$4`,[score,correct,total,id]);
     await pool.query(`INSERT INTO activity_events(user_id,event_type,metadata) VALUES($1,'ATTEMPT_SUBMITTED',$2)`,[req.user.id,JSON.stringify({attempt_id:id,mode:attempt.mode,exam:attempt.exam,score,used_questions:total,unanswered})]);
-    res.json({score,correct,total,unanswered,usedQuestionIds:usedIds});
+    res.json({
+      score,correct,total,unanswered,usedQuestionIds:usedIds,
+      review: qs.rows.map(q=>({questionId:Number(q.id),correct_option:Number(q.correct_option)}))
+    });
   }catch(e){console.error(e);sendError(res,500,'Grading service error.');}
 });
 
