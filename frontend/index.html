@@ -6157,7 +6157,9 @@ window.startPractice=async function(n){
       if(typeof api!=='function') throw new Error('Backend API இணைப்பு கிடைக்கவில்லை.');
       var d=await api('/attempts/'+encodeURIComponent(attemptId)+'/submit',{method:'POST',body:JSON.stringify({answers:answers})});
       var total=Number(d.total||qs.length), correct=Number(d.correct||0), unanswered=Number(d.unanswered||0), score=Number(d.score||0), wrong=Math.max(0,total-correct-unanswered);
-      var reviewData=await api('/attempts/'+encodeURIComponent(attemptId)+'/review',{method:'GET'});
+      /* Mock Review: correct_option is returned by the same submit response.
+         No separate /review endpoint is required. */
+      var reviewData={review:Array.isArray(d.review)?d.review:[]};
       var summary=document.getElementById('mockSummary');
       if(summary) summary.innerHTML='<p><b>மொத்த கேள்விகள்:</b> '+total+'</p><p><b>சரி:</b> '+correct+'</p><p><b>தவறு:</b> '+wrong+'</p><p><b>விடையளிக்காதது:</b> '+unanswered+'</p><p><b>மதிப்பெண்:</b> '+score+'%</p>';
       var student=document.getElementById('studentResultSummary');
