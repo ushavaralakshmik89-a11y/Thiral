@@ -1480,6 +1480,40 @@ api.post('/attempts/:id/check-answer', requirePasswordReady, async (req,res)=>{
   }
 });
 
+/* ===== MOCK TEST REVIEW: CORRECT ANSWER ONLY AFTER SUBMISSION ===== */
+api.get('/attempts/:id/review', requirePasswordReady, async (req,res)=>{
+  try{
+    const id=Number(req.params.id);
+    if(!Number.isInteger(id) || id<1) return sendError(res,400,'Invalid attempt ID.');
+
+    const a=await pool.query(
+      `SELECT id,status,mode,question_ids FROM attempts WHERE id=$1 AND user_id=$2 LIMIT 1`,
+      [id,req.user.id]
+    );
+    if(!a.rowCount) return sendError(res,404,'Attempt not found.');
+    const attempt=a.rows[0];
+    if(attempt.mode!=='mock') return sendError(res,404,'Mock attempt not found.');
+    if(attempt.status!=='SUBMITTED') return sendError(res,409,'Review is available only after submission.');
+
+    const ids=Array.isArray(attempt.question_ids)
+      ? attempt.question_ids.map(Number).filter(Number.isInteger)
+      : [];
+    if(!ids.length) return res.json({review:[]});
+
+    const q=await pool.query(
+      `SELECT id AS question_id,correct_option,COALESCE(explanation,'') AS explanation
+       FROM questions
+       WHERE id=ANY($1::bigint[])
+       ORDER BY array_position($1::bigint[],id)`,
+      [ids]
+    );
+    res.json({review:q.rows});
+  }catch(e){
+    console.error('[MOCK REVIEW] error:',e);
+    sendError(res,500,'Mock review service error.');
+  }
+});
+
 api.post('/attempts/:id/submit', requirePasswordReady, async (req,res)=>{
   try {
     const id=Number(req.params.id);
@@ -4789,7 +4823,6 @@ async function start(){
     await ensureModelExamTables();
     await backfillLastLoginFromAudit();
     await ensureAdmin();
-api.get('/attempts/:id/review',requirePasswordReady,async(req,res)=>{try{const id=Number(req.params.id);if(!Number.isInteger(id)||id<1)return sendError(res,400,'Invalid attempt ID.');const a=await pool.query(`SELECT id,status,question_ids FROM attempts WHERE id=$1 AND user_id=$2 LIMIT 1`,[id,req.user.id]);if(!a.rowCount)return sendError(res,404,'Attempt not found.');const attempt=a.rows[0];if(attempt.status!=='SUBMITTED')return sendError(res,409,'Review is available only after submission.');const ids=Array.isArray(attempt.question_ids)?attempt.question_ids.map(Number).filter(Number.isInteger):[];if(!ids.length)return res.json({review:[]});const q=await pool.query(`SELECT q.id AS question_id,q.correct_option,COALESCE(q.explanation,'') AS explanation FROM unnest($1::bigint[]) WITH ORDINALITY AS x(id,ord) JOIN questions q ON q.id=x.id ORDER BY x.ord`,[ids]);res.json({review:q.rows});}catch(e){console.error('[MOCK REVIEW] error:',e);sendError(res,500,'Mock review service error.');}});
     app.listen(PORT,'0.0.0.0',()=>console.log(`Thiral V171 Secure Temporary Password + Gender Summary + Detailed Usage Monitor listening on port ${PORT}`));
   }catch(e){
     console.error('Startup failed:',e);
