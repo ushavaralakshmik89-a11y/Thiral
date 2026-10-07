@@ -2846,7 +2846,257 @@ api.use('/mock/questions', requirePasswordReady, async (req,res,next)=>{
     };
 
 
-    /*
+    
+/* ===== V8 GROUP 4 MOCK SINGLE ROUTE FIX =====
+   Single interceptor for Group 4 Mock. Existing legacy route remains
+   untouched below this block.
+*/
+api.use('/mock/questions', requirePasswordReady, async (req,res,next)=>{
+  if(req.method!=='GET') return next();
+
+  const requestedExam=String(req.query.exam||'').trim().toLowerCase();
+  const requestedMode=String(req.query.mode||'').trim().toLowerCase();
+
+  if(requestedExam && requestedExam!=='group 4' && requestedExam!=='group4') return next();
+  if(requestedMode && requestedMode!=='mock') return next();
+
+  const client=await pool.connect();
+
+  try{
+    await client.query('BEGIN');
+    await client.query(
+      'SELECT pg_advisory_xact_lock(hashtext($1))',
+      [`thiral-group4-mock-v8:${req.user.id}`]
+    );
+
+    const specs=[
+      {subjects:['tamil','Tamil'],language:'ta',count:100},
+      {subjects:['gs','general studies','general knowledge','பொது அறிவு','பொது அறிவியல்'],language:'ta',count:75},
+      {subjects:['apt','aptitude','திறனறிவு'],language:'ta',count:25}
+    ];
+
+    const norm=v=>String(v??'').trim().toLowerCase();
+
+    const difficultyScore=q=>{
+      const d=norm(q.difficulty||q.level);
+      if(d.includes('hard')||d.includes('கடின')) return 3;
+      if(d.includes('medium')||d.includes('moderate')||d.includes('நடுத்தர')) return 2;
+      if(d.includes('easy')||d.includes('எளி')) return 1;
+      return 2;
+    };
+
+    const contentKey=q=>{
+      const n=v=>String(v??'')
+        .normalize('NFKC')
+        .replace(/\s+/g,' ')
+        .trim()
+        .toLowerCase();
+      return n(q.question)+'|'+n(q.options);
+    };
+
+    const clean=q=>{
+      const x={...q};
+      x.difficulty=String(q.difficulty||q.level||'');
+      delete x.correct_option;
+      delete x.level;
+      delete x._topic;
+      delete x._subtopic;
+      delete x._score;
+      return x;
+    };
+
+    const fetchFresh=async spec=>{
+      const rows=[];
+      let lastId=0;
+      const PAGE=1000;
+
+      while(true){
+        const r=await client.query(`
+          SELECT
+            q.id,q.exam,q.subject,q.subtopic,q.language,q.question,
+            q.options,q.explanation,
+            COALESCE(
+              to_jsonb(q)->>'difficulty',
+              to_jsonb(q)->>'level',''
+            ) AS difficulty
+          FROM questions q
+          WHERE lower(trim(COALESCE(q.exam,''))) IN ('group 4','group4')
+            AND lower(trim(COALESCE(q.language,''))) IN ('ta','tamil','தமிழ்')
+            AND q.subject = ANY($1::text[])
+            AND q.is_active=true
+            AND q.id>$2
+            AND NOT EXISTS(
+              SELECT 1 FROM question_history h
+              WHERE h.user_id=$3
+                AND h.question_id=q.id
+                AND h.mode='mock'
+            )
+          ORDER BY q.id
+          LIMIT $4
+        `,[spec.subjects,lastId,req.user.id,PAGE]);
+
+        if(!r.rows.length) break;
+
+        for(const q of r.rows){
+          q._subtopic=String(q.subtopic??'').trim()||'__no_subtopic__';
+          q._topic=group4TopicForSubtopic(String(q.subtopic??''))||'__other__';
+          q._score=difficultyScore(q);
+          rows.push(q);
+          lastId=Number(q.id);
+        }
+
+        if(r.rows.length<PAGE) break;
+      }
+
+      return rows;
+    };
+
+    const choose=(rows,target)=>{
+      const selected=[];
+      const ids=new Set();
+      const contents=new Set();
+      const topicCount=new Map();
+      const subCount=new Map();
+
+      const add=q=>{
+        if(!q||selected.length>=target) return false;
+        const id=Number(q.id), key=contentKey(q);
+        if(ids.has(id)||contents.has(key)) return false;
+
+        ids.add(id);
+        contents.add(key);
+        selected.push(clean(q));
+        topicCount.set(q._topic,(topicCount.get(q._topic)||0)+1);
+        subCount.set(q._subtopic,(subCount.get(q._subtopic)||0)+1);
+        return true;
+      };
+
+      const pool=[...rows].sort(()=>Math.random()-0.5);
+
+      // Topic coverage.
+      const topics=new Map();
+      for(const q of pool){
+        if(!topics.has(q._topic)) topics.set(q._topic,[]);
+        topics.get(q._topic).push(q);
+      }
+      for(const list of topics.values()){
+        if(selected.length>=target) break;
+        list.sort((a,b)=>b._score-a._score);
+        add(list[0]);
+      }
+
+      // Subtopic coverage.
+      const subs=new Map();
+      for(const q of pool){
+        if(!subs.has(q._subtopic)) subs.set(q._subtopic,[]);
+        subs.get(q._subtopic).push(q);
+      }
+      const subKeys=[...subs.keys()].sort(
+        (a,b)=>subs.get(a).length-subs.get(b).length
+      );
+
+      for(const s of subKeys){
+        if(selected.length>=target) break;
+        const candidate=subs.get(s)
+          .filter(q=>!ids.has(Number(q.id))&&!contents.has(contentKey(q)))
+          .sort((a,b)=>b._score-a._score)[0];
+        if(candidate) add(candidate);
+      }
+
+      // Balanced fill across the remaining fresh pool.
+      while(selected.length<target){
+        const remaining=pool.filter(q=>
+          !ids.has(Number(q.id))&&!contents.has(contentKey(q))
+        );
+        if(!remaining.length) break;
+
+        remaining.sort((a,b)=>{
+          const sa=(subCount.get(a._subtopic)||0)*100+
+                   (topicCount.get(a._topic)||0)*20-
+                   a._score*3;
+          const sb=(subCount.get(b._subtopic)||0)*100+
+                   (topicCount.get(b._topic)||0)*20-
+                   b._score*3;
+          return sa-sb;
+        });
+
+        add(remaining[0]);
+      }
+
+      return selected;
+    };
+
+    const pools=[];
+    for(const spec of specs){
+      pools.push(await fetchFresh(spec));
+    }
+
+    const tamil=choose(pools[0],100);
+    const gs=choose(pools[1],75);
+    const apt=choose(pools[2],25);
+
+    if(tamil.length<100||gs.length<75||apt.length<25){
+      await client.query('ROLLBACK');
+      return res.status(409).json({
+        error:'NOT_ENOUGH_FRESH_MOCK_QUESTIONS',
+        message:'இந்த மாணவருக்கு மீண்டும் வராத 200 புதிய Mock கேள்விகள் போதுமான அளவில் இல்லை.',
+        available:{
+          tamil:tamil.length,
+          gs:gs.length,
+          aptitude:apt.length
+        },
+        required:{tamil:100,gs:75,aptitude:25}
+      });
+    }
+
+    const selected=[...tamil,...gs,...apt];
+    const ids=selected.map(q=>Number(q.id));
+
+    if(selected.length!==200||new Set(ids).size!==200){
+      await client.query('ROLLBACK');
+      return res.status(500).json({
+        error:'MOCK_SELECTION_INVALID',
+        message:'200 unique questions could not be assembled.'
+      });
+    }
+
+    const ins=await client.query(`
+      INSERT INTO attempts(user_id,exam,subject,mode,language,question_ids)
+      VALUES($1,'Group 4','mixed','mock','mixed',$2)
+      RETURNING id
+    `,[req.user.id,ids]);
+
+    await client.query(`
+      INSERT INTO question_history(user_id,question_id,mode)
+      SELECT $1,x,'mock'
+      FROM unnest($2::bigint[]) AS x
+      ON CONFLICT(user_id,question_id,mode) DO NOTHING
+    `,[req.user.id,ids]);
+
+    await client.query('COMMIT');
+
+    return res.json({
+      attemptId:ins.rows[0].id,
+      questions:selected,
+      count:200,
+      recycled:0
+    });
+
+  }catch(err){
+    try{await client.query('ROLLBACK');}catch(_){}
+    console.error('V8 GROUP 4 MOCK ERROR:',err);
+    return res.status(500).json({
+      error:'MOCK_GENERATION_FAILED',
+      message:'Mock test உருவாக்கும்போது server error ஏற்பட்டது.',
+      detail:process.env.NODE_ENV==='production'?undefined:String(err.message||err)
+    });
+  }finally{
+    client.release();
+  }
+});
+/* ===== END V8 GROUP 4 MOCK SINGLE ROUTE FIX ===== */
+
+/*
       V7 FIX:
       V6 called selectCoverage(), but that helper was accidentally omitted
       while the V5/V6 pool builder was being replaced. That causes:
@@ -3150,8 +3400,6 @@ api.get('/attempts/:id/review', requirePasswordReady, async (req,res)=>{
     return sendError(res,500,'Review service error.');
   }
 });
-
-
 api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
   const exam=String(req.query.exam||'').trim();
   const requestedLanguage=String(req.query.language||'ta').trim();
