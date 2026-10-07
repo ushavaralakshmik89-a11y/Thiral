@@ -6129,7 +6129,7 @@ window.startPractice=async function(n){
       else if(isCorrect){status='✅ சரி';cls='good';}
       else{status='❌ தவறு';cls='bad';}
       var ex=String(r.explanation||q.e||q.explanation||'').trim();
-      var showCorrect=!isCorrect && hasCorrect;
+      var showCorrect=hasCorrect;
       return '<div class="card" style="box-shadow:none;border:1px solid #e5e7eb;margin-bottom:12px;padding:15px;">'+
         '<div><b>'+esc(i+1)+'. '+esc(q.q||q.question||'')+'</b></div>'+
         '<p><b>உங்கள் விடை:</b> '+esc(your)+'</p>'+
