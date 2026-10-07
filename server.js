@@ -2561,378 +2561,6 @@ app.use('/api/admin', async (req, res, next) => {
 });
 
 
-
-/* ================================================================
-   V10 SAFE GROUP 4 MOCK LAYER
-   Emergency-safe version:
-   - Uses the SAME subject/language matching as the known working route.
-   - Does NOT replace or modify the original Mock route.
-   - If this layer cannot confidently build a Mock, it calls next(),
-     allowing the original route to handle the request.
-   - Uses several small ID windows instead of scanning the full bank.
-   - Rotates windows between Mocks to improve topic/subtopic coverage.
-   ================================================================ */
-
-api.get('/mock/questions', requirePasswordReady, async (req,res,next)=>{
-  const exam=String(req.query.exam||'').trim();
-  const requestedLanguage=String(req.query.language||'ta').trim();
-
-  if(exam!=='group4' || !['ta','en'].includes(requestedLanguage)){
-    return next();
-  }
-
-  const client=await pool.connect();
-
-  try{
-    const specs=[
-      {name:'tamil',count:100,candidates:['tamil','தமிழ்'],language:'ta'},
-      {
-        name:'gs',
-        count:75,
-        candidates:[
-          'பொது அறிவு',
-          'General Knowledge',
-          'general knowledge',
-          'பொது அறிவு / General Studies',
-          'General Studies',
-          'general studies'
-        ],
-        language:requestedLanguage
-      },
-      {
-        name:'apt',
-        count:25,
-        candidates:[
-          'apt',
-          'திறனறிவு / Aptitude',
-          'Aptitude',
-          'aptitude'
-        ],
-        language:requestedLanguage
-      }
-    ];
-
-    const normalize=v=>String(v??'')
-      .normalize('NFKC')
-      .replace(/[“”‘’]/g,'"')
-      .replace(/[^\p{L}\p{N}]+/gu,' ')
-      .replace(/\s+/g,' ')
-      .trim()
-      .toLowerCase();
-
-    const contentKey=q=>{
-      let opts=[];
-      if(Array.isArray(q.options)) opts=q.options;
-      else if(typeof q.options==='string'){
-        try{
-          const x=JSON.parse(q.options);
-          if(Array.isArray(x)) opts=x;
-        }catch(_){}
-      }
-      return normalize(q.question)+'|'+opts.map(normalize).sort().join('|');
-    };
-
-    const difficulty=q=>{
-      const d=normalize(q.difficulty||q.level);
-      if(d.includes('very hard')||d.includes('மிக கடின')) return 4;
-      if(d.includes('hard')||d.includes('கடின')) return 3;
-      if(d.includes('moderate')||d.includes('medium')||d.includes('நடுத்தர')) return 2;
-      return 1;
-    };
-
-    /*
-      Get the ID range cheaply. This does not read question rows.
-    */
-    const range=await client.query(`
-      SELECT
-        COALESCE(MIN(id),0)::bigint AS min_id,
-        COALESCE(MAX(id),0)::bigint AS max_id
-      FROM questions
-      WHERE exam=$1
-        AND is_active=true
-    `,[exam]);
-
-    const minId=Number(range.rows[0]?.min_id||0);
-    const maxId=Number(range.rows[0]?.max_id||0);
-
-    if(!minId || !maxId){
-      return next();
-    }
-
-    /*
-      Find how many previous Mocks this student has taken.
-      This is only used to move the windows.
-    */
-    const attemptQ=await client.query(`
-      SELECT count(*)::int AS n
-      FROM attempts
-      WHERE user_id=$1
-        AND exam=$2
-        AND mode='mock'
-    `,[req.user.id,exam]);
-
-    const mockNo=Number(attemptQ.rows[0]?.n||0);
-
-    /*
-      Small bounded windows. The important point is that the window moves.
-      We never load the first 3000 questions permanently.
-    */
-    const windowSize=350;
-    const windowCount=10;
-
-    const fetchWindow=async(spec,start)=>{
-      const r=await client.query(`
-        SELECT
-          q.id,q.exam,q.subject,q.subtopic,q.language,
-          q.question,q.options,q.explanation,
-          COALESCE(
-            to_jsonb(q)->>'difficulty',
-            to_jsonb(q)->>'level',''
-          ) AS difficulty
-        FROM questions q
-        WHERE q.exam=$1
-          AND q.subject=ANY($2::text[])
-          AND q.language=$3
-          AND q.is_active=true
-          AND q.id>=$4
-          AND NOT EXISTS(
-            SELECT 1
-            FROM question_history h
-            WHERE h.user_id=$5
-              AND h.question_id=q.id
-              AND h.mode='mock'
-          )
-        ORDER BY q.id
-        LIMIT $6
-      `,[exam,spec.candidates,spec.language,start,req.user.id,windowSize]);
-
-      return r.rows.map(q=>({...q,_mockSubject:spec.name}));
-    };
-
-    const buildPool=async spec=>{
-      const out=[];
-      const ids=new Set();
-
-      const span=Math.max(1,maxId-minId+1);
-
-      for(let i=0;i<windowCount;i++){
-        /*
-          Different coprime-ish steps make successive Mocks move through
-          different parts of the ID space.
-        */
-        const raw=(mockNo*windowSize*17 + i*7919 + (spec.name==='gs'?1237:spec.name==='apt'?3571:619))%span;
-        const start=minId+Math.floor(raw);
-
-        const rows=await fetchWindow(spec,start);
-
-        for(const q of rows){
-          const id=Number(q.id);
-          if(ids.has(id)) continue;
-          ids.add(id);
-          q._sub=normalize(q.subtopic)||'__no_subtopic__';
-          q._topic=group4TopicForSubtopic(String(q.subtopic||''))||'__other__';
-          q._difficulty=difficulty(q);
-          out.push(q);
-        }
-
-        if(out.length>=Math.max(500,spec.count*8)) break;
-      }
-
-      return out;
-    };
-
-    const choose=(rows,target)=>{
-      const unique=[];
-      const contentSeen=new Set();
-
-      for(const q of rows){
-        const ck=contentKey(q);
-        if(!ck||contentSeen.has(ck)) continue;
-        contentSeen.add(ck);
-        unique.push(q);
-      }
-
-      if(unique.length<target) return [];
-
-      const selected=[];
-      const ids=new Set();
-      const contents=new Set();
-      const subCount=new Map();
-      const topicCount=new Map();
-
-      const add=q=>{
-        const id=Number(q.id);
-        const ck=contentKey(q);
-        if(ids.has(id)||contents.has(ck)) return false;
-        ids.add(id);
-        contents.add(ck);
-        selected.push(q);
-        subCount.set(q._sub,(subCount.get(q._sub)||0)+1);
-        topicCount.set(q._topic,(topicCount.get(q._topic)||0)+1);
-        return true;
-      };
-
-      /*
-        First: one per topic.
-      */
-      const topics=new Map();
-      for(const q of unique){
-        if(!topics.has(q._topic)) topics.set(q._topic,[]);
-        topics.get(q._topic).push(q);
-      }
-
-      for(const list of topics.values()){
-        if(selected.length>=target) break;
-        list.sort((a,b)=>b._difficulty-a._difficulty);
-        add(list[0]);
-      }
-
-      /*
-        Second: one per subtopic.
-      */
-      const subs=new Map();
-      for(const q of unique){
-        if(!subs.has(q._sub)) subs.set(q._sub,[]);
-        subs.get(q._sub).push(q);
-      }
-
-      const subLists=[...subs.values()]
-        .sort((a,b)=>a.length-b.length);
-
-      for(const list of subLists){
-        if(selected.length>=target) break;
-        const q=list
-          .filter(x=>!ids.has(Number(x.id)))
-          .sort((a,b)=>b._difficulty-a._difficulty)[0];
-        if(q) add(q);
-      }
-
-      /*
-        Final fill: least-used topic/subtopic first.
-      */
-      while(selected.length<target){
-        let best=null;
-        let bestScore=Infinity;
-
-        for(const q of unique){
-          if(ids.has(Number(q.id))) continue;
-
-          const score=
-            (subCount.get(q._sub)||0)*100+
-            (topicCount.get(q._topic)||0)*20-
-            q._difficulty;
-
-          if(score<bestScore){
-            bestScore=score;
-            best=q;
-          }
-        }
-
-        if(!best) break;
-        add(best);
-      }
-
-      return selected.length===target?selected:[];
-    };
-
-    const pools=[];
-    for(const spec of specs){
-      const rows=await buildPool(spec);
-      pools.push({spec,rows});
-    }
-
-    const tamil=choose(pools[0].rows,100);
-    const gs=choose(pools[1].rows,75);
-    const apt=choose(pools[2].rows,25);
-
-    /*
-      SAFETY FALLBACK:
-      If the new selector does not have enough fresh rows, DO NOT return
-      "no questions". Let the original known-working Mock route run.
-    */
-    if(tamil.length!==100 || gs.length!==75 || apt.length!==25){
-      client.release();
-      return next();
-    }
-
-    const selected=[...tamil,...gs,...apt];
-
-    const finalIds=new Set();
-    const finalContent=new Set();
-
-    for(const q of selected){
-      const id=Number(q.id);
-      const ck=contentKey(q);
-
-      if(finalIds.has(id)||finalContent.has(ck)){
-        client.release();
-        return next();
-      }
-
-      finalIds.add(id);
-      finalContent.add(ck);
-    }
-
-    /*
-      Keep the response shape compatible with the existing frontend.
-      correct_option is intentionally not exposed during the Mock.
-    */
-    const questions=selected.map(q=>({
-      id:q.id,
-      exam:q.exam,
-      subject:q.subject,
-      subtopic:q.subtopic,
-      language:q.language,
-      question:q.question,
-      options:q.options,
-      explanation:q.explanation
-    }));
-
-    await client.query('BEGIN');
-
-    const ins=await client.query(`
-      INSERT INTO attempts(
-        user_id,exam,subject,mode,language,question_ids
-      )
-      VALUES($1,$2,'mixed','mock','mixed',$3)
-      RETURNING id
-    `,[req.user.id,exam,selected.map(q=>Number(q.id))]);
-
-    await client.query(`
-      INSERT INTO question_history(
-        user_id,question_id,mode
-      )
-      SELECT $1,x,'mock'
-      FROM unnest($2::bigint[]) AS x
-      ON CONFLICT(user_id,question_id,mode) DO NOTHING
-    `,[req.user.id,selected.map(q=>Number(q.id))]);
-
-    await client.query('COMMIT');
-
-    client.release();
-
-    return res.json({
-      attemptId:ins.rows[0].id,
-      questions,
-      count:200,
-      recycled:0
-    });
-
-  }catch(e){
-    try{ await client.query('ROLLBACK'); }catch(_){}
-    console.error('V10 safe Mock layer error:',e);
-    client.release();
-
-    /*
-      Never break the working Mock because of this optimization layer.
-    */
-    return next();
-  }
-});
-
-/* ===== END V10 SAFE GROUP 4 MOCK LAYER ===== */
-
-
 /* ===== GROUP 4 MOCK ROTATION API =====
    Final Group 4 Mock selector.
    - Exactly 200 questions when the database has at least 200 unique unused rows.
@@ -2943,6 +2571,313 @@ api.get('/mock/questions', requirePasswordReady, async (req,res,next)=>{
    - Never deletes or rewrites question-bank rows.
    - Practice 10/20/50/100 routes are not changed here.
 */
+
+
+/* ===== GROUP 4 MOCK V11 QUALITY ROTATION =====
+   ADDITIVE ONLY: existing question rows and the original Mock route are not
+   changed or deleted. This interceptor handles valid Group 4 Mock requests
+   before the legacy route so the old selector cannot silently take over.
+
+   Goals:
+   - exact 100 Tamil + 75 GS + 25 Aptitude
+   - per-student fresh history; one student's history never blocks another
+   - subtopic/topic rotation across repeated Mocks using a small persistent
+     per-student rotation table
+   - difficulty mix: target 15% easy, 55% moderate, 25% hard, 5% very hard
+     when the database actually contains those levels; otherwise strongest
+     available questions fill the gap
+   - one-subtopic-at-a-time round-robin selection prevents Pallava/Buddha or
+     Addition/Subtraction/Multiplication/Division from swallowing the Mock
+   - no question-bank UPDATE/DELETE/INSERT is performed
+*/
+api.get('/mock/questions', requirePasswordReady, async (req,res,next)=>{
+  const exam=String(req.query.exam||'').trim();
+  const requestedLanguage=String(req.query.language||'ta').trim();
+  if(exam!=='group4' || !['ta','en'].includes(requestedLanguage)) return next();
+
+  const client=await pool.connect();
+  try{
+    await client.query('BEGIN');
+    await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`,[`thiral-group4-mock-v11:${req.user.id}`]);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS thiral_mock_rotation_v11 (
+        user_id TEXT NOT NULL,
+        exam TEXT NOT NULL,
+        subject TEXT NOT NULL,
+        bucket TEXT NOT NULL,
+        served_count INTEGER NOT NULL DEFAULT 0,
+        last_served_at TIMESTAMPTZ,
+        PRIMARY KEY(user_id,exam,subject,bucket)
+      )
+    `);
+
+    const specs=[
+      {name:'tamil',need:100,candidates:['tamil','தமிழ்'],language:'ta'},
+      {name:'gs',need:75,candidates:['பொது அறிவு','General Knowledge','general knowledge','பொது அறிவு / General Studies','General Studies','general studies'],language:requestedLanguage},
+      {name:'apt',need:25,candidates:['apt','திறனறிவு / Aptitude','Aptitude','aptitude'],language:requestedLanguage}
+    ];
+
+    const normalize=v=>String(v??'').normalize('NFKC').replace(/[“”‘’]/g,'"').replace(/[^\p{L}\p{N}%]+/gu,' ').replace(/\s+/g,' ').trim().toLowerCase();
+    const contentKey=q=>{
+      const a=Array.isArray(q.options)?q.options.map(normalize).filter(Boolean).sort():[];
+      return normalize(q.question)+'|'+a.join('|');
+    };
+    const questionKey=q=>normalize(q.question);
+
+    const old=await client.query(`
+      SELECT q.question,q.options
+      FROM question_history h JOIN questions q ON q.id=h.question_id
+      WHERE h.user_id=$1 AND h.mode='mock'
+    `,[req.user.id]);
+    const blockedContent=new Set(old.rows.map(contentKey));
+    const blockedQuestion=new Set(old.rows.map(questionKey));
+
+    const attemptCount=await client.query(`SELECT COUNT(*)::int AS n FROM attempts WHERE user_id=$1 AND exam=$2 AND mode='mock'`,[req.user.id,exam]);
+    const mockNo=Number(attemptCount.rows[0]?.n||0);
+
+    const canonicalNewGS={};
+    if(typeof GROUP4_NEW_GS_51_MAP!=='undefined'){
+      for(const [ta,en] of Object.entries(GROUP4_NEW_GS_51_MAP||{})){
+        canonicalNewGS[normalize(ta)]=ta;
+        canonicalNewGS[normalize(en)]=ta;
+      }
+    }
+
+    const bucketOf=q=>{
+      const raw=String(q.subtopic||'').trim();
+      if(raw) return normalize(canonicalNewGS[normalize(raw)]||raw);
+      const mapped=typeof group4TopicForSubtopic==='function'?group4TopicForSubtopic(raw):'';
+      if(mapped) return normalize(mapped);
+      const text=normalize(q.question);
+      if(q._mockSubject==='apt'){
+        if(/கூட்டல்|addition|plus|sum/.test(text)) return 'addition';
+        if(/கழித்தல்|subtraction|minus|difference/.test(text)) return 'subtraction';
+        if(/பெருக்கல்|multiplication|product|times/.test(text)) return 'multiplication';
+        if(/வகுத்தல்|division|quotient|divided/.test(text)) return 'division';
+      }
+      if(q._mockSubject==='gs'){
+        if(/pallava|பல்லவர்/.test(text)) return 'பல்லவர்';
+        if(/buddha|புத்தர்|பௌத்த/.test(text)) return 'புத்தம்';
+      }
+      return '__other__';
+    };
+
+    const difficulty=q=>{
+      const raw=normalize(q.difficulty||'');
+      const text=normalize(q.question);
+      const words=text.split(' ').filter(Boolean).length;
+      const complex=/statement|assertion|reason|cause|effect|match|matching|pair|sequence|arrange|order|select the correct|which of the following|கூற்று|காரணம்|விளைவு|பொருத்துக|வரிசை|சரியான இணை|பின்வருவனவற்றில்/.test(text);
+      const quant=/percentage|ratio|average|profit|loss|interest|discount|time and work|speed|distance|mixture|age|probability|series|equation|fraction|சதவீதம்|விகிதம்|சராசரி|இலாபம்|நட்டம்|வட்டி|தள்ளுபடி|வேலை|வேகம்|தூரம்|கலவை|வயது|நிகழ்தகவு|வரிசை|சமன்பாடு|பின்னம்/.test(text);
+      const direct=/^(who|where|when|what is|what was|which is|which was|name the|யார்|எவர்|எங்கு|எப்போது|எது|எவை|எந்த)/.test(text);
+      let score=(complex?3:0)+(quant?3:0)+(words>=24?2:0)+(text.length>=125?1:0)-(direct&&!complex&&!quant&&words<18?3:0);
+      if(/very\s*hard|veryhard|மிக\s*கடின/.test(raw)) return {b:3,s:score+8};
+      if(/\bhard\b|கடின/.test(raw)) return {b:2,s:score+5};
+      if(/moderate|medium|மிதமான|சாதாரண/.test(raw)) return {b:1,s:score+3};
+      if(/easy|basic|எளிது|அடிப்படை/.test(raw)) return {b:0,s:score};
+      return {b:score>=5?3:score>=2?2:score>=0?1:0,s:score};
+    };
+
+    const fetchSubject=async spec=>{
+      const mm=await client.query(`
+        SELECT MIN(id)::bigint AS min_id,MAX(id)::bigint AS max_id
+        FROM questions
+        WHERE exam=$1 AND subject=ANY($2::text[]) AND language=$3 AND is_active=true
+      `,[exam,spec.candidates,spec.language]);
+      const minId=Number(mm.rows[0]?.min_id||0), maxId=Number(mm.rows[0]?.max_id||0);
+      if(!minId || !maxId) return [];
+      const span=Math.max(1,maxId-minId+1);
+      const windows=[];
+      const width=Math.min(1800,Math.max(600,Math.floor(span/10)||600));
+      const starts=[0,.17,.34,.51,.68,.85].map((ratio,i)=>Math.floor((mockNo*width*0.73 + span*ratio)%span));
+      for(const st of starts){
+        const a=minId+st, b=Math.min(maxId,a+width-1);
+        windows.push(`(q.id BETWEEN ${Math.floor(a)} AND ${Math.floor(b)})`);
+      }
+      const whereWindows=windows.join(' OR ');
+      const r=await client.query(`
+        SELECT q.id,q.exam,q.subject,q.subtopic,q.language,q.question,q.options,q.explanation,
+               COALESCE(to_jsonb(q)->>'difficulty',to_jsonb(q)->>'level','') AS difficulty
+        FROM questions q
+        WHERE q.exam=$1 AND q.subject=ANY($2::text[]) AND q.language=$3
+          AND q.is_active=true AND (${whereWindows})
+          AND NOT EXISTS (
+            SELECT 1 FROM question_history h
+            WHERE h.user_id=$4 AND h.question_id=q.id AND h.mode='mock'
+          )
+        ORDER BY q.id
+        LIMIT 10000
+      `,[exam,spec.candidates,spec.language,req.user.id]);
+      return r.rows.map(q=>({...q,_mockSubject:spec.name}));
+    };
+
+    const all=[];
+    for(const spec of specs) all.push(...await fetchSubject(spec));
+
+    const fresh=[]; const seenC=new Set(blockedContent); const seenQ=new Set(blockedQuestion);
+    for(const q of all){
+      const ck=contentKey(q), qk=questionKey(q);
+      if(!qk || seenC.has(ck) || seenQ.has(qk)) continue;
+      seenC.add(ck); seenQ.add(qk); fresh.push(q);
+    }
+
+    const rotation=await client.query(`
+      SELECT subject,bucket,served_count,last_served_at
+      FROM thiral_mock_rotation_v11
+      WHERE user_id=$1 AND exam=$2
+    `,[String(req.user.id),exam]);
+    const rot=new Map(rotation.rows.map(r=>[r.subject+'|'+r.bucket,{count:Number(r.served_count||0),last:r.last_served_at?new Date(r.last_served_at).getTime():0}]));
+
+    const chooseSubject=(rows,need,subject)=>{
+      const groups=new Map();
+      for(const q of rows){
+        const b=bucketOf(q);
+        if(!groups.has(b)) groups.set(b,[]);
+        groups.get(b).push(q);
+      }
+      for(const arr of groups.values()) arr.sort((a,b)=>difficulty(b).s-difficulty(a).s || Number(a.id)-Number(b.id));
+
+      const keys=[...groups.keys()].sort((a,b)=>{
+        const A=rot.get(subject+'|'+a)||{count:0,last:0}, B=rot.get(subject+'|'+b)||{count:0,last:0};
+        return A.count-B.count || A.last-B.last || a.localeCompare(b);
+      });
+      const chosen=[]; const used=new Set();
+      const target={0:Math.round(need*.15),1:Math.round(need*.55),2:Math.round(need*.25),3:Math.round(need*.05)};
+      const usedDiff={0:0,1:0,2:0,3:0};
+
+      /* First pass: one strong question per least-served bucket. */
+      for(const k of keys){
+        if(chosen.length>=need) break;
+        const arr=groups.get(k)||[];
+        if(!arr.length) continue;
+        let best=arr.find(q=>usedDiff[difficulty(q).b]<target[difficulty(q).b]);
+        if(!best) best=arr[0];
+        chosen.push(best); used.add(String(best.id)); usedDiff[difficulty(best).b]++;
+      }
+
+      /* Round-robin by bucket. This is the part humans apparently require
+         spelled out: a large Pallava pool does not get to eat the whole GS. */
+      let changed=true;
+      while(chosen.length<need && changed){
+        changed=false;
+        for(const k of keys){
+          if(chosen.length>=need) break;
+          const arr=groups.get(k)||[];
+          const best=arr.find(q=>!used.has(String(q.id)) && usedDiff[difficulty(q).b]<target[difficulty(q).b]);
+          if(best){chosen.push(best);used.add(String(best.id));usedDiff[difficulty(best).b]++;changed=true;}
+        }
+      }
+
+      /* Fill any remaining slots by the least-served buckets first, while
+         still ranking harder questions above short direct-fact items. */
+      const remaining=[];
+      for(const k of keys) for(const q of (groups.get(k)||[])) if(!used.has(String(q.id))) remaining.push({q,k});
+      remaining.sort((a,b)=>{
+        const A=rot.get(subject+'|'+a.k)||{count:0,last:0}, B=rot.get(subject+'|'+b.k)||{count:0,last:0};
+        return A.count-B.count || difficulty(b.q).s-difficulty(a.q).s;
+      });
+      for(const x of remaining){ if(chosen.length>=need) break; chosen.push(x.q); used.add(String(x.q.id)); }
+      return chosen.slice(0,need);
+    };
+
+    const selectedBySubject={};
+    for(const spec of specs){
+      const rows=fresh.filter(q=>q._mockSubject===spec.name);
+      selectedBySubject[spec.name]=chooseSubject(rows,spec.need,spec.name);
+    }
+
+    /* If a fresh window is short, expand to the complete fresh pool for that
+       subject. This is only the shortage path. It guarantees that recycling
+       happens only after the student's actual unused pool is exhausted. */
+    for(const spec of specs){
+      if(selectedBySubject[spec.name].length>=spec.need) continue;
+      const r=await client.query(`
+        SELECT q.id,q.exam,q.subject,q.subtopic,q.language,q.question,q.options,q.explanation,
+               COALESCE(to_jsonb(q)->>'difficulty',to_jsonb(q)->>'level','') AS difficulty
+        FROM questions q
+        WHERE q.exam=$1 AND q.subject=ANY($2::text[]) AND q.language=$3 AND q.is_active=true
+          AND NOT EXISTS (SELECT 1 FROM question_history h WHERE h.user_id=$4 AND h.question_id=q.id AND h.mode='mock')
+        ORDER BY q.id
+        LIMIT 50000
+      `,[exam,spec.candidates,spec.language,req.user.id]);
+      const local=[]; const localC=new Set(blockedContent); const localQ=new Set(blockedQuestion);
+      for(const q of r.rows){
+        const x={...q,_mockSubject:spec.name},ck=contentKey(x),qk=questionKey(x);
+        if(!qk||localC.has(ck)||localQ.has(qk)) continue;
+        localC.add(ck);localQ.add(qk);local.push(x);
+      }
+      selectedBySubject[spec.name]=chooseSubject(local,spec.need,spec.name);
+    }
+
+    const insufficient=specs.filter(s=>selectedBySubject[s.name].length<s.need);
+    let recycled=0;
+    if(insufficient.length){
+      for(const spec of insufficient){
+        const r=await client.query(`
+          SELECT q.id,q.exam,q.subject,q.subtopic,q.language,q.question,q.options,q.explanation,
+                 COALESCE(to_jsonb(q)->>'difficulty',to_jsonb(q)->>'level','') AS difficulty
+          FROM questions q
+          WHERE q.exam=$1 AND q.subject=ANY($2::text[]) AND q.language=$3 AND q.is_active=true
+          ORDER BY q.id LIMIT 50000
+        `,[exam,spec.candidates,spec.language]);
+        const unique=[]; const seen=new Set();
+        for(const q of r.rows){ const x={...q,_mockSubject:spec.name},ck=contentKey(x); if(!ck||seen.has(ck)) continue; seen.add(ck); unique.push(x); }
+        const current=selectedBySubject[spec.name]; const used=new Set(current.map(q=>contentKey(q)));
+        let i=0;
+        while(current.length<spec.need && unique.length){
+          const q=unique[i%unique.length]; i++;
+          const ck=contentKey(q); if(used.has(ck)){ if(i>unique.length*2) break; continue; }
+          used.add(ck);current.push(q);recycled++;
+          if(i>unique.length*3) break;
+        }
+        selectedBySubject[spec.name]=current.slice(0,spec.need);
+      }
+    }
+
+    const tamil=selectedBySubject.tamil, gs=selectedBySubject.gs, apt=selectedBySubject.apt;
+    if(tamil.length!==100 || gs.length!==75 || apt.length!==25){
+      await client.query('ROLLBACK');
+      return sendError(res,409,`Mock-க்கு தேவையான தனித்துவமான கேள்விகள் போதவில்லை. தமிழ்: ${tamil.length}/100, GS: ${gs.length}/75, Aptitude: ${apt.length}/25.`);
+    }
+
+    const selected=[...tamil,...gs,...apt];
+    const ids=selected.map(q=>Number(q.id));
+    const ins=await client.query(`
+      INSERT INTO attempts(user_id,exam,subject,mode,language,question_ids)
+      VALUES($1,$2,'mixed','mock','mixed',$3) RETURNING id
+    `,[req.user.id,exam,ids]);
+    await client.query(`
+      INSERT INTO question_history(user_id,question_id,mode)
+      SELECT $1,x,'mock' FROM unnest($2::bigint[]) AS x
+      ON CONFLICT(user_id,question_id,mode) DO NOTHING
+    `,[req.user.id,ids]);
+
+    const now=new Date();
+    const bucketCounts=new Map();
+    for(const q of selected){
+      const subject=q._mockSubject,b=bucketOf(q),key=subject+'|'+b;
+      bucketCounts.set(key,(bucketCounts.get(key)||0)+1);
+    }
+    for(const [key,n] of bucketCounts){
+      const [subject,bucket]=key.split('|');
+      await client.query(`
+        INSERT INTO thiral_mock_rotation_v11(user_id,exam,subject,bucket,served_count,last_served_at)
+        VALUES($1,$2,$3,$4,$5,$6)
+        ON CONFLICT(user_id,exam,subject,bucket) DO UPDATE
+        SET served_count=thiral_mock_rotation_v11.served_count+EXCLUDED.served_count,
+            last_served_at=EXCLUDED.last_served_at
+      `,[String(req.user.id),exam,subject,bucket,n,now]);
+    }
+
+    await client.query('COMMIT');
+    return res.json({attemptId:ins.rows[0].id,questions:selected,count:200,recycled});
+  }catch(e){
+    try{await client.query('ROLLBACK');}catch(_){ }
+    console.error('Group 4 Mock V11 selector error:',e);
+    return sendError(res,500,'Mock question service error.');
+  }finally{ client.release(); }
+});
+
 api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
   const exam=String(req.query.exam||'').trim();
   const requestedLanguage=String(req.query.language||'ta').trim();
