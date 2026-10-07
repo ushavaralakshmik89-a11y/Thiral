@@ -3924,7 +3924,7 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
     const all=[];
     for(const spec of specs){
       const r=await client.query(
-        `SELECT id,exam,subject,subtopic,language,question,options,explanation,
+        `SELECT id,exam,subject,subtopic,language,question,options,'' AS explanation,
                 COALESCE(to_jsonb(questions)->>'difficulty',to_jsonb(questions)->>'level','') AS difficulty
            FROM questions
           WHERE exam=$1
@@ -4091,7 +4091,7 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
       const recycleAll=[];
       for(const spec of specs){
         const r=await client.query(
-          `SELECT id,exam,subject,subtopic,language,question,options,explanation,
+          `SELECT id,exam,subject,subtopic,language,question,options,'' AS explanation,
                   COALESCE(to_jsonb(questions)->>'difficulty',to_jsonb(questions)->>'level','') AS difficulty
              FROM questions
             WHERE exam=$1
