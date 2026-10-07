@@ -1527,57 +1527,6 @@ api.post('/attempts/:id/submit', requirePasswordReady, async (req,res)=>{
   }catch(e){console.error(e);sendError(res,500,'Grading service error.');}
 });
 
-
-/* ===== MOCK REVIEW API =====
-   Returns the answer key only after the student's attempt is submitted.
-   Existing question rows are read-only. */
-api.get('/attempts/:id/review', requirePasswordReady, async (req,res)=>{
-  try{
-    const id=Number(req.params.id);
-    if(!Number.isInteger(id)) return sendError(res,400,'Invalid attempt id.');
-
-    const a=await pool.query(
-      `SELECT id,mode,status,question_ids
-         FROM attempts
-        WHERE id=$1 AND user_id=$2
-        LIMIT 1`,
-      [id,req.user.id]
-    );
-    if(!a.rowCount) return sendError(res,404,'Attempt not found.');
-
-    const attempt=a.rows[0];
-    if(attempt.mode!=='mock') return sendError(res,400,'Review is available for Mock attempts only.');
-    if(attempt.status!=='SUBMITTED') return sendError(res,409,'Mock attempt is not submitted yet.');
-
-    const ids=Array.isArray(attempt.question_ids)
-      ? attempt.question_ids.map(Number).filter(Number.isInteger)
-      : [];
-    if(!ids.length) return res.json({review:[]});
-
-    const q=await pool.query(
-      `SELECT id AS question_id, correct_option, explanation
-         FROM questions
-        WHERE id=ANY($1::bigint[]) AND is_active=true`,
-      [ids]
-    );
-
-    const byId=new Map(q.rows.map(r=>[String(r.question_id),r]));
-    const review=ids.map(questionId=>{
-      const r=byId.get(String(questionId));
-      return r ? {
-        question_id:Number(r.question_id),
-        correct_option:Number(r.correct_option),
-        explanation:r.explanation || ''
-      } : null;
-    }).filter(Boolean);
-
-    return res.json({review});
-  }catch(e){
-    console.error('Mock review error:',e);
-    return sendError(res,500,'Mock review service error.');
-  }
-});
-
 api.get('/results', requirePasswordReady, async (req,res)=>{
   try{
     const q=await pool.query(`SELECT id,exam,subject,mode,language,score,correct_count,total_count,started_at,submitted_at FROM attempts WHERE user_id=$1 AND status='SUBMITTED' ORDER BY started_at DESC LIMIT 100`,[req.user.id]);
@@ -2622,6 +2571,179 @@ app.use('/api/admin', async (req, res, next) => {
    - Never deletes or rewrites question-bank rows.
    - Practice 10/20/50/100 routes are not changed here.
 */
+/* ================================================================
+   THIRAL GROUP 4 MOCK V2 - ADDITIVE QUESTION QUALITY SELECTOR
+   ---------------------------------------------------------------
+   IMPORTANT:
+   - Existing Mock route below is NOT deleted.
+   - Existing security/authentication is NOT changed.
+   - Existing question rows are NOT updated/deleted.
+   - Existing question_history is NOT changed.
+   - Practice / Question Bank routes are NOT changed.
+   - Frontend response shape remains compatible.
+   - This route only changes HOW fresh Mock questions are selected.
+   ================================================================ */
+
+api.get('/mock/questions', requirePasswordReady, async (req,res,next)=>{
+  const exam=String(req.query.exam||'').trim();
+  const requestedLanguage=String(req.query.language||'ta').trim();
+  if(exam!=='group4' || !['ta','en'].includes(requestedLanguage)) return next();
+
+  const client=await pool.connect();
+  try{
+    await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))',[`thiral-group4-mock-v2:${req.user.id}`]);
+
+    const specs=[
+      {name:'tamil',count:100,candidates:['tamil','தமிழ்'],language:'ta'},
+      {name:'gs',count:75,candidates:['பொது அறிவு','General Knowledge','general knowledge','பொது அறிவு / General Studies','General Studies','general studies'],language:requestedLanguage},
+      {name:'apt',count:25,candidates:['apt','திறனறிவு / Aptitude','Aptitude','aptitude'],language:requestedLanguage}
+    ];
+
+    const norm=v=>String(v??'').normalize('NFKC').replace(/[“”‘’]/g,'"').replace(/[^\p{L}\p{N}]+/gu,' ').replace(/\s+/g,' ').trim().toLowerCase();
+    const qKey=q=>norm(q.question);
+    const cKey=q=>{
+      let a=[];
+      if(Array.isArray(q.options)) a=q.options;
+      else if(typeof q.options==='string'){
+        try{const x=JSON.parse(q.options);a=Array.isArray(x)?x:[q.options];}catch(_){a=[q.options];}
+      }
+      return `${norm(q.question)}||${a.map(norm).filter(Boolean).sort().join('|')}`;
+    };
+
+    const old=await client.query(`
+      SELECT q.id,q.question,q.options
+      FROM question_history h JOIN questions q ON q.id=h.question_id
+      WHERE h.user_id=$1 AND h.mode='mock'`,[req.user.id]);
+
+    const oldIds=new Set(old.rows.map(q=>String(q.id)));
+    const oldQ=new Set(old.rows.map(qKey).filter(Boolean));
+    const oldC=new Set(old.rows.map(cKey));
+
+    const difficulty=q=>{
+      const d=norm(q.difficulty||q.level||'');
+      if(d.includes('very hard')||d.includes('veryhard')||d.includes('மிக கடின')||d==='3') return 3;
+      if(d.includes('hard')||d.includes('difficult')||d.includes('கடின')||d==='2') return 2;
+      if(d.includes('moderate')||d.includes('medium')||d.includes('normal')||d.includes('நடுத்தர')||d==='1') return 1;
+      if(d.includes('easy')||d.includes('basic')||d.includes('எளி')||d==='0') return 0;
+      const t=norm(q.question); let s=0;
+      if(t.length>=100)s+=2;if(t.length>=160)s+=2;if(t.length>=240)s++;
+      if(/\d/.test(t)||t.includes('எவ்வளவு')||t.includes('கணக்க')||t.includes('விகித')||t.includes('சதவீத')||t.includes('average')||t.includes('ratio')||t.includes('percentage'))s+=2;
+      if(t.includes('ஏன்')||t.includes('காரணம்')||t.includes('சரியான விளக்கம்')||t.includes('which of the following')||t.includes('why')||t.includes('reason'))s+=2;
+      return s>=7?3:s>=4?2:s>=2?1:0;
+    };
+
+    const quality=q=>{
+      const d=difficulty(q),t=norm(q.question);let s=d*100;
+      if(t.length>=100)s+=10;if(t.length>=160)s+=10;if(/\d/.test(t))s+=5;if(t.length<45)s-=15;
+      return s+Math.random()*30;
+    };
+
+    const pools={tamil:[],gs:[],apt:[]};
+
+    for(const spec of specs){
+      const r=await client.query(`
+        SELECT id,exam,subject,subtopic,language,question,options,explanation,
+               COALESCE(to_jsonb(questions)->>'difficulty',to_jsonb(questions)->>'level','') AS difficulty
+        FROM questions
+        WHERE exam=$1 AND subject=ANY($2::text[]) AND language=$3 AND is_active=true
+          AND NOT EXISTS(
+            SELECT 1 FROM question_history h
+            WHERE h.user_id=$4 AND h.question_id=questions.id AND h.mode='mock'
+          )
+        ORDER BY random()`,[exam,spec.candidates,spec.language,req.user.id]);
+
+      for(const q of r.rows){
+        const id=String(q.id),qk=qKey(q),ck=cKey(q);
+        if(!qk||oldIds.has(id)||oldQ.has(qk)||oldC.has(ck)) continue;
+        oldQ.add(qk);oldC.add(ck);pools[spec.name].push(q);
+      }
+    }
+
+    const select=(rows,count)=>{
+      if(!rows.length)return [];
+      const buckets=new Map();
+      for(const q of rows){const k=norm(q.subtopic)||'__no_subtopic__';if(!buckets.has(k))buckets.set(k,[]);buckets.get(k).push(q);}
+      for(const a of buckets.values())a.sort((x,y)=>quality(y)-quality(x));
+
+      const topics=Array.from(buckets.keys());
+      for(let i=topics.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[topics[i],topics[j]]=[topics[j],topics[i]];}
+
+      const chosen=[],ids=new Set(),qs=new Set(),cs=new Set();
+      let more=true;
+      while(chosen.length<count&&more){
+        more=false;
+        for(const topic of topics){
+          if(chosen.length>=count)break;
+          const a=buckets.get(topic);if(!a?.length)continue;
+          const q=a.shift(),id=String(q.id),qk=qKey(q),ck=cKey(q);
+          if(ids.has(id)||qs.has(qk)||cs.has(ck))continue;
+          ids.add(id);qs.add(qk);cs.add(ck);chosen.push(q);more=true;
+        }
+      }
+
+      const remain=[];for(const a of buckets.values())remain.push(...a);remain.sort((x,y)=>quality(y)-quality(x));
+      const target={1:Math.round(count*.20),2:Math.round(count*.60),3:Math.round(count*.20)};
+      const got={0:0,1:0,2:0,3:0};
+      for(const q of chosen)got[difficulty(q)]++;
+
+      for(const wanted of [3,2,1]){
+        if(chosen.length>=count)break;
+        for(const q of remain){
+          if(chosen.length>=count||difficulty(q)!==wanted||got[wanted]>=target[wanted])continue;
+          const id=String(q.id),qk=qKey(q),ck=cKey(q);
+          if(ids.has(id)||qs.has(qk)||cs.has(ck))continue;
+          ids.add(id);qs.add(qk);cs.add(ck);got[wanted]++;chosen.push(q);
+        }
+      }
+
+      for(const q of remain){
+        if(chosen.length>=count)break;
+        const id=String(q.id),qk=qKey(q),ck=cKey(q);
+        if(ids.has(id)||qs.has(qk)||cs.has(ck))continue;
+        ids.add(id);qs.add(qk);cs.add(ck);chosen.push(q);
+      }
+
+      for(let i=chosen.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[chosen[i],chosen[j]]=[chosen[j],chosen[i]];}
+      return chosen.slice(0,count);
+    };
+
+    const tamil=select(pools.tamil,100);
+    const gs=select(pools.gs,75);
+    const apt=select(pools.apt,25);
+
+    if(tamil.length<100||gs.length<75||apt.length<25){
+      await client.query('ROLLBACK');
+      return sendError(res,409,`புதிய தனித்துவமான கேள்விகள் போதவில்லை. Tamil: ${tamil.length}/100, GS: ${gs.length}/75, Aptitude: ${apt.length}/25. பழைய Mock கேள்விகள் மீண்டும் பயன்படுத்தப்படவில்லை.`);
+    }
+
+    const selected=[...tamil,...gs,...apt];
+    const clean=selected.map(q=>Number(q.id));
+
+    if(clean.length!==200||new Set(clean).size!==200){
+      await client.query('ROLLBACK');
+      return sendError(res,409,'Mock Test-ல் duplicate question கண்டறியப்பட்டது. புதிய Mock உருவாக்கப்படவில்லை.');
+    }
+
+    const ins=await client.query(`
+      INSERT INTO attempts(user_id,exam,subject,mode,language,question_ids)
+      VALUES($1,$2,'mixed','mock','mixed',$3) RETURNING id`,[req.user.id,exam,clean]);
+
+    await client.query(`
+      INSERT INTO question_history(user_id,question_id,mode)
+      SELECT $1,x,'mock' FROM unnest($2::bigint[]) AS x
+      ON CONFLICT(user_id,question_id,mode) DO NOTHING`,[req.user.id,clean]);
+
+    await client.query('COMMIT');
+    return res.json({attemptId:ins.rows[0].id,questions:selected,count:200,recycled:0});
+
+  }catch(e){
+    try{await client.query('ROLLBACK');}catch(_){ }
+    console.error('Group 4 Mock V2 selector error:',e);
+    return sendError(res,500,'Mock Test question selection service error.');
+  }finally{client.release();}
+});
+
 api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
   const exam=String(req.query.exam||'').trim();
   const requestedLanguage=String(req.query.language||'ta').trim();
