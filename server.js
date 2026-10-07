@@ -2563,19 +2563,19 @@ app.use('/api/admin', async (req, res, next) => {
 
 
 /* ================================================================
-   V9 GROUP 4 MOCK
-   ONLY addresses the two requested issues:
-   1) faster Mock loading
-   2) broad question-bank rotation across topics/subtopics
-
-   Existing database rows, Practice, Question Bank, Auth and Security
-   are untouched. The legacy Mock route below remains unchanged.
-   This handler intercepts valid Group 4 Mock requests before it.
-================================================================ */
+   V10 SAFE GROUP 4 MOCK LAYER
+   Emergency-safe version:
+   - Uses the SAME subject/language matching as the known working route.
+   - Does NOT replace or modify the original Mock route.
+   - If this layer cannot confidently build a Mock, it calls next(),
+     allowing the original route to handle the request.
+   - Uses several small ID windows instead of scanning the full bank.
+   - Rotates windows between Mocks to improve topic/subtopic coverage.
+   ================================================================ */
 
 api.get('/mock/questions', requirePasswordReady, async (req,res,next)=>{
-  const exam=String(req.query.exam||'').trim().toLowerCase();
-  const requestedLanguage=String(req.query.language||'ta').trim().toLowerCase();
+  const exam=String(req.query.exam||'').trim();
+  const requestedLanguage=String(req.query.language||'ta').trim();
 
   if(exam!=='group4' || !['ta','en'].includes(requestedLanguage)){
     return next();
@@ -2584,29 +2584,12 @@ api.get('/mock/questions', requirePasswordReady, async (req,res,next)=>{
   const client=await pool.connect();
 
   try{
-    await client.query('BEGIN');
-
-    /*
-      Prevent two Mock starts for the same student at the same moment.
-      This is a transaction-scoped lock, so it disappears immediately after
-      the Mock is created.
-    */
-    await client.query(
-      `SELECT pg_advisory_xact_lock(hashtext($1))`,
-      [`thiral-group4-mock-v9:${req.user.id}`]
-    );
-
     const specs=[
+      {name:'tamil',count:100,candidates:['tamil','தமிழ்'],language:'ta'},
       {
-        key:'tamil',
-        count:100,
-        subjects:['tamil','தமிழ்'],
-        language:'ta'
-      },
-      {
-        key:'gs',
+        name:'gs',
         count:75,
-        subjects:[
+        candidates:[
           'பொது அறிவு',
           'General Knowledge',
           'general knowledge',
@@ -2617,9 +2600,9 @@ api.get('/mock/questions', requirePasswordReady, async (req,res,next)=>{
         language:requestedLanguage
       },
       {
-        key:'apt',
+        name:'apt',
         count:25,
-        subjects:[
+        candidates:[
           'apt',
           'திறனறிவு / Aptitude',
           'Aptitude',
@@ -2637,84 +2620,68 @@ api.get('/mock/questions', requirePasswordReady, async (req,res,next)=>{
       .trim()
       .toLowerCase();
 
-    const questionKey=q=>normalize(q.question);
-
     const contentKey=q=>{
-      let options=[];
-      if(Array.isArray(q.options)){
-        options=q.options;
-      }else if(typeof q.options==='string'){
+      let opts=[];
+      if(Array.isArray(q.options)) opts=q.options;
+      else if(typeof q.options==='string'){
         try{
-          const parsed=JSON.parse(q.options);
-          if(Array.isArray(parsed)) options=parsed;
+          const x=JSON.parse(q.options);
+          if(Array.isArray(x)) opts=x;
         }catch(_){}
       }
-
-      return normalize(q.question)+'||'+
-        options.map(normalize).filter(Boolean).sort().join('|');
+      return normalize(q.question)+'|'+opts.map(normalize).sort().join('|');
     };
 
-    /*
-      Difficulty is only a tie-breaker here.
-      Coverage is more important than repeatedly choosing one easy topic.
-    */
-    const qualityScore=q=>{
+    const difficulty=q=>{
       const d=normalize(q.difficulty||q.level);
-
-      if(d.includes('very hard') || d.includes('மிக கடின')) return 4;
-      if(d.includes('hard') || d.includes('கடின')) return 3;
-      if(d.includes('moderate') || d.includes('medium') || d.includes('நடுத்தர')) return 2;
-      if(d.includes('easy') || d.includes('எளிது')) return 1;
-
-      return 2;
+      if(d.includes('very hard')||d.includes('மிக கடின')) return 4;
+      if(d.includes('hard')||d.includes('கடின')) return 3;
+      if(d.includes('moderate')||d.includes('medium')||d.includes('நடுத்தர')) return 2;
+      return 1;
     };
 
     /*
-      The key performance change:
-      We DO NOT scan the whole question bank.
-
-      Instead, every Mock gets a rotating ID window. The window changes from
-      Mock to Mock for the same student. This prevents the first few thousand
-      IDs from becoming the permanent source of questions.
-
-      Several windows are sampled and merged. If a window is short because
-      the student has already consumed it, another window is tried.
+      Get the ID range cheaply. This does not read question rows.
     */
-    const getMockNumber=async()=>{
-      const r=await client.query(`
-        SELECT count(*)::int AS n
-        FROM attempts
-        WHERE user_id=$1
-          AND mode='mock'
-          AND exam='group4'
-      `,[req.user.id]);
+    const range=await client.query(`
+      SELECT
+        COALESCE(MIN(id),0)::bigint AS min_id,
+        COALESCE(MAX(id),0)::bigint AS max_id
+      FROM questions
+      WHERE exam=$1
+        AND is_active=true
+    `,[exam]);
 
-      return Number(r.rows[0]?.n||0);
-    };
+    const minId=Number(range.rows[0]?.min_id||0);
+    const maxId=Number(range.rows[0]?.max_id||0);
 
-    const mockNumber=await getMockNumber();
-
-    const getMaxId=async spec=>{
-      const r=await client.query(`
-        SELECT COALESCE(MAX(id),0)::bigint AS max_id
-        FROM questions
-        WHERE lower(trim(COALESCE(exam,'')))='group4'
-          AND subject=ANY($1::text[])
-          AND language=$2
-          AND is_active=true
-      `,[spec.subjects,spec.language]);
-
-      return Number(r.rows[0]?.max_id||0);
-    };
+    if(!minId || !maxId){
+      return next();
+    }
 
     /*
-      Fetch a bounded candidate window around a rotating ID anchor.
-      There is intentionally no LIMIT 3000 here.
+      Find how many previous Mocks this student has taken.
+      This is only used to move the windows.
     */
-    const fetchWindow=async(spec,anchor)=>{
-      const PAGE=700;
+    const attemptQ=await client.query(`
+      SELECT count(*)::int AS n
+      FROM attempts
+      WHERE user_id=$1
+        AND exam=$2
+        AND mode='mock'
+    `,[req.user.id,exam]);
 
-      const first=await client.query(`
+    const mockNo=Number(attemptQ.rows[0]?.n||0);
+
+    /*
+      Small bounded windows. The important point is that the window moves.
+      We never load the first 3000 questions permanently.
+    */
+    const windowSize=350;
+    const windowCount=10;
+
+    const fetchWindow=async(spec,start)=>{
+      const r=await client.query(`
         SELECT
           q.id,q.exam,q.subject,q.subtopic,q.language,
           q.question,q.options,q.explanation,
@@ -2723,408 +2690,247 @@ api.get('/mock/questions', requirePasswordReady, async (req,res,next)=>{
             to_jsonb(q)->>'level',''
           ) AS difficulty
         FROM questions q
-        WHERE lower(trim(COALESCE(q.exam,'')))='group4'
-          AND q.subject=ANY($1::text[])
-          AND lower(trim(COALESCE(q.language,'')))=$2
+        WHERE q.exam=$1
+          AND q.subject=ANY($2::text[])
+          AND q.language=$3
           AND q.is_active=true
-          AND q.id>=$3
+          AND q.id>=$4
           AND NOT EXISTS(
             SELECT 1
             FROM question_history h
-            WHERE h.user_id=$4
+            WHERE h.user_id=$5
               AND h.question_id=q.id
               AND h.mode='mock'
           )
         ORDER BY q.id
-        LIMIT $5
-      `,[spec.subjects,spec.language,anchor,req.user.id,PAGE]);
+        LIMIT $6
+      `,[exam,spec.candidates,spec.language,start,req.user.id,windowSize]);
 
-      /*
-        Wrap around only when the rotating anchor is near the end.
-        This is still bounded and does not scan the complete bank.
-      */
-      if(first.rows.length>=PAGE) return first.rows;
-
-      const remaining=PAGE-first.rows.length;
-
-      const second=await client.query(`
-        SELECT
-          q.id,q.exam,q.subject,q.subtopic,q.language,
-          q.question,q.options,q.explanation,
-          COALESCE(
-            to_jsonb(q)->>'difficulty',
-            to_jsonb(q)->>'level',''
-          ) AS difficulty
-        FROM questions q
-        WHERE lower(trim(COALESCE(q.exam,'')))='group4'
-          AND q.subject=ANY($1::text[])
-          AND lower(trim(COALESCE(q.language,'')))=$2
-          AND q.is_active=true
-          AND q.id<$3
-          AND NOT EXISTS(
-            SELECT 1
-            FROM question_history h
-            WHERE h.user_id=$4
-              AND h.question_id=q.id
-              AND h.mode='mock'
-          )
-        ORDER BY q.id
-        LIMIT $5
-      `,[spec.subjects,spec.language,anchor,req.user.id,remaining]);
-
-      return [...first.rows,...second.rows];
+      return r.rows.map(q=>({...q,_mockSubject:spec.name}));
     };
 
-    /*
-      Get distinct subtopics only from a bounded candidate set.
-      We do not ask PostgreSQL to scan every question just to build a
-      subtopic list. The DB's existing question data remains untouched.
-    */
-    const buildCandidates=async(spec)=>{
-      const maxId=await getMaxId(spec);
-      if(!maxId) return [];
+    const buildPool=async spec=>{
+      const out=[];
+      const ids=new Set();
 
-      /*
-        The anchor sequence deliberately changes from Mock to Mock.
-        Different multipliers give different coverage patterns for each
-        subject without making the query random/full-table.
-      */
-      const seeds=[
-        1,
-        3,
-        7,
-        13
-      ];
+      const span=Math.max(1,maxId-minId+1);
 
-      const rows=[];
-      const seenIds=new Set();
+      for(let i=0;i<windowCount;i++){
+        /*
+          Different coprime-ish steps make successive Mocks move through
+          different parts of the ID space.
+        */
+        const raw=(mockNo*windowSize*17 + i*7919 + (spec.name==='gs'?1237:spec.name==='apt'?3571:619))%span;
+        const start=minId+Math.floor(raw);
 
-      for(const seed of seeds){
-        const raw=((mockNumber+1)*seed*9973)%Math.max(1,maxId);
-        const anchor=Math.max(1,Math.floor(raw));
+        const rows=await fetchWindow(spec,start);
 
-        const batch=await fetchWindow(spec,anchor);
-
-        for(const q of batch){
+        for(const q of rows){
           const id=Number(q.id);
-          if(seenIds.has(id)) continue;
-
-          seenIds.add(id);
-
-          q._subtopic=normalize(q.subtopic)||'__no_subtopic__';
+          if(ids.has(id)) continue;
+          ids.add(id);
+          q._sub=normalize(q.subtopic)||'__no_subtopic__';
           q._topic=group4TopicForSubtopic(String(q.subtopic||''))||'__other__';
-          q._quality=qualityScore(q);
-
-          rows.push(q);
+          q._difficulty=difficulty(q);
+          out.push(q);
         }
 
-        /*
-          Once enough candidates have been collected, stop querying.
-          This is the major latency protection.
-        */
-        if(rows.length>=1400) break;
+        if(out.length>=Math.max(500,spec.count*8)) break;
       }
 
-      return rows;
+      return out;
     };
 
-    const choose=async(spec,rows,target)=>{
-      if(!rows.length) return [];
-
-      /*
-        Exclude duplicate question content inside this Mock.
-        Previous Mock history is already excluded by SQL question ID, but
-        content duplicates may exist under another ID.
-      */
+    const choose=(rows,target)=>{
       const unique=[];
-      const seenContent=new Set();
+      const contentSeen=new Set();
 
       for(const q of rows){
         const ck=contentKey(q);
-        if(!ck || seenContent.has(ck)) continue;
-
-        seenContent.add(ck);
+        if(!ck||contentSeen.has(ck)) continue;
+        contentSeen.add(ck);
         unique.push(q);
       }
 
-      /*
-        Long-term coverage:
-        Prefer subtopics that are represented in the current rotating window
-        and give one question to each before filling additional slots.
-      */
-      const bySub=new Map();
-      const byTopic=new Map();
-
-      for(const q of unique){
-        if(!bySub.has(q._subtopic)) bySub.set(q._subtopic,[]);
-        bySub.get(q._subtopic).push(q);
-
-        if(!byTopic.has(q._topic)) byTopic.set(q._topic,[]);
-        byTopic.get(q._topic).push(q);
-      }
+      if(unique.length<target) return [];
 
       const selected=[];
-      const usedIds=new Set();
-      const usedContent=new Set();
-      const subUse=new Map();
-      const topicUse=new Map();
+      const ids=new Set();
+      const contents=new Set();
+      const subCount=new Map();
+      const topicCount=new Map();
 
       const add=q=>{
-        if(!q || selected.length>=target) return false;
-
         const id=Number(q.id);
         const ck=contentKey(q);
-
-        if(usedIds.has(id)||usedContent.has(ck)) return false;
-
-        usedIds.add(id);
-        usedContent.add(ck);
+        if(ids.has(id)||contents.has(ck)) return false;
+        ids.add(id);
+        contents.add(ck);
         selected.push(q);
-
-        subUse.set(q._subtopic,(subUse.get(q._subtopic)||0)+1);
-        topicUse.set(q._topic,(topicUse.get(q._topic)||0)+1);
-
+        subCount.set(q._sub,(subCount.get(q._sub)||0)+1);
+        topicCount.set(q._topic,(topicCount.get(q._topic)||0)+1);
         return true;
       };
 
       /*
-        Phase 1: topic coverage.
+        First: one per topic.
       */
-      const topicEntries=[...byTopic.entries()]
-        .sort((a,b)=>{
-          const ac=a[1].length;
-          const bc=b[1].length;
-          return ac-bc;
-        });
+      const topics=new Map();
+      for(const q of unique){
+        if(!topics.has(q._topic)) topics.set(q._topic,[]);
+        topics.get(q._topic).push(q);
+      }
 
-      for(const [,list] of topicEntries){
+      for(const list of topics.values()){
         if(selected.length>=target) break;
-
-        list.sort((a,b)=>b._quality-a._quality);
-
+        list.sort((a,b)=>b._difficulty-a._difficulty);
         add(list[0]);
       }
 
       /*
-        Phase 2: subtopic coverage.
-        This is the important change for the user's requirement:
-        Addition/History/etc. cannot monopolize the entire candidate set.
+        Second: one per subtopic.
       */
-      const subEntries=[...bySub.entries()]
-        .sort((a,b)=>{
-          const ac=a[1].length;
-          const bc=b[1].length;
-          return ac-bc;
-        });
+      const subs=new Map();
+      for(const q of unique){
+        if(!subs.has(q._sub)) subs.set(q._sub,[]);
+        subs.get(q._sub).push(q);
+      }
 
-      for(const [,list] of subEntries){
+      const subLists=[...subs.values()]
+        .sort((a,b)=>a.length-b.length);
+
+      for(const list of subLists){
         if(selected.length>=target) break;
-
-        const candidate=list
-          .filter(q=>!usedIds.has(Number(q.id)))
-          .sort((a,b)=>b._quality-a._quality)[0];
-
-        if(candidate) add(candidate);
+        const q=list
+          .filter(x=>!ids.has(Number(x.id)))
+          .sort((a,b)=>b._difficulty-a._difficulty)[0];
+        if(q) add(q);
       }
 
       /*
-        Phase 3: balanced fill.
-        Under-used topic/subtopic wins. Quality is secondary.
+        Final fill: least-used topic/subtopic first.
       */
       while(selected.length<target){
-        const remaining=unique.filter(q=>
-          !usedIds.has(Number(q.id)) &&
-          !usedContent.has(contentKey(q))
-        );
+        let best=null;
+        let bestScore=Infinity;
 
-        if(!remaining.length) break;
+        for(const q of unique){
+          if(ids.has(Number(q.id))) continue;
 
-        remaining.sort((a,b)=>{
-          const as=
-            (subUse.get(a._subtopic)||0)*100+
-            (topicUse.get(a._topic)||0)*25-
-            a._quality*4;
+          const score=
+            (subCount.get(q._sub)||0)*100+
+            (topicCount.get(q._topic)||0)*20-
+            q._difficulty;
 
-          const bs=
-            (subUse.get(b._subtopic)||0)*100+
-            (topicUse.get(b._topic)||0)*25-
-            b._quality*4;
+          if(score<bestScore){
+            bestScore=score;
+            best=q;
+          }
+        }
 
-          return as-bs;
-        });
-
-        add(remaining[0]);
+        if(!best) break;
+        add(best);
       }
 
-      return selected.slice(0,target);
+      return selected.length===target?selected:[];
     };
 
-    const candidatePools=[];
-
+    const pools=[];
     for(const spec of specs){
-      const rows=await buildCandidates(spec);
-      candidatePools.push({
-        spec,
-        rows
-      });
+      const rows=await buildPool(spec);
+      pools.push({spec,rows});
     }
 
-    const tamil=await choose(specs[0],candidatePools[0].rows,100);
-    const gs=await choose(specs[1],candidatePools[1].rows,75);
-    const apt=await choose(specs[2],candidatePools[2].rows,25);
+    const tamil=choose(pools[0].rows,100);
+    const gs=choose(pools[1].rows,75);
+    const apt=choose(pools[2].rows,25);
 
     /*
-      If a rotating window is unusually sparse, make one additional bounded
-      pass for that subject only. No whole-bank scan.
+      SAFETY FALLBACK:
+      If the new selector does not have enough fresh rows, DO NOT return
+      "no questions". Let the original known-working Mock route run.
     */
-    const refill=async(spec,current,target)=>{
-      if(current.length>=target) return current;
-
-      const maxId=await getMaxId(spec);
-      if(!maxId) return current;
-
-      const extraSeed=mockNumber*7919+target*104729;
-      const anchor=Math.max(
-        1,
-        Math.floor(extraSeed%Math.max(1,maxId))
-      );
-
-      const extra=await fetchWindow(spec,anchor);
-      const merged=[...candidatePools.find(x=>x.spec===spec)?.rows||[],...extra];
-
-      return choose(spec,merged,target);
-    };
-
-    const tamilFinal=await refill(specs[0],tamil,100);
-    const gsFinal=await refill(specs[1],gs,75);
-    const aptFinal=await refill(specs[2],apt,25);
-
-    if(
-      tamilFinal.length<100 ||
-      gsFinal.length<75 ||
-      aptFinal.length<25
-    ){
-      await client.query('ROLLBACK');
-
-      return sendError(
-        res,
-        409,
-        `புதிய Mock கேள்விகள் போதவில்லை. Tamil ${tamilFinal.length}/100, GS ${gsFinal.length}/75, Aptitude ${aptFinal.length}/25.`
-      );
+    if(tamil.length!==100 || gs.length!==75 || apt.length!==25){
+      client.release();
+      return next();
     }
 
-    const selected=[
-      ...tamilFinal,
-      ...gsFinal,
-      ...aptFinal
-    ];
+    const selected=[...tamil,...gs,...apt];
 
-    /*
-      Final duplicate protection.
-    */
     const finalIds=new Set();
-    const finalQuestions=new Set();
     const finalContent=new Set();
 
     for(const q of selected){
-      const id=String(q.id);
-      const qk=questionKey(q);
+      const id=Number(q.id);
       const ck=contentKey(q);
 
-      if(
-        finalIds.has(id) ||
-        finalQuestions.has(qk) ||
-        finalContent.has(ck)
-      ){
-        await client.query('ROLLBACK');
-
-        return sendError(
-          res,
-          409,
-          'Mock Test-ல் duplicate question கண்டறியப்பட்டது.'
-        );
+      if(finalIds.has(id)||finalContent.has(ck)){
+        client.release();
+        return next();
       }
 
       finalIds.add(id);
-      finalQuestions.add(qk);
       finalContent.add(ck);
     }
 
     /*
-      Do not expose internal selection fields or correct answers.
+      Keep the response shape compatible with the existing frontend.
+      correct_option is intentionally not exposed during the Mock.
     */
-    const cleanQuestions=selected.map(q=>{
-      const out={
-        id:q.id,
-        exam:q.exam,
-        subject:q.subject,
-        subtopic:q.subtopic,
-        language:q.language,
-        question:q.question,
-        options:q.options,
-        explanation:q.explanation
-      };
+    const questions=selected.map(q=>({
+      id:q.id,
+      exam:q.exam,
+      subject:q.subject,
+      subtopic:q.subtopic,
+      language:q.language,
+      question:q.question,
+      options:q.options,
+      explanation:q.explanation
+    }));
 
-      return out;
-    });
+    await client.query('BEGIN');
 
-    const cleanIds=selected.map(q=>Number(q.id));
+    const ins=await client.query(`
+      INSERT INTO attempts(
+        user_id,exam,subject,mode,language,question_ids
+      )
+      VALUES($1,$2,'mixed','mock','mixed',$3)
+      RETURNING id
+    `,[req.user.id,exam,selected.map(q=>Number(q.id))]);
 
-    const ins=await client.query(
-      `INSERT INTO attempts(
-         user_id,
-         exam,
-         subject,
-         mode,
-         language,
-         question_ids
-       )
-       VALUES($1,$2,'mixed','mock','mixed',$3)
-       RETURNING id`,
-      [req.user.id,'group4',cleanIds]
-    );
-
-    await client.query(
-      `INSERT INTO question_history(
-         user_id,
-         question_id,
-         mode
-       )
-       SELECT $1,x,'mock'
-       FROM unnest($2::bigint[]) AS x
-       ON CONFLICT(
-         user_id,question_id,mode
-       ) DO NOTHING`,
-      [req.user.id,cleanIds]
-    );
+    await client.query(`
+      INSERT INTO question_history(
+        user_id,question_id,mode
+      )
+      SELECT $1,x,'mock'
+      FROM unnest($2::bigint[]) AS x
+      ON CONFLICT(user_id,question_id,mode) DO NOTHING
+    `,[req.user.id,selected.map(q=>Number(q.id))]);
 
     await client.query('COMMIT');
 
+    client.release();
+
     return res.json({
       attemptId:ins.rows[0].id,
-      questions:cleanQuestions,
+      questions,
       count:200,
       recycled:0
     });
 
   }catch(e){
-    try{
-      await client.query('ROLLBACK');
-    }catch(_){}
-
-    console.error('V9 Group 4 Mock selector error:',e);
-
-    return sendError(
-      res,
-      500,
-      'Mock question service error.'
-    );
-  }finally{
+    try{ await client.query('ROLLBACK'); }catch(_){}
+    console.error('V10 safe Mock layer error:',e);
     client.release();
+
+    /*
+      Never break the working Mock because of this optimization layer.
+    */
+    return next();
   }
 });
 
-/* ===== END V9 GROUP 4 MOCK ===== */
+/* ===== END V10 SAFE GROUP 4 MOCK LAYER ===== */
 
 
 /* ===== GROUP 4 MOCK ROTATION API =====
