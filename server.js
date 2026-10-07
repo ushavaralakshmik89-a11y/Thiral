@@ -2824,7 +2824,7 @@ api.use('/mock/questions', requirePasswordReady, async (req,res,next)=>{
            * No artificial LIMIT can hide valid questions.
            */
           const r=await client.query(
-            `SELECT id,exam,subject,subtopic,language,question,options,explanation,
+            `SELECT id,exam,subject,subtopic,language,question,options,explanation,correct_option,
                     COALESCE(to_jsonb(questions)->>'difficulty',
                              to_jsonb(questions)->>'level','') AS difficulty
                FROM questions
@@ -2853,7 +2853,7 @@ api.use('/mock/questions', requirePasswordReady, async (req,res,next)=>{
           const perTopic=12;
           const r=await client.query(
             `WITH fresh AS (
-               SELECT id,exam,subject,subtopic,language,question,options,explanation,
+               SELECT id,exam,subject,subtopic,language,question,options,explanation,correct_option,
                       COALESCE(to_jsonb(questions)->>'difficulty',
                                to_jsonb(questions)->>'level','') AS difficulty,
                       row_number() OVER(
@@ -2873,7 +2873,7 @@ api.use('/mock/questions', requirePasswordReady, async (req,res,next)=>{
                        AND h.mode='mock'
                   )
              )
-             SELECT id,exam,subject,subtopic,language,question,options,explanation,difficulty
+             SELECT id,exam,subject,subtopic,language,question,options,explanation,correct_option,difficulty
                FROM fresh
               WHERE rn <= $5
               ORDER BY id`,
@@ -2890,7 +2890,7 @@ api.use('/mock/questions', requirePasswordReady, async (req,res,next)=>{
             const used=new Set(rows.map(q=>String(q.id)));
 
             const r2=await client.query(
-              `SELECT id,exam,subject,subtopic,language,question,options,explanation,
+              `SELECT id,exam,subject,subtopic,language,question,options,explanation,correct_option,
                       COALESCE(to_jsonb(questions)->>'difficulty',
                                to_jsonb(questions)->>'level','') AS difficulty
                  FROM questions
@@ -3092,7 +3092,7 @@ api.use('/mock/questions', requirePasswordReady, async (req,res,next)=>{
       if(difficultyChosen.length<spec.count && freshTotal>=spec.count){
 
         const r3=await client.query(
-          `SELECT id,exam,subject,subtopic,language,question,options,explanation,
+          `SELECT id,exam,subject,subtopic,language,question,options,explanation,correct_option,
                   COALESCE(to_jsonb(questions)->>'difficulty',
                            to_jsonb(questions)->>'level','') AS difficulty
              FROM questions
@@ -3138,7 +3138,7 @@ api.use('/mock/questions', requirePasswordReady, async (req,res,next)=>{
       if(difficultyChosen.length<spec.count && freshTotal<spec.count){
 
         const recycle=await client.query(
-          `SELECT id,exam,subject,subtopic,language,question,options,explanation,
+          `SELECT id,exam,subject,subtopic,language,question,options,explanation,correct_option,
                   COALESCE(to_jsonb(questions)->>'difficulty',
                            to_jsonb(questions)->>'level','') AS difficulty
              FROM questions
@@ -3924,7 +3924,7 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
     const all=[];
     for(const spec of specs){
       const r=await client.query(
-        `SELECT id,exam,subject,subtopic,language,question,options,'' AS explanation,
+        `SELECT id,exam,subject,subtopic,language,question,options,'' AS explanation,correct_option,
                 COALESCE(to_jsonb(questions)->>'difficulty',to_jsonb(questions)->>'level','') AS difficulty
            FROM questions
           WHERE exam=$1
@@ -4091,7 +4091,7 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
       const recycleAll=[];
       for(const spec of specs){
         const r=await client.query(
-          `SELECT id,exam,subject,subtopic,language,question,options,'' AS explanation,
+          `SELECT id,exam,subject,subtopic,language,question,options,'' AS explanation,correct_option,
                   COALESCE(to_jsonb(questions)->>'difficulty',to_jsonb(questions)->>'level','') AS difficulty
              FROM questions
             WHERE exam=$1
