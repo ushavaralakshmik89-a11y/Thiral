@@ -1527,27 +1527,20 @@ api.post('/attempts/:id/submit', requirePasswordReady, async (req,res)=>{
   }catch(e){console.error(e);sendError(res,500,'Grading service error.');}
 });
 
-
 /* =========================================================
    THIRAL POST-SUBMIT REVIEW
    ---------------------------------------------------------
-   Existing Question / Practice / Mock / Bank APIs are kept
-   unchanged. Correct answers are released only after the
-   student's own attempt is SUBMITTED.
+   ONLY ADDITION TO THE ORIGINAL SERVER.
+   All existing routes and logic remain unchanged.
+   Correct answers are released only after submission.
    ========================================================= */
-
 api.get('/attempts/:id/review', requirePasswordReady, async (req,res)=>{
   try{
     const attemptId=Number(req.params.id);
-
     if(!Number.isInteger(attemptId) || attemptId < 1){
       return sendError(res,400,'Invalid attempt ID.');
     }
 
-    /*
-     * Ownership check:
-     * A student can review only their own attempt.
-     */
     const attemptResult=await pool.query(
       `SELECT id,status,mode,question_ids
        FROM attempts
@@ -1561,89 +1554,29 @@ api.get('/attempts/:id/review', requirePasswordReady, async (req,res)=>{
     }
 
     const attempt=attemptResult.rows[0];
-
-    /*
-     * Never expose the answer key while an attempt is still active.
-     */
     if(String(attempt.status||'').toUpperCase() !== 'SUBMITTED'){
-      return sendError(
-        res,
-        409,
-        'Review is available only after the test is submitted.'
-      );
+      return sendError(res,409,'Review is available only after the test is submitted.');
     }
 
     const questionIds=Array.isArray(attempt.question_ids)
-      ? [...new Set(
-          attempt.question_ids
-            .map(Number)
-            .filter(Number.isInteger)
-        )]
+      ? [...new Set(attempt.question_ids.map(Number).filter(Number.isInteger))]
       : [];
 
     if(!questionIds.length){
-      return res.json({
-        ok:true,
-        attemptId,
-        mode:attempt.mode,
-        questions:[]
-      });
-    }
-
-    /*
-     * Question Bank:
-     * the submit endpoint counts only questions actually reached/
-     * answered in that bank session. Do not expose unseen questions
-     * in the review.
-     *
-     * Practice / Mock:
-     * all questions belonging to the submitted attempt are reviewed.
-     */
-    let reviewIds=questionIds;
-
-    if(String(attempt.mode||'').toLowerCase() === 'bank'){
-      /*
-       * For Bank attempts, use the attempt's persisted answer
-       * information when available. If the current schema does
-       * not have a separate answer table, the frontend still sends
-       * the complete reached set at submit time and the attempt's
-       * total_count represents the submitted review set.
-       *
-       * The normal Mock/Practice path remains completely unchanged.
-       */
-      const totalCount=Number(attempt.total_count||0);
-
-      if(totalCount > 0 && totalCount < questionIds.length){
-        reviewIds=questionIds.slice(0,totalCount);
-      }
+      return res.json({ok:true,attemptId,mode:attempt.mode,questions:[]});
     }
 
     const q=await pool.query(
-      `SELECT
-          id,
-          question,
-          options,
-          correct_option,
-          explanation,
-          COALESCE(
-            to_jsonb(questions)->>'difficulty',
-            to_jsonb(questions)->>'level',
-            ''
-          ) AS difficulty
+      `SELECT id,question,options,correct_option,explanation,
+              COALESCE(to_jsonb(questions)->>'difficulty',to_jsonb(questions)->>'level','') AS difficulty
        FROM questions
        WHERE id=ANY($1::bigint[])
          AND is_active=true`,
-      [reviewIds]
+      [questionIds]
     );
 
-    const byId=new Map(
-      q.rows.map(row=>[String(row.id),row])
-    );
-
-    /*
-     * Preserve the exact order used by the attempt.
-     */
-    const questions=reviewIds
+    const byId=new Map(q.rows.map(row=>[String(row.id),row]));
+    const questions=questionIds
       .map(id=>byId.get(String(id)))
       .filter(Boolean)
       .map(row=>({
@@ -1655,13 +1588,7 @@ api.get('/attempts/:id/review', requirePasswordReady, async (req,res)=>{
         difficulty:String(row.difficulty||'')
       }));
 
-    return res.json({
-      ok:true,
-      attemptId,
-      mode:attempt.mode,
-      questions
-    });
-
+    return res.json({ok:true,attemptId,mode:attempt.mode,questions});
   }catch(e){
     console.error('Attempt review error:',e);
     return sendError(res,500,'Review service error.');
@@ -2878,10 +2805,10 @@ api.use('/mock/questions', requirePasswordReady, async (req,res,next)=>{
       ) bucket=0;
 
       const complex=
-        /statement|statements|assertion|reason|cause|effect|match|matching|pair|sequence|arrange|order|select the correct|which of the following/.test(t);
+        /statement|statements|assertion|reason|cause|effect|match|matching|pair|sequence|arrange|order|select the correct|which of the following|??????|?????????|??????|??????|?????????|?????|?????? ???|????????????????/.test(t);
 
       const quantitative=
-        /percentage|ratio|average|profit|loss|interest|discount|time and work|speed|distance|mixture|age|probability|data interpretation|series|equation|fraction/.test(t);
+        /percentage|ratio|average|profit|loss|interest|discount|time and work|speed|distance|mixture|age|probability|data interpretation|series|equation|fraction|???????|???????|??????|??????|??????|?????|????????|????|?????|?????|????|????|?????????|????|?????|????????|???????/.test(t);
 
       let score=0;
       if(complex) score+=3;
@@ -4152,8 +4079,8 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
       const words=text.split(' ').filter(Boolean).length;
       const directFact=/^(who|where|when|what is|what was|which is|which was|identify|name the|who was|where was|when was)\b/.test(text)
         || /^(????|????|?????|???????|???|???|????|???????? ?????|????????)\b/.test(text);
-      const complex=/statement|statements|assertion|reason|cause|effect|match|matching|pair|sequence|arrange|order|select the correct|which of the following ???|???????????????/.test(text);
-      const quantitative=/percentage|ratio|average|profit|loss|interest|discount|time and work|speed|distance|mixture|age|probability|data interpretation|series|equation|fraction/.test(text);
+      const complex=/statement|statements|assertion|reason|cause|effect|match|matching|pair|sequence|arrange|order|select the correct|which of the following|??????|?????????|??????|??????|?????????|?????|?????? ???|???????????????? ???|???????????????/.test(text);
+      const quantitative=/percentage|ratio|average|profit|loss|interest|discount|time and work|speed|distance|mixture|age|probability|data interpretation|series|equation|fraction|???????|???????|??????|??????|??????|?????|????????|????|?????|?????|????|????|?????????|????|?????|????????|???????/.test(text);
       const long=words>=24 || text.length>=125;
       const optionText=Array.isArray(q.options)?q.options.map(normalizeText).join(' '):'';
       const richOptions=optionText.split(' ').filter(Boolean).length>=18;
