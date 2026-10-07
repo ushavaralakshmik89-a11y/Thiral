@@ -1429,7 +1429,7 @@ api.post('/attempts/:id/check-answer', requirePasswordReady, async (req,res)=>{
     }
 
     const attemptResult=await pool.query(
-      `SELECT id,status,question_ids
+      `SELECT id,status,question_ids,mode
        FROM attempts
        WHERE id=$1 AND user_id=$2
        LIMIT 1`,
@@ -1442,7 +1442,7 @@ api.post('/attempts/:id/check-answer', requirePasswordReady, async (req,res)=>{
 
     const attempt=attemptResult.rows[0];
 
-    if(attempt.status==='SUBMITTED') {
+    if(attempt.status==='SUBMITTED' && attempt.mode!=='mock') {
       return sendError(res,409,'Attempt already submitted.');
     }
 
@@ -1523,26 +1523,6 @@ api.post('/attempts/:id/submit', requirePasswordReady, async (req,res)=>{
 
     await pool.query(`UPDATE attempts SET status='SUBMITTED',score=$1,correct_count=$2,total_count=$3,submitted_at=now() WHERE id=$4`,[score,correct,total,id]);
     await pool.query(`INSERT INTO activity_events(user_id,event_type,metadata) VALUES($1,'ATTEMPT_SUBMITTED',$2)`,[req.user.id,JSON.stringify({attempt_id:id,mode:attempt.mode,exam:attempt.exam,score,used_questions:total,unanswered})]);
-    if(attempt.mode==='mock'){
-      const reviewResult=usedIds.length
-        ? await pool.query(`SELECT id,question,options,correct_option,explanation FROM questions WHERE id=ANY($1::bigint[]) ORDER BY array_position($1::bigint[],id)`,[usedIds])
-        : {rows:[]};
-      const review=reviewResult.rows.map(q=>{
-        const raw=answers[String(q.id)] ?? answers[q.id];
-        const selected=Number(raw);
-        return {
-          id:Number(q.id),
-          question:q.question,
-          options:q.options,
-          selected_answer:Number.isInteger(selected) ? selected : -1,
-          correct:Number.isInteger(selected) && selected===Number(q.correct_option),
-          correct_option:Number(q.correct_option),
-          explanation:q.explanation || ''
-        };
-      });
-      return res.json({score,correct,total,unanswered,usedQuestionIds:usedIds,review});
-    }
-
     res.json({score,correct,total,unanswered,usedQuestionIds:usedIds});
   }catch(e){console.error(e);sendError(res,500,'Grading service error.');}
 });
