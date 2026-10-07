@@ -2845,6 +2845,150 @@ api.use('/mock/questions', requirePasswordReady, async (req,res,next)=>{
       };
     };
 
+
+    /*
+      V7 FIX:
+      V6 called selectCoverage(), but that helper was accidentally omitted
+      while the V5/V6 pool builder was being replaced. That causes:
+        ReferenceError: selectCoverage is not defined
+      and the Mock API returns an error instead of questions.
+
+      This helper is intentionally additive. It does not modify any existing
+      question-bank row and does not use the old 3000-row route.
+    */
+    const selectCoverage=(pool,target)=>{
+      const selected=[];
+      const selectedIds=new Set();
+      const selectedContent=new Set();
+      const topicCount=new Map();
+      const subCount=new Map();
+
+      const takeBestFrom=rows=>{
+        const usable=rows.filter(q=>
+          !selectedIds.has(Number(q.id)) &&
+          !selectedContent.has(contentKeyV4(q))
+        );
+
+        if(!usable.length) return null;
+
+        usable.sort((a,b)=>{
+          if((b._difficulty||0)!==(a._difficulty||0)){
+            return (b._difficulty||0)-(a._difficulty||0);
+          }
+          return Math.random()-0.5;
+        });
+
+        return usable[0];
+      };
+
+      /* Phase 1: represent as many mapped topics as possible. */
+      const topicEntries=shuffleV4([...pool.byTopic.entries()]);
+
+      for(const [topic,subMap] of topicEntries){
+        if(selected.length>=target) break;
+
+        const subEntries=shuffleV4([...subMap.entries()]);
+        let picked=null;
+
+        for(const [,rows] of subEntries){
+          picked=takeBestFrom(rows);
+          if(picked) break;
+        }
+
+        if(picked){
+          selected.push(picked);
+          selectedIds.add(Number(picked.id));
+          selectedContent.add(contentKeyV4(picked));
+
+          topicCount.set(topic,(topicCount.get(topic)||0)+1);
+          subCount.set(
+            picked._subtopic,
+            (subCount.get(picked._subtopic)||0)+1
+          );
+        }
+      }
+
+      /* Phase 2: represent as many different subtopics as possible. */
+      const subEntries=shuffleV4([...pool.bySubtopic.entries()]);
+
+      for(const [subtopic,rows] of subEntries){
+        if(selected.length>=target) break;
+
+        const normalizedSubtopic=normalizeTextV4(subtopic);
+        if(subCount.has(normalizedSubtopic)) continue;
+
+        const picked=takeBestFrom(rows);
+        if(!picked) continue;
+
+        selected.push(picked);
+        selectedIds.add(Number(picked.id));
+        selectedContent.add(contentKeyV4(picked));
+
+        const topic=picked._topic;
+        topicCount.set(topic,(topicCount.get(topic)||0)+1);
+        subCount.set(
+          picked._subtopic,
+          (subCount.get(picked._subtopic)||0)+1
+        );
+      }
+
+      /*
+        Phase 3: balanced fill.
+        Lower usage of a topic/subtopic gets priority; difficulty is a
+        secondary quality signal, so the mock does not become a parade of
+        trivial one-line questions.
+      */
+      while(selected.length<target){
+        const allRows=[];
+
+        for(const rows of pool.bySubtopic.values()){
+          for(const q of rows){
+            if(
+              !selectedIds.has(Number(q.id)) &&
+              !selectedContent.has(contentKeyV4(q))
+            ){
+              allRows.push(q);
+            }
+          }
+        }
+
+        if(!allRows.length) break;
+
+        allRows.sort((a,b)=>{
+          const sa=
+            (subCount.get(a._subtopic)||0)*100 +
+            (topicCount.get(a._topic)||0)*20 -
+            (a._difficulty||0)*3;
+
+          const sb=
+            (subCount.get(b._subtopic)||0)*100 +
+            (topicCount.get(b._topic)||0)*20 -
+            (b._difficulty||0)*3;
+
+          if(sa!==sb) return sa-sb;
+          return Math.random()-0.5;
+        });
+
+        const picked=allRows[0];
+
+        selected.push(picked);
+        selectedIds.add(Number(picked.id));
+        selectedContent.add(contentKeyV4(picked));
+
+        topicCount.set(
+          picked._topic,
+          (topicCount.get(picked._topic)||0)+1
+        );
+
+        subCount.set(
+          picked._subtopic,
+          (subCount.get(picked._subtopic)||0)+1
+        );
+      }
+
+      return selected;
+    };
+
     const pools=[];
     for(const spec of specs){
       pools.push({
