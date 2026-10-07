@@ -1486,7 +1486,18 @@ api.post('/attempts/:id/submit', requirePasswordReady, async (req,res)=>{
     const a=await pool.query(`SELECT * FROM attempts WHERE id=$1 AND user_id=$2 LIMIT 1`,[id,req.user.id]);
     if(!a.rowCount) return sendError(res,404,'Attempt not found.');
     const attempt=a.rows[0];
-    if(attempt.status==='SUBMITTED') return res.json({score:attempt.score,correct:attempt.correct_count,total:attempt.total_count});
+    if(attempt.status==='SUBMITTED') {
+      const reviewIds=Array.isArray(attempt.question_ids) ? attempt.question_ids.map(Number) : [];
+      const reviewQ=reviewIds.length
+        ? await pool.query(`SELECT id,correct_option FROM questions WHERE id=ANY($1::bigint[])`,[reviewIds])
+        : {rows:[]};
+      return res.json({
+        score:attempt.score,
+        correct:attempt.correct_count,
+        total:attempt.total_count,
+        review:reviewQ.rows.map(q=>({question_id:Number(q.id),correct_option:Number(q.correct_option)}))
+      });
+    }
     const answers=req.body?.answers && typeof req.body.answers==='object' ? req.body.answers : {};
     const allIds=Array.isArray(attempt.question_ids) ? attempt.question_ids.map(Number) : [];
     /* For Question Bank, only questions actually reached/answered in this
@@ -1523,7 +1534,20 @@ api.post('/attempts/:id/submit', requirePasswordReady, async (req,res)=>{
 
     await pool.query(`UPDATE attempts SET status='SUBMITTED',score=$1,correct_count=$2,total_count=$3,submitted_at=now() WHERE id=$4`,[score,correct,total,id]);
     await pool.query(`INSERT INTO activity_events(user_id,event_type,metadata) VALUES($1,'ATTEMPT_SUBMITTED',$2)`,[req.user.id,JSON.stringify({attempt_id:id,mode:attempt.mode,exam:attempt.exam,score,used_questions:total,unanswered})]);
-    res.json({score,correct,total,unanswered,usedQuestionIds:usedIds});
+    res.json({
+      score,
+      correct,
+      total,
+      unanswered,
+      usedQuestionIds:usedIds,
+      /* Mock Test Review needs the correct option for each submitted question.
+         The frontend already owns the question text/options, so only the
+         server-authoritative answer index is returned here. */
+      review:qs.rows.map(q=>({
+        question_id:Number(q.id),
+        correct_option:Number(q.correct_option)
+      }))
+    });
   }catch(e){console.error(e);sendError(res,500,'Grading service error.');}
 });
 
@@ -2824,7 +2848,7 @@ api.use('/mock/questions', requirePasswordReady, async (req,res,next)=>{
            * No artificial LIMIT can hide valid questions.
            */
           const r=await client.query(
-            `SELECT id,exam,subject,subtopic,language,question,options,explanation,correct_option,
+            `SELECT id,exam,subject,subtopic,language,question,options,explanation,
                     COALESCE(to_jsonb(questions)->>'difficulty',
                              to_jsonb(questions)->>'level','') AS difficulty
                FROM questions
@@ -2853,7 +2877,7 @@ api.use('/mock/questions', requirePasswordReady, async (req,res,next)=>{
           const perTopic=12;
           const r=await client.query(
             `WITH fresh AS (
-               SELECT id,exam,subject,subtopic,language,question,options,explanation,correct_option,
+               SELECT id,exam,subject,subtopic,language,question,options,explanation,
                       COALESCE(to_jsonb(questions)->>'difficulty',
                                to_jsonb(questions)->>'level','') AS difficulty,
                       row_number() OVER(
@@ -2873,7 +2897,7 @@ api.use('/mock/questions', requirePasswordReady, async (req,res,next)=>{
                        AND h.mode='mock'
                   )
              )
-             SELECT id,exam,subject,subtopic,language,question,options,explanation,correct_option,difficulty
+             SELECT id,exam,subject,subtopic,language,question,options,explanation,difficulty
                FROM fresh
               WHERE rn <= $5
               ORDER BY id`,
@@ -2890,7 +2914,7 @@ api.use('/mock/questions', requirePasswordReady, async (req,res,next)=>{
             const used=new Set(rows.map(q=>String(q.id)));
 
             const r2=await client.query(
-              `SELECT id,exam,subject,subtopic,language,question,options,explanation,correct_option,
+              `SELECT id,exam,subject,subtopic,language,question,options,explanation,
                       COALESCE(to_jsonb(questions)->>'difficulty',
                                to_jsonb(questions)->>'level','') AS difficulty
                  FROM questions
@@ -3092,7 +3116,7 @@ api.use('/mock/questions', requirePasswordReady, async (req,res,next)=>{
       if(difficultyChosen.length<spec.count && freshTotal>=spec.count){
 
         const r3=await client.query(
-          `SELECT id,exam,subject,subtopic,language,question,options,explanation,correct_option,
+          `SELECT id,exam,subject,subtopic,language,question,options,explanation,
                   COALESCE(to_jsonb(questions)->>'difficulty',
                            to_jsonb(questions)->>'level','') AS difficulty
              FROM questions
@@ -3138,7 +3162,7 @@ api.use('/mock/questions', requirePasswordReady, async (req,res,next)=>{
       if(difficultyChosen.length<spec.count && freshTotal<spec.count){
 
         const recycle=await client.query(
-          `SELECT id,exam,subject,subtopic,language,question,options,explanation,correct_option,
+          `SELECT id,exam,subject,subtopic,language,question,options,explanation,
                   COALESCE(to_jsonb(questions)->>'difficulty',
                            to_jsonb(questions)->>'level','') AS difficulty
              FROM questions
@@ -3924,7 +3948,7 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
     const all=[];
     for(const spec of specs){
       const r=await client.query(
-        `SELECT id,exam,subject,subtopic,language,question,options,'' AS explanation,correct_option,
+        `SELECT id,exam,subject,subtopic,language,question,options,'' AS explanation,
                 COALESCE(to_jsonb(questions)->>'difficulty',to_jsonb(questions)->>'level','') AS difficulty
            FROM questions
           WHERE exam=$1
@@ -4091,7 +4115,7 @@ api.get('/mock/questions', requirePasswordReady, async (req,res)=>{
       const recycleAll=[];
       for(const spec of specs){
         const r=await client.query(
-          `SELECT id,exam,subject,subtopic,language,question,options,'' AS explanation,correct_option,
+          `SELECT id,exam,subject,subtopic,language,question,options,'' AS explanation,
                   COALESCE(to_jsonb(questions)->>'difficulty',to_jsonb(questions)->>'level','') AS difficulty
              FROM questions
             WHERE exam=$1
