@@ -6128,14 +6128,11 @@ window.startPractice=async function(n){
       if(!isAnswered){status='⚪ விடையளிக்கவில்லை';cls='warn';}
       else if(isCorrect){status='✅ சரி';cls='good';}
       else{status='❌ தவறு';cls='bad';}
-      var ex=String(r.explanation||q.e||q.explanation||'').trim();
-      var showCorrect=hasCorrect;
       return '<div class="card" style="box-shadow:none;border:1px solid #e5e7eb;margin-bottom:12px;padding:15px;">'+
         '<div><b>'+esc(i+1)+'. '+esc(q.q||q.question||'')+'</b></div>'+
         '<p><b>உங்கள் விடை:</b> '+esc(your)+'</p>'+
-        (showCorrect?'<p><b>சரியான விடை:</b> '+esc(right)+'</p>':'')+
+        '<p><b>சரியான பதில்:</b> '+esc(right)+'</p>'+
         '<p class="'+cls+'" style="font-size:18px;font-weight:800;">'+status+'</p>'+
-        (showCorrect && ex?'<p class="small"><b>விளக்கம்:</b> '+esc(ex)+'</p>':'')+
         '</div>';
     }).join('');
     if(legacy) legacy.innerHTML=html;
